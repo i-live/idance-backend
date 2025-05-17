@@ -11,7 +11,7 @@ erDiagram
         timestamptz created_at
         timestamptz updated_at
         string email "From auth.users"
-        -- etc (other auth.users fields)
+        %% etc (other auth.users fields)
     }
 
     profiles {
