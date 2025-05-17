@@ -16,7 +16,7 @@ erDiagram
 
     profiles {
         uuid user_id PK FK_users_id
-        text username UK "For username.idance.live"
+        text username UK "For username idance live"
         text first_name
         text last_name
         date date_of_birth
