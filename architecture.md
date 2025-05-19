@@ -20,13 +20,13 @@ graph TD
     Supabase -->|User Management| AuthN["Auth: Email/Pass, Social (Future)"]
     Supabase -->|Data Persistence| DB[("PostgreSQL Database w/ PostGIS")]
     Supabase -->|Business Logic| EdgeFuncs{"Edge Functions (Deno/TypeScript)"}
-    Supabase -->|Real-time Comms| RT[Realtime Service (Chat, Notifications)]
-    Supabase -->|Media Storage| Store[Storage (User Photos/Videos)]
+    Supabase -->|Real-time Comms| "RT[Realtime Service (Chat, Notifications)"]
+    Supabase -->|Media Storage| "Store[Storage (User Photos/Videos)"]
 
-    UserDevice -->|API Calls (Authenticated)| EdgeFuncs
+    UserDevice -->|"API Calls (Authenticated)"| EdgeFuncs
     EdgeFuncs -->|CRUD, Logic, Geo-queries| DB
     EdgeFuncs -->|Auth Checks| AuthN
-    UserDevice -->|Subscribe/Publish (Chat)| RT
+    UserDevice -->|"Subscribe/Publish (Chat)"| RT
     UserDevice -->|Upload/Download Media| Store
 
     AdminUser[Admin User] -->|Web Interface/Direct| SupabaseDashboard[Supabase Dashboard]
