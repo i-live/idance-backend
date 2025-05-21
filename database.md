@@ -6,125 +6,116 @@ This document details the PostgreSQL database schema for the "iDance" applicatio
 
 ```mermaid
 erDiagram
+    users ||--o{ profiles : has
     users {
-        uuid id PK "References auth.users.id"
-        timestamptz created_at
-        timestamptz updated_at
-        string email "From auth.users"
-        %% etc (other auth.users fields)
+        uuid id PK
+        timestamp created_at
+        timestamp updated_at
+        string email
     }
 
     profiles {
-        uuid user_id PK FK_users_id
-        text username UK "Unique username"
-        text first_name
-        text last_name
+        uuid user_id FK
+        string username UK
+        string first_name
+        string last_name
         date date_of_birth
-        text gender "ENUM: Male, Female, Non-binary, Other, Prefer not to say"
-        integer height_cm "Height in cm"
-        integer weight_kg "Weight in kg (optional, consider privacy)"
-        text build "ENUM: Slim, Athletic, Average, Muscular, Curvy, Other, Prefer not to say"
-        text bio "User's biography"
-        jsonb dance_styles "Array of selected dance styles"
-        text skill_level "ENUM: Beginner, Intermediate, Advanced, Professional, Social/Fun"
-        boolean partner_seeking_status "True if actively seeking a partner"
-        text location_city
-        text location_state
-        text location_country
-        float latitude "For PostGIS"
-        float longitude "For PostGIS"
-        text profile_picture_url
-        jsonb portfolio_items "Array of {type: 'image'/'video', url: '', caption: ''}"
-        boolean is_pro_user "Default: false"
-        text pro_custom_domain UK "Nullable"
-        timestamptz pro_subscription_ends_at "Nullable"
-        text verification_status "ENUM: none, pending, verified, rejected. Default: none"
-        timestamptz verified_at "Nullable"
-        timestamptz last_active_at "Default: now()"
-        timestamptz created_at "Default: now()"
-        timestamptz updated_at "Default: now()"
+        string gender
+        int height_cm
+        int weight_kg
+        string build
+        string bio
+        json dance_styles
+        string skill_level
+        boolean partner_seeking_status
+        string location_city
+        string location_state
+        string location_country
+        float latitude
+        float longitude
+        string profile_picture_url
+        json portfolio_items
+        boolean is_pro_user
+        string pro_custom_domain
+        timestamp pro_subscription_ends_at
+        string verification_status
+        timestamp verified_at
+        timestamp last_active_at
+        timestamp created_at
+        timestamp updated_at
     }
 
     user_preferences {
-        uuid user_id PK FK_users_id
-        jsonb discovery_dance_styles "Array of dance styles to discover"
-        text discovery_skill_levels "Array of skill levels to discover"
-        integer discovery_min_age
-        integer discovery_max_age
-        integer discovery_distance_miles "Default: 50"
-        boolean notifications_new_match "Default: true"
-        boolean notifications_new_message "Default: true"
-        boolean notifications_new_like "Default: true"
-        timestamptz updated_at "Default: now()"
+        uuid user_id PK
+        json discovery_styles
+        json discovery_levels
+        int min_age
+        int max_age
+        int distance_miles
+        boolean notify_match
+        boolean notify_message
+        boolean notify_like
+        timestamp updated_at
     }
 
     swipes {
-        uuid swiper_user_id PK FK_users_id
-        uuid swiped_user_id PK FK_users_id_target "User ID of the profile being swiped on"
-        text swipe_type "ENUM: like, pass, superlike"
-        timestamptz created_at "Default: now()"
+        uuid swiper_id PK
+        uuid swiped_id PK
+        string type
+        timestamp created_at
     }
 
     matches {
-        uuid id PK "Default: uuid_generate_v4()"
-        uuid user1_id FK_users_id
-        uuid user2_id FK_users_id_other
-        timestamptz created_at "Default: now()"
-        -- Constraint: user1_id < user2_id to ensure unique pairs
+        uuid id PK
+        uuid user1_id FK
+        uuid user2_id FK
+        timestamp created_at
     }
 
     chats {
-        uuid id PK "Default: uuid_generate_v4()"
-        uuid match_id FK_matches_id UK "One chat per match"
-        uuid last_message_id FK_messages_id "Nullable, for quick preview"
-        timestamptz user1_last_read_at "Nullable"
-        timestamptz user2_last_read_at "Nullable"
-        timestamptz created_at "Default: now()"
-        timestamptz updated_at "Default: now()"
+        uuid id PK
+        uuid match_id FK
+        uuid last_msg_id FK
+        timestamp user1_read
+        timestamp user2_read
+        timestamp created_at
+        timestamp updated_at
     }
 
     messages {
-        uuid id PK "Default: uuid_generate_v4()"
-        uuid chat_id FK_chats_id
-        uuid sender_id FK_users_id
-        text content_type "ENUM: text, image, video_thumbnail. Default: text"
-        text content "The actual message text"
-        text media_url "URL if content_type is image/video"
-        timestamptz created_at "Default: now()"
+        uuid id PK
+        uuid chat_id FK
+        uuid sender_id FK
+        string type
+        string content
+        string media_url
+        timestamp created_at
     }
 
     waitlist_entries {
-        uuid id PK "Default: uuid_generate_v4()"
-        text email UK
-        text first_name
-        text last_name
-        text username_preference
-        text gender_preference
-        jsonb dance_styles_preference
-        text skill_level_preference
-        text location_city_preference
-        text notes "Internal notes from admin review"
-        text status "ENUM: pending_email_verification, pending_application, pending_review, approved, imported, rejected. Default: pending_email_verification"
-        timestamptz submitted_at "Default: now()"
-        timestamptz processed_at "Nullable"
-        text source "e.g., prelaunch_site_v1, systeme_io_form"
+        uuid id PK
+        string email UK
+        string first_name
+        string last_name
+        string username
+        string gender
+        json dance_styles
+        string skill_level
+        string location
+        string notes
+        string status
+        timestamp submitted_at
+        timestamp processed_at
+        string source
     }
 
-    users ||--o{ profiles : "has"
-    users ||--o{ user_preferences : "has"
-    users ||--o{ swipes_initiated : "initiates"
-    users ||--o{ swipes_received : "receives"
-    users ||--o{ matches_as_user1 : "is_user1_in"
-    users ||--o{ matches_as_user2 : "is_user2_in"
-    users ||--o{ messages : "sends"
-    users ||--o{ waitlist_entries : "may_create"
-
-    swipes_initiated }o--|| swipes : "swiper_user_id"
-    swipes_received }o--|| swipes : "swiped_user_id"
-    matches_as_user1 }o--|| matches : "user1_id"
-    matches_as_user2 }o--|| matches : "user2_id"
-    matches ||--o{ chats : "has_one"
-    chats ||--o{ messages : "contains"
+    users ||--o{ user_preferences : has
+    users ||--o{ swipes : swipes
+    users ||--o{ matches : matches
+    users ||--o{ messages : sends
+    users ||--o{ waitlist_entries : creates
+    matches ||--|| chats : has
+    chats ||--o{ messages : contains
 ```
 
 ## 2. Table Schemas
