@@ -16,18 +16,18 @@ iDance is a mobile application designed to connect dancers for various purposes,
 
 ```mermaid
 graph TD
-    UserDevice[User Device: React Native App w/ Expo on iOS/Android] -->|"HTTPS/WSS (Supabase SDK)"| Supabase[Supabase Backend Platform]
-    Supabase -->|User Management| AuthN["Auth: Email/Pass, Social (Future)"]
-    Supabase -->|Data Persistence| DB[("PostgreSQL Database w/ PostGIS")]
-    Supabase -->|Business Logic| EdgeFuncs{"Edge Functions (Deno/TypeScript)"}
-    Supabase -->|Real-time Comms| "RT[Realtime Service (Chat, Notifications)"]
-    Supabase -->|Media Storage| "Store[Storage (User Photos/Videos)"]
+    UserDevice[Mobile_App] -->|HTTPS/WSS| Supabase[Supabase]
+    Supabase -->|Auth| AuthN[Authentication]
+    Supabase -->|Data| DB[(PostgreSQL)]
+    Supabase -->|Logic| EdgeFuncs[Edge_Functions]
+    Supabase -->|Realtime| RT[Realtime]
+    Supabase -->|Storage| Store[Storage]
 
-    UserDevice -->|"API Calls (Authenticated)"| EdgeFuncs
-    EdgeFuncs -->|CRUD, Logic, Geo-queries| DB
-    EdgeFuncs -->|Auth Checks| AuthN
-    UserDevice -->|"Subscribe/Publish (Chat)"| RT
-    UserDevice -->|Upload/Download Media| Store
+    UserDevice -->|API| EdgeFuncs
+    EdgeFuncs -->|CRUD| DB
+    EdgeFuncs -->|Verify| AuthN
+    UserDevice -->|Chat| RT
+    UserDevice -->|Media| Store
 
     AdminUser[Admin User] -->|Web Interface/Direct| SupabaseDashboard[Supabase Dashboard]
     AdminUser -->|Web Interface| AdminPanel[Minimal Admin Panel (Web App)]

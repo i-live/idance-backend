@@ -6,43 +6,43 @@ This document details the PostgreSQL database schema for the "iDance" applicatio
 
 ```mermaid
 erDiagram
+    users ||--o{ profiles : has
     users {
-        uuid id PK "References auth.users.id"
+        uuid id PK
         timestamptz created_at
         timestamptz updated_at
-        string email "From auth.users"
-        %% etc (other auth.users fields)
+        string email
     }
 
     profiles {
-        uuid user_id PK FK_users_id
-        text username UK "Unique username"
-        text first_name
-        text last_name
+        uuid user_id FK
+        string username UK
+        string first_name
+        string last_name
         date date_of_birth
-        text gender "ENUM: Male, Female, Non-binary, Other, Prefer not to say"
-        integer height_cm "Height in cm"
-        integer weight_kg "Weight in kg (optional, consider privacy)"
-        text build "ENUM: Slim, Athletic, Average, Muscular, Curvy, Other, Prefer not to say"
-        text bio "User's biography"
-        jsonb dance_styles "Array of selected dance styles"
-        text skill_level "ENUM: Beginner, Intermediate, Advanced, Professional, Social/Fun"
-        boolean partner_seeking_status "True if actively seeking a partner"
-        text location_city
-        text location_state
-        text location_country
-        float latitude "For PostGIS"
-        float longitude "For PostGIS"
-        text profile_picture_url
-        jsonb portfolio_items "Array of {type: 'image'/'video', url: '', caption: ''}"
-        boolean is_pro_user "Default: false"
-        text pro_custom_domain UK "Nullable"
-        timestamptz pro_subscription_ends_at "Nullable"
-        text verification_status "ENUM: none, pending, verified, rejected. Default: none"
-        timestamptz verified_at "Nullable"
-        timestamptz last_active_at "Default: now()"
-        timestamptz created_at "Default: now()"
-        timestamptz updated_at "Default: now()"
+        string gender
+        int height_cm
+        int weight_kg
+        string build
+        string bio
+        json dance_styles
+        string skill_level
+        boolean partner_seeking_status
+        string location_city
+        string location_state
+        string location_country
+        float latitude
+        float longitude
+        string profile_picture_url
+        json portfolio_items
+        boolean is_pro_user
+        string pro_custom_domain
+        timestamptz pro_subscription_ends_at
+        string verification_status
+        timestamptz verified_at
+        timestamptz last_active_at
+        timestamptz created_at
+        timestamptz updated_at
     }
 
     user_preferences {
