@@ -16,44 +16,44 @@ iDance is a mobile application designed to connect dancers for various purposes,
 
 ```mermaid
 graph TD
-    UserDevice[User Device: React Native App w/ Expo on iOS/Android] -->|"HTTPS/WSS (Supabase SDK)"| Supabase[Supabase Backend Platform]
-    Supabase -->|User Management| AuthN["Auth: Email/Pass, Social (Future)"]
-    Supabase -->|Data Persistence| DB[("PostgreSQL Database w/ PostGIS")]
-    Supabase -->|Business Logic| EdgeFuncs{"Edge Functions (Deno/TypeScript)"}
-    Supabase -->|Real-time Comms| "RT[Realtime Service (Chat, Notifications)"]
-    Supabase -->|Media Storage| "Store[Storage (User Photos/Videos)"]
+    UserDevice[Mobile App] -->|HTTPS/WSS| Supabase[Supabase]
+    Supabase -->|Auth| AuthN[Authentication]
+    Supabase -->|Data| DB[(PostgreSQL)]
+    Supabase -->|Logic| EdgeFuncs[Edge Functions]
+    Supabase -->|Realtime| RT[Realtime]
+    Supabase -->|Storage| Store[Storage]
 
-    UserDevice -->|"API Calls (Authenticated)"| EdgeFuncs
-    EdgeFuncs -->|CRUD, Logic, Geo-queries| DB
-    EdgeFuncs -->|Auth Checks| AuthN
-    UserDevice -->|"Subscribe/Publish (Chat)"| RT
-    UserDevice -->|Upload/Download Media| Store
+    UserDevice -->|API| EdgeFuncs
+    EdgeFuncs -->|CRUD| DB
+    EdgeFuncs -->|Verify| AuthN
+    UserDevice -->|Chat| RT
+    UserDevice -->|Media| Store
 
-    AdminUser[Admin User] -->|Web Interface/Direct| SupabaseDashboard[Supabase Dashboard]
-    AdminUser -->|Web Interface| AdminPanel[Minimal Admin Panel (Web App)]
-    AdminPanel -->|API Calls| AdminEdgeFuncs{Admin-Specific Edge Functions}
-    AdminEdgeFuncs --> DB
+    Admin[Admin] -->|Interface| Dashboard[Supabase Dashboard]
+    Admin -->|Web UI| Panel[Admin Panel]
+    Panel -->|API| AdminFunc[Admin Functions]
+    AdminFunc -->|Data| DB
 
-    subgraph Pre-Launch & Waitlist System
+    subgraph PreLaunch[Pre-Launch System]
         direction LR
-        ProspectiveUser[Prospective User] -->|Browser| PrelaunchSite[prelaunch.idance.live (Static Site)]
-        PrelaunchSite -->|Email Form Submit| SystemeIOForms[Systeme.io Forms/Landing Page]
-        SystemeIOForms -->|Webhook/API (Future)| SupabaseWaitlistCapture[Edge Function: Capture to Waitlist Table]
-        SystemeIOForms -->|User Data| SystemeIOCRM[Systeme.io CRM (Email Sequences, Management)]
-        AdminUser -->|Manual Review| SystemeIOCRM
-        AdminUser -->|Approve/Import| WaitlistImportProcess[Process to Import to Main DB]
+        User[User] -->|Visit| Website[Landing Page]
+        Website -->|Submit| Forms[Systeme.io Forms]
+        Forms -->|Webhook| Waitlist[Waitlist Table]
+        Forms -->|Store| CRM[Systeme.io CRM]
+        Admin -->|Review| CRM
+        Admin -->|Import| DB
     end
 
-    subgraph Pro User Domain Handling (Post-MVP Refinement)
+    subgraph ProUser[Pro User System]
         direction LR
-        UserCustomDNS[User's Custom Domain DNS] -- CNAME --> Cloudflare[Cloudflare for idance.live]
-        Cloudflare -->|Forward/Proxy| ProfileServerLogic[Profile Serving Logic (e.g., Edge Function / Web App)]
-        ProfileServerLogic --> DB
+        DNS[Custom DNS] -->|CNAME| CDN[Cloudflare]
+        CDN -->|Proxy| Logic[Profile Logic]
+        Logic --> DB
     end
 
-    UserDevice -.->|Future: Epic 2| TimelineService[Timeline Feature Service]
-    UserDevice -.->|Future: Epic 3| CompetitionService[Competition Feature Service]
-    UserDevice -.->|Future: Post-MVP| IDVerificationService[ID Verification (3rd Party for Official, AI for Photo Match)]
+    UserDevice -.->|Future| Timeline[Timeline Service]
+    UserDevice -.->|Future| Competition[Competition Service]
+    UserDevice -.->|Future| Verify[ID Verification]
 ```
 
 ## 3. Frontend: React Native with Expo
