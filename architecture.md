@@ -34,26 +34,26 @@ graph TD
     Panel -->|API| AdminFunc[Admin Functions]
     AdminFunc -->|Data| DB
 
-    subgraph Pre-Launch & Waitlist System
+    subgraph PreLaunch[Pre-Launch System]
         direction LR
-        ProspectiveUser[Prospective User] -->|Browser| PrelaunchSite[prelaunch.idance.live (Static Site)]
-        PrelaunchSite -->|Email Form Submit| SystemeIOForms[Systeme.io Forms/Landing Page]
-        SystemeIOForms -->|Webhook/API (Future)| SupabaseWaitlistCapture[Edge Function: Capture to Waitlist Table]
-        SystemeIOForms -->|User Data| SystemeIOCRM[Systeme.io CRM (Email Sequences, Management)]
-        AdminUser -->|Manual Review| SystemeIOCRM
-        AdminUser -->|Approve/Import| WaitlistImportProcess[Process to Import to Main DB]
+        User[User] -->|Visit| Website[Landing Page]
+        Website -->|Submit| Forms[Systeme.io Forms]
+        Forms -->|Webhook| Waitlist[Waitlist Table]
+        Forms -->|Store| CRM[Systeme.io CRM]
+        Admin -->|Review| CRM
+        Admin -->|Import| DB
     end
 
-    subgraph Pro User Domain Handling (Post-MVP Refinement)
+    subgraph ProUser[Pro User System]
         direction LR
-        UserCustomDNS[User's Custom Domain DNS] -- CNAME --> Cloudflare[Cloudflare for idance.live]
-        Cloudflare -->|Forward/Proxy| ProfileServerLogic[Profile Serving Logic (e.g., Edge Function / Web App)]
-        ProfileServerLogic --> DB
+        DNS[Custom DNS] -->|CNAME| CDN[Cloudflare]
+        CDN -->|Proxy| Logic[Profile Logic]
+        Logic --> DB
     end
 
-    UserDevice -.->|Future: Epic 2| TimelineService[Timeline Feature Service]
-    UserDevice -.->|Future: Epic 3| CompetitionService[Competition Feature Service]
-    UserDevice -.->|Future: Post-MVP| IDVerificationService[ID Verification (3rd Party for Official, AI for Photo Match)]
+    UserDevice -.->|Future| Timeline[Timeline Service]
+    UserDevice -.->|Future| Competition[Competition Service]
+    UserDevice -.->|Future| Verify[ID Verification]
 ```
 
 ## 3. Frontend: React Native with Expo
