@@ -16,10 +16,10 @@ iDance is a mobile application designed to connect dancers for various purposes,
 
 ```mermaid
 graph TD
-    UserDevice[Mobile_App] -->|HTTPS/WSS| Supabase[Supabase]
+    UserDevice[Mobile App] -->|HTTPS/WSS| Supabase[Supabase]
     Supabase -->|Auth| AuthN[Authentication]
     Supabase -->|Data| DB[(PostgreSQL)]
-    Supabase -->|Logic| EdgeFuncs[Edge_Functions]
+    Supabase -->|Logic| EdgeFuncs[Edge Functions]
     Supabase -->|Realtime| RT[Realtime]
     Supabase -->|Storage| Store[Storage]
 
@@ -29,10 +29,10 @@ graph TD
     UserDevice -->|Chat| RT
     UserDevice -->|Media| Store
 
-    AdminUser[Admin User] -->|Web Interface/Direct| SupabaseDashboard[Supabase Dashboard]
-    AdminUser -->|Web Interface| AdminPanel[Minimal Admin Panel (Web App)]
-    AdminPanel -->|API Calls| AdminEdgeFuncs{Admin-Specific Edge Functions}
-    AdminEdgeFuncs --> DB
+    Admin[Admin] -->|Interface| Dashboard[Supabase Dashboard]
+    Admin -->|Web UI| Panel[Admin Panel]
+    Panel -->|API| AdminFunc[Admin Functions]
+    AdminFunc -->|Data| DB
 
     subgraph Pre-Launch & Waitlist System
         direction LR
