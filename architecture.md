@@ -94,7 +94,7 @@ iDance is a mobile application and web platform designed to facilitate connectin
     - Referral System
     - Analytics & Reports
 
-### 2.4 User Sites
+### 2.4 User Sites (Primary MVP Product)
 *   **Technology:**
     - Next.js
     - TypeScript
@@ -103,19 +103,24 @@ iDance is a mobile application and web platform designed to facilitate connectin
     - iDrive E2
 
 *   **Core Features:**
-    - Public Profile Site
-    - Custom Domain Support
-    - Portfolio Showcase
-    - Media Gallery
-    - Blog/Journal
-    - Contact Forms
+    - Personal dance website at `username.idance.live`
+    - Professional portfolio showcase
+    - Media gallery with optimization
+    - Dance journal/blog
+    - SEO-optimized profiles
+    - Custom domain mapping
+    - Social media integration
+    - Contact forms with spam protection
 
-*   **Admin Interface:**
-    - Site Customization
-    - Content Management
-    - Analytics Dashboard
-    - Media Library
-    - Domain Management
+*   **User Admin Portal:**
+    - Site theme customization
+    - Content management system
+    - Visitor analytics
+    - Referral tracking dashboard
+    - Media library
+    - Domain settings
+    - SEO tools
+    - Commission tracking
 
 ## 3. Infrastructure & Services
 
@@ -144,32 +149,44 @@ iDance is a mobile application and web platform designed to facilitate connectin
     - Edge Functions
 
 ### 3.3 Domain & DNS
-*   **Components:**
-    - Dynadot (Domain Registrar)
-    - Cloudflare (DNS/CDN)
-    - SSL Management
-    - Custom Domain Support
+*   **Core Setup:**
+    - Cloudflare for `idance.live` domain
+    - Automatic SSL for all subdomains
+    - CDN for global performance
+    - CNAME setup for custom domains
+
+*   **Custom Domain Support:**
+    - Simple documentation for CNAME setup
+    - Users can point their domains to `sites.idance.live`
+    - Automatic SSL via Cloudflare
+    - Zero additional cost for the platform
 
 ## 4. Business Features
 
 ### 4.1 User Tiers
-*   **Basic (Free):**
-    - Basic profile features
-    - Limited swipes
-    - Basic timeline access
-    - Standard chat
+*   **Initial Launch (Free):**
+    - Personal `username.idance.live` subdomain
+    - Full featured portfolio site
+    - Media gallery and blog
+    - Contact form
+    - Basic analytics
+    - Custom domain support (via CNAME)
+    - Basic SEO tools
+    - Referral tracking
 
-*   **Pro ($19.99/mo):**
-    - Enhanced features
-    - Unlimited swipes
-    - Custom domain
-    - Referral commissions
+*   **Pro Tier (Future):**
+    - To be introduced after company setup
+    - Enhanced analytics
+    - Priority support
+    - Premium themes
+    - Advanced SEO tools
+    - Commission payouts
 
-*   **VIP (Earned):**
-    - All Pro features
-    - Special perks
-    - Priority features
-    - Enhanced visibility
+*   **VIP (Future - Earned):**
+    - Recognition for top creators
+    - Special profile badges
+    - Early feature access
+    - Community leadership opportunities
 
 ### 4.2 Referral System
 *   **Features:**
@@ -178,29 +195,42 @@ iDance is a mobile application and web platform designed to facilitate connectin
     - Automated payouts
     - Analytics dashboard
 
-## 5. Launch Strategy
+## 5. Launch Strategy: User Sites First
 
-### 5.1 Pre-Launch
-*   **Phase 1: Signup**
-    - Landing page
-    - Waitlist system
-    - Referral tracking
+### 5.1 Initial Launch: Personal Dance Sites
+*   **Direct Value Proposition**
+    - Instant `username.idance.live` subdomain upon signup
+    - Portfolio site with media gallery and blog
+    - Built-in SEO optimization
+    - Contact forms and social links
+    - Custom domain support
+    - Analytics dashboard
 
-*   **Phase 2: Engagement**
-    - Profile completion
-    - Email communication
-    - Community building
+*   **Admin Portal Access**
+    - Site customization tools
+    - Content management
+    - Visitor analytics
+    - Referral system tracking
+    - SEO settings
 
-*   **Phase 3: Activation**
-    - User review
-    - Account activation
-    - Feature enablement
+*   **Built-in Growth Engine**
+    - Users share their iDance sites on social media
+    - Referral tracking from day one
+    - Commission system for Pro signups
+    - SEO drives organic growth
 
-### 5.2 Launch Perks
-*   Free Pro membership (1 year)
-*   Custom website access
-*   Early referral benefits
-*   Professional features
+### 5.2 Phase Two: Mobile App Launch
+*   **Data-Driven Features**
+    - Pre-built network of verified dancers
+    - Existing content for timeline/social features
+    - Ready user base for matching algorithm
+    - Proven user engagement metrics
+
+*   **Natural Platform Evolution**
+    - Web users transition to mobile features
+    - Integration between sites and app
+    - Cross-platform content sharing
+    - Unified analytics and tracking
 
 ## 6. Technical Architecture
 
@@ -275,29 +305,7 @@ graph TD
     - Preview Deployments
     - Production Release
 
-## 8. Future Roadmap
-
-### 8.1 MVP Launch
-*   Core authentication
-*   Basic profiles
-*   Matching system
-*   Timeline/Journal
-*   Chat functionality
-*   Referral system
-
-### 8.2 Near-term Enhancements
-*   Advanced matching
-*   Enhanced timeline
-*   Content moderation
-*   Analytics improvements
-
-### 8.3 Future Features
-*   ID verification
-*   AI matchmaking
-*   Advanced analytics
-*   Community features
-
-## 9. Technology Stack Summary
+## 8. Technology Stack Summary
 *   **Frontend:** React Native (TypeScript), Next.js (TypeScript)
 *   **Backend:** Supabase, Edge Functions (TypeScript)
 *   **Storage:** iDrive E2
