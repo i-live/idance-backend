@@ -29,7 +29,7 @@ graph TD
     EdgeFuncs -->|Referral Logic| DB
     EdgeFuncs -->|Timeline Logic| DB
     UserDevice -->|Chat| RT
-    UserDevice -->|Media (Profile, Journal)| Store
+    UserDevice -->|"Media (Profile, Journal)"| Store
 
     Admin[Admin] -->|Interface| Dashboard[Supabase Dashboard/Custom Admin Panel]
     Admin -->|Web UI| Panel[Admin Panel]
