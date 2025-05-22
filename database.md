@@ -15,7 +15,7 @@ erDiagram
     }
 
     profiles {
-        uuid user_id PK "PK, References users.id"
+        uuid user_id PK "FK to users.id"
         text username UK "Unique, for profile URL (username.idance.live)"
         text first_name "Not Null"
         text last_name "Not Null"
@@ -30,8 +30,8 @@ erDiagram
         text profile_status "Not Null, Default: 'pending_waitlist_approval', CHECK: ('pending_waitlist_approval', 'active', 'incomplete', 'suspended', 'vip')"
         text profile_picture_url "Nullable, valid URL"
         text user_tier "Not Null, Default: 'basic', CHECK: ('basic', 'pro', 'vip')"
-        text stripe_customer_id "Nullable, UK"
-        text stripe_subscription_id "Nullable, UK"
+        text stripe_customer_id UK "Nullable, Stripe Customer ID"
+        text stripe_subscription_id UK "Nullable, Stripe Subscription ID"
         text pro_subscription_status "Nullable (e.g., 'active', 'canceled', 'past_due', 'incomplete', 'trialing')"
         timestamptz pro_subscription_ends_at "Nullable"
         text location_city "Nullable"
@@ -50,8 +50,8 @@ erDiagram
     }
 
     user_dance_styles {
-        uuid user_id PK FK "References profiles.user_id"
-        integer dance_style_id PK FK "References dance_styles_lookup.id"
+        uuid user_id PK "Part of Composite PK, FK to profiles.user_id"
+        integer dance_style_id PK "Part of Composite PK, FK to dance_styles_lookup.id"
         text proficiency_level "Not Null, CHECK: ('Beginner', 'Intermediate', 'Advanced', 'Professional', 'Social/Fun')"
     }
 
@@ -69,8 +69,8 @@ erDiagram
     }
 
     user_interests {
-        uuid user_id PK FK "References profiles.user_id"
-        integer interest_id PK FK "References interests_lookup.id"
+        uuid user_id PK "Part of Composite PK, FK to profiles.user_id"
+        integer interest_id PK "Part of Composite PK, FK to interests_lookup.id"
     }
 
     social_platforms_lookup {
@@ -96,7 +96,7 @@ erDiagram
     }
 
     user_preferences {
-        uuid user_id PK "PK, References users.id"
+        uuid user_id PK "FK to users.id"
         jsonb discovery_dance_styles "Array of integer dance_style_ids for filtering"
         jsonb discovery_skill_levels "Array of text"
         integer discovery_min_age "CHECK >= 18"
@@ -112,8 +112,8 @@ erDiagram
     }
 
     swipes {
-        uuid swiper_user_id PK "Part of PK, FK to users.id (swiper)"
-        uuid swiped_user_id PK "Part of PK, FK to users.id (swiped)"
+        uuid swiper_user_id PK "Part of Composite PK, FK to users.id (swiper)"
+        uuid swiped_user_id PK "Part of Composite PK, FK to users.id (swiped)"
         text swipe_type "Not Null, CHECK: ('like', 'pass', 'superlike')"
         timestamptz created_at "Default: now()"
     }
@@ -127,7 +127,7 @@ erDiagram
 
     chats {
         uuid id PK "Default: uuid_generate_v4()"
-        uuid match_id FK "FK, UK, References matches.id, Not Null"
+        uuid match_id FK "Unique Key, References matches.id, Not Null"
         uuid last_message_id FK "References messages.id, Nullable, ON DELETE SET NULL"
         timestamptz user1_last_read_at "Nullable"
         timestamptz user2_last_read_at "Nullable"
@@ -139,7 +139,7 @@ erDiagram
         uuid id PK "Default: uuid_generate_v4()"
         uuid chat_id FK "References chats.id, Not Null"
         uuid sender_id FK "References users.id, Not Null"
-        text content_type "Not Null, Default: 'text', CHECK: ('text', 'image', 'video_thumbnail', 'audio_link')"
+        text content_type "Not Null, Default: 'text', CHECK: ('text', 'image', 'video_thumbnail', 'audio_link', 'system_message')"
         text content "Not Null"
         text media_url "Nullable, valid URL"
         timestamptz created_at "Default: now()"
@@ -163,7 +163,7 @@ erDiagram
     referrals {
         uuid id PK "Default: uuid_generate_v4()"
         uuid referrer_user_id FK "References users.id, Not Null (The one who referred)"
-        uuid referred_user_id FK "FK, UK, References users.id, Not Null (The one who was referred)"
+        uuid referred_user_id FK "Unique Key, References users.id, Not Null (The one who was referred)"
         text status "Not Null, Default: 'pending_activation', CHECK: ('pending_activation', 'active_basic', 'active_pro', 'lapsed_pro', 'commission_eligible')"
         integer referral_level "Not Null, Default: 1 (1 for direct, 2 for secondary, etc.)"
         uuid originating_referral_id FK "References referrals.id, Nullable (for multi-level tracking)"
@@ -178,9 +178,9 @@ erDiagram
         uuid paying_user_id FK "References users.id, Not Null (User whose Pro subscription generated commission)"
         numeric amount "Not Null, CHECK > 0"
         text currency "Not Null, Default: 'USD'"
-        text commission_type "Not Null, CHECK: ('direct_pro_signup', 'secondary_pro_signup', 'tertiary_pro_signup', 'pro_renewal')"
+        text commission_type "Not Null, CHECK: ('direct_pro_signup', 'secondary_pro_signup', 'tertiary_pro_signup', 'direct_pro_renewal', 'secondary_pro_renewal', 'tertiary_pro_renewal')"
         timestamptz transaction_date "Default: now()"
-        text status "Not Null, Default: 'pending', CHECK: ('pending', 'paid', 'failed', 'refunded')"
+        text status "Not Null, Default: 'pending_payout', CHECK: ('pending_payout', 'paid_out', 'failed', 'refunded', 'on_hold')"
         uuid payment_id "Nullable (e.g., Stripe transaction ID)"
     }
 
