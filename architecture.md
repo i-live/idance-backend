@@ -60,12 +60,12 @@ graph TD
     UserDevice -.->|Future| Verify[ID Verification]
 ```
 
-## 3. Frontend App: React Native with Expo & Web
+## 3. Frontend App: React Native with Expo
 
-*   **Platform:** React Native with Expo (Managed Workflow + EAS Build) for mobile; A modern web framework (e.g., Next.js, Remix, Astro, SvelteKit - TBD) for the web frontend.
-*   **Language:** TypeScript.
+*   **Platform:** React Native with Expo (Managed Workflow + EAS Build)
+*   **Language:** Javascript.
 *   **Core Responsibilities:**
-    *   User Interface (UI) and User Experience (UX) across platforms.
+    *   User Interface (UI) and User Experience (UX) across iOS and Android.
     *   Client-side state management.
     *   Communication with Supabase backend (Auth, Database, Edge Functions, Storage, Realtime).
     *   Handling user input and gestures.
@@ -84,7 +84,7 @@ graph TD
             *   View likes and comments
             *   Engagement analytics for post owners
         *   Post Detail Screen: Expanded view of a post with all comments
-        *   Swipe Screen (primarily mobile, potential web adaptation): Discovering and connecting with other dancers based on preferences.
+        *   Swipe Screen: Discovering and connecting with other dancers based on preferences.
         *   Profile Screen (Publicly viewable via web, editable by owner):
             *   View/Edit Own Profile: Comprehensive details - basic stats, description, preferences, dance styles (with proficiency levels), reels (videos), photos, audios, awards, other interests, social media links, looking for partners/jobs status, referrer information.
             *   View Other Users' Profiles.
@@ -97,14 +97,13 @@ graph TD
         *   Referral Dashboard Screen: Track referrals, commission status, and referral links/codes.
         *   Subscription Management Screen: View current tier (Basic, Pro, VIP), manage Pro subscription.
         *   Backoffice for Profile Site Customization.
-*   **Navigation:** React Navigation (Mobile), appropriate web routing solution (e.g., Next.js router).
+*   **Navigation:** React Navigation
 *   **State Management:** Zustand, Redux Toolkit, React Context, or framework-specific solutions (e.g., Svelte stores).
 *   **API Client:** Supabase JavaScript Client Library (`supabase-js`).
 *   **Deployment:**
-    *   Mobile: Expo Application Services (EAS) Build for app stores.
-    *   Web: Vercel, Netlify, Cloudflare Pages, or similar PaaS.
+    *   Expo Application Services (EAS) Build for app stores.
 
-## 4. Backend: Supabase
+## 4. Backend: Supabase + Supabase Edge Functions
 
 Supabase provides the BaaS (Backend as a Service) platform.
 
@@ -154,7 +153,6 @@ The pre-launch strategy focuses on generating early interest, onboarding initial
         *   Signup includes email, password, and an optional referrer code/username.
         *   Upon signup, user accounts are created in Supabase Auth.
         *   Corresponding entries in the `profiles` table are created with a `profile_status` of 'pending_waitlist_approval' (or similar).
-    *   **"Outgoing AI" Briefing Narrative:** Marketing communications may include the concept of an "outgoing AI" that briefs potential prelaunch participants on the platform and its benefits, encouraging early adoption and social sharing.
 
 *   **Phase 2: Profile Completion & Engagement**
     *   Users are encouraged to start filling out their profiles even while on the waitlist to expedite activation and enhance their future visibility.
@@ -251,9 +249,9 @@ The admin portal is built as a standalone Next.js application hosted on Cloudfla
         *   Trend analysis
         *   User behavior insights
 
-## 8. User Personal Frontend
+## 8. User Sites
 
-Each user gets a personalized frontend accessible via their subdomain (e.g., `user1.idance.live`), built using Next.js and hosted on Cloudflare Pages.
+Each user gets a personalized website accessible via their subdomain (e.g., `user1.idance.live` or their own domain if they link it up), built using Next.js and hosted on Cloudflare Pages.
 
 *   **Technology Stack:**
     *   Next.js for SSR and static generation
@@ -262,7 +260,7 @@ Each user gets a personalized frontend accessible via their subdomain (e.g., `us
     *   TailwindCSS for responsive design
     *   iDrive E2 for media storage
 
-*   **Public Site (`user1.idance.live`):**
+*   **Public Site (`user1.idance.live` or their own domain if they link it up):**
     *   Responsive, modern design
     *   Customizable templates
     *   Portfolio showcase
@@ -318,7 +316,13 @@ Each user gets a personalized frontend accessible via their subdomain (e.g., `us
 ## 11. Future Epics & Enhancements Roadmap (High-Level)
 
 *   **Epic 1: MVP Launch (Core Functionality)**
-    *   Auth, Comprehensive Profiles (including dance styles/proficiency, awards, social links, reels, photos, audios), Swiping, Matching, Chat, Direct Waitlist System, Core Referral System (signup, tracking, multi-level structure), Dance Journal & Timeline, Basic/Pro/VIP Tier Foundation (Pro Subscription payments can be activated post-initial user seeding, but structure in place).
+    *   Auth, Comprehensive Profiles (including dance styles/proficiency, social links, reels, photos, audios),
+    *   Swiping, Matching
+    *   Chat
+    *   Direct Waitlist System
+    *   Core Referral System (signup, tracking, multi-level structure)
+    *   Dance Journal & Timeline
+    *   Basic/Pro/VIP Tier Foundation (Pro Subscription payments can be activated post-initial user seeding, but structure in place).
     *   *Early Enhancement:* Simple auto-message prompt post-match, basic profile customization backoffice.
 *   **Epic 2: Full Pro Features & Monetization**
     *   Full Stripe integration for Pro subscriptions and commission payouts.
@@ -340,7 +344,7 @@ Each user gets a personalized frontend accessible via their subdomain (e.g., `us
 
 ## 12. Technology Choices Summary
 
-*   **Mobile App:** React Native with Expo (TypeScript)
+*   **Mobile App:** React Native with Expo (JS)
 *   **Web App:** Modern Web Framework (e.g., Next.js, Remix, Astro, SvelteKit - TypeScript, TBD)
 *   **Backend:** Supabase (Postgres, Auth, Edge Functions, Realtime, Storage)
 *   **Payment Processing:** Stripe
