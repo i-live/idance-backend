@@ -48,7 +48,7 @@ graph TD
     subgraph PreLaunchSignup[Pre-Launch Signup Flow]
         direction LR
         NewUser[Prospective User] -->|Visit Landing Page| WebFrontend[Web Frontend]
-        WebFrontend -->|Signup Form (with Referrer)| EdgeFuncs
+        WebFrontend -->|"Signup Form (with Referrer)"| EdgeFuncs
         EdgeFuncs -->|Create User (status: waitlist)| AuthN
         EdgeFuncs -->|Create Profile (status: waitlist)| DB
     end
