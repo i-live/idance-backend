@@ -24,6 +24,7 @@ erDiagram
         TEXT bio "Max 2000 chars"
         BOOLEAN looking_for_partners "Default false"
         BOOLEAN looking_for_jobs "Default false"
+        BOOLEAN looking_for_dancers "Default false"
         UUID referrer_id FK "References users"
         TEXT referral_code UK "Unique code"
         TEXT commission_tier "Tier level"
@@ -107,6 +108,12 @@ erDiagram
         INT discovery_distance_miles "Range"
         JSONB discovery_gender_preference "Preferences"
         BOOLEAN notifications_enabled "Default true"
+        TEXT search_location_city "Custom search city"
+        TEXT search_location_state "Custom search state"
+        TEXT search_location_country "Custom search country"
+        FLOAT8 search_latitude "Custom search PostGIS"
+        FLOAT8 search_longitude "Custom search PostGIS"
+        BOOLEAN use_custom_location "Default false"
         TIMESTAMPTZ updated_at "Auto-updated"
     }
 
@@ -215,6 +222,7 @@ erDiagram
 *   `bio` (TEXT, NULLABLE, CHECK: length up to 2000 chars)
 *   `looking_for_partners` (BOOLEAN, NOT NULL, Default: FALSE)
 *   `looking_for_jobs` (BOOLEAN, NOT NULL, Default: FALSE)
+*   `looking_for_dancers` (BOOLEAN, NOT NULL, Default: FALSE)
 *   `referrer_id` (UUID, NULLABLE, FK to `auth.users.id` ON DELETE SET NULL)
 *   `referral_code` (TEXT, UNIQUE, NULLABLE)
 *   `commission_tier` (TEXT, NULLABLE)
@@ -292,6 +300,12 @@ erDiagram
 *   `discovery_distance_miles` (INTEGER, NOT NULL, Default: 50)
 *   `discovery_gender_preference` (JSONB, NULLABLE, Default: '[]'::jsonb)
 *   `notifications_enabled` (BOOLEAN, NOT NULL, Default: TRUE)
+*   `search_location_city` (TEXT, NULLABLE)
+*   `search_location_state` (TEXT, NULLABLE)
+*   `search_location_country` (TEXT, NULLABLE)
+*   `search_latitude` (FLOAT8, NULLABLE)
+*   `search_longitude` (FLOAT8, NULLABLE)
+*   `use_custom_location` (BOOLEAN, NOT NULL, Default: FALSE)
 *   `updated_at` (TIMESTAMPTZ, Default: now())
 
 ## 3. Database Extensions

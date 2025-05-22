@@ -4,7 +4,7 @@ This document outlines the system architecture for the "iDance" mobile applicati
 
 ## 1. Overview
 
-iDance is a mobile application and web platform designed to connect dancers for various purposes, including finding dance partners, building professional networks, and fostering a vibrant community. It features comprehensive user profiles (showcasing dance styles, proficiency, reels, photos, awards, social links), a swipe-based search for connections, a personal dance journal that feeds into a main timeline, direct chat capabilities, and an integrated referral system. The initial development focuses on establishing these core functionalities alongside robust user authentication.
+iDance is a mobile application and web platform designed to facilitate connecting dancers to help find new dance partners, other dancers, dance jobs, building professional networks, and fostering a vibrant community. It features comprehensive user profiles (showcasing dance styles, proficiency, reels, photos, awards, social links), a swipe-based tinder-like matching system for connections, a tiktok-like timeline to showcase users' personal dance journal, direct chat capabilities, and an integrated referral system. The initial development focuses on establishing these core functionalities alongside robust user authentication.
 
 **Guiding Principles for Architecture:**
 *   **Rapid Development:** Prioritize technologies and approaches that enable quick iteration (React Native with Expo, Supabase, potentially a modern web framework like Next.js or Remix).
