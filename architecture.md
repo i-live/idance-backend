@@ -23,7 +23,7 @@ iDance is a mobile application and web platform designed to facilitate connectin
 ### 2.1 Mobile App (iOS/Android)
 *   **Technology:**
     - React Native with Expo
-    - Javascript
+    - TypeScript
     - EAS Build + Updates
     - Supabase Client SDK
     - React Navigation
@@ -298,9 +298,25 @@ graph TD
 *   Community features
 
 ## 9. Technology Stack Summary
-*   **Frontend:** React Native, Next.js
-*   **Backend:** Supabase, Edge Functions
+*   **Frontend:** React Native (TypeScript), Next.js (TypeScript)
+*   **Backend:** Supabase, Edge Functions (TypeScript)
 *   **Storage:** iDrive E2
 *   **Infrastructure:** Cloudflare
 *   **Payment:** Stripe
-*   **Tools:** pnpm, TypeScript
+*   **Development Tools:**
+    *   TypeScript for all components (mobile, web, backend)
+    *   pnpm for package management
+    *   ESLint + Prettier for code formatting
+    *   Jest for testing
+    *   GitHub Actions for CI/CD
+
+### Type Safety & Code Sharing
+
+*   Shared TypeScript types between:
+    *   Mobile app and web components
+    *   Frontend and backend (Supabase)
+    *   API interfaces and database schema
+*   Automatic type generation from database schema
+*   Strong typing for API responses and requests
+
+This architecture emphasizes type safety, code reuse, and maintainable development practices while enabling rapid iteration and scalability.
