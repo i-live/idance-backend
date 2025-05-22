@@ -1,7 +1,5 @@
 # iDance - System Architecture
 
-This document outlines the system architecture for the "iDance" mobile application and web platform.
-
 ## 1. Overview
 
 iDance is a mobile application and web platform designed to facilitate connecting dancers to help find new dance partners, other dancers, dance jobs, building professional networks, and fostering a vibrant community. It features comprehensive user profiles (showcasing dance styles, proficiency, reels, photos, awards, social links), a swipe-based tinder-like matching system for connections, a tiktok-like timeline to showcase users' dance journal, direct chat capabilities, and an integrated referral system. The initial development focuses on establishing these core functionalities alongside robust user authentication.
@@ -60,17 +58,23 @@ graph TD
     UserDevice -.->|Future| Verify[ID Verification]
 ```
 
-## 3. Frontend App: React Native with Expo
+## 3. Core Software Components
 
+### 3.1 Mobile App (iOS/Android)
 *   **Platform:** React Native with Expo (Managed Workflow + EAS Build)
-*   **Language:** Javascript.
-*   **Core Responsibilities:**
-    *   User Interface (UI) and User Experience (UX) across iOS and Android.
-    *   Client-side state management.
-    *   Communication with Supabase backend (Auth, Database, Edge Functions, Storage, Realtime).
-    *   Handling user input and gestures.
-    *   Requesting necessary device permissions (location, camera, photo library for mobile).
-*   **Key Modules/Screens (across Mobile & Web where applicable):**
+*   **Language:** Javascript
+*   **Deployment:** EAS Build for app stores, EAS Update for OTA updates
+*   **Core Features:**
+    *   Authentication & user management
+    *   Profile management
+    *   Swipe-based matching
+    *   Timeline/social features
+    *   Chat system
+    *   Media upload/management
+    *   Location-based search
+    *   Referral system interface
+
+*   **Key Screens:**
     *   **Authentication & Onboarding:**
         *   Signup Screen (Email/Password, Referrer Code/Username input).
         *   Login Screen.
@@ -97,53 +101,103 @@ graph TD
         *   Referral Dashboard Screen: Track referrals, commission status, and referral links/codes.
         *   Subscription Management Screen: View current tier (Basic, Pro, VIP), manage Pro subscription.
         *   Backoffice for Profile Site Customization.
-*   **Navigation:** React Navigation
-*   **State Management:** Zustand, Redux Toolkit, React Context, or framework-specific solutions (e.g., Svelte stores).
-*   **API Client:** Supabase JavaScript Client Library (`supabase-js`).
-*   **Deployment:**
-    *   Expo Application Services (EAS) Build for app stores.
 
-## 4. Backend: Supabase + Supabase Edge Functions
+### 3.2 Backend Services
+*   **Platform:** Supabase + Edge Functions
+*   **Language:** TypeScript (Edge Functions)
+*   **Components:**
+    *   **Authentication:** Supabase Auth
+    *   **Database:** PostgreSQL with PostGIS
+    *   **Storage:** iDrive E2
+    *   **Realtime:** Supabase Realtime
+    *   **Edge Functions:** Custom business logic
 
-Supabase provides the BaaS (Backend as a Service) platform.
+*   **Key Functions:**
+    *   `on_user_signup`: Triggered by Auth to create an initial user profile (with 'pending_waitlist_approval' status and handling referrer details).
+    *   `get_swipe_candidates`: Fetches profiles for the swipe screen based on user preferences and location.
+    *   `process_swipe`: Handles like/pass/superlike logic, checks for new matches, creates match records.
+    *   `update_user_profile`: Handles comprehensive profile updates (dance styles, proficiency, awards, social links, etc.).
+    *   `get_user_profile`: Fetches a specific user's profile (public and private views).
+    *   `get_likes_received`: Fetches users who liked the current user.
+    *   `get_matches`: Fetches mutual matches.
+    *   `handle_subscription_webhook`: Listens for Stripe webhooks to update Pro subscription status.
+    *   `process_referral_signup`: Validates referrer, links users, initializes referral status.
+    *   `calculate_commissions`: Calculates and potentially logs commissions for Pro referrals (multi-level).
+    *   `get_timeline_feed`: Aggregates and serves content for the main timeline from dance journals.
+    *   `create_journal_post`: Handles creation of new dance journal entries (videos, vlogs, text).
+    *   `manage_profile_status`: Admin function to approve/manage users (e.g., from 'pending_waitlist_approval' to 'active').
+    *   `get_referral_dashboard_data`: Fetches data for the user's referral dashboard.
+    *   Functions for profile site customization.
+    *   `handle_post_interaction`: Manages likes, comments, and other social interactions
+    *   `get_post_engagement`: Fetches likes, comments, and engagement metrics
 
-*   **Authentication (Supabase Auth):**
-    *   Email/Password signup and login (including referrer capture during signup).
-    *   Secure JWT (JSON Web Token) handling.
-    *   Row Level Security (RLS) policies on database tables to enforce data access rules.
-    *   Auth Hooks (e.g., to trigger an Edge Function on new user signup to create a profile with 'waitlist' status and process referrer).
-*   **Database (Supabase Postgres):**
-    *   PostgreSQL database.
-    *   Schema detailed in `database.md`.
-    *   **PostGIS Extension:** Enabled for geospatial queries (location-based matching).
-    *   RLS heavily utilized for data security.
-*   **Edge Functions (Supabase Functions - Deno/TypeScript):**
-    *   Serverless functions for custom backend logic. Examples:
-        *   `on_user_signup`: Triggered by Auth to create an initial user profile (with 'pending_waitlist_approval' status and handling referrer details).
-        *   `get_swipe_candidates`: Fetches profiles for the swipe screen based on user preferences and location.
-        *   `process_swipe`: Handles like/pass/superlike logic, checks for new matches, creates match records.
-        *   `update_user_profile`: Handles comprehensive profile updates (dance styles, proficiency, awards, social links, etc.).
-        *   `get_user_profile`: Fetches a specific user's profile (public and private views).
-        *   `get_likes_received`: Fetches users who liked the current user.
-        *   `get_matches`: Fetches mutual matches.
-        *   `handle_subscription_webhook`: Listens for Stripe webhooks to update Pro subscription status.
-        *   `process_referral_signup`: Validates referrer, links users, initializes referral status.
-        *   `calculate_commissions`: Calculates and potentially logs commissions for Pro referrals (multi-level).
-        *   `get_timeline_feed`: Aggregates and serves content for the main timeline from dance journals.
-        *   `create_journal_post`: Handles creation of new dance journal entries (videos, vlogs, text).
-        *   `manage_profile_status`: Admin function to approve/manage users (e.g., from 'pending_waitlist_approval' to 'active').
-        *   `get_referral_dashboard_data`: Fetches data for the user's referral dashboard.
-        *   Functions for profile site customization.
-        *   `handle_post_interaction`: Manages likes, comments, and other social interactions
-        *   `get_post_engagement`: Fetches likes, comments, and engagement metrics
-*   **Realtime (Supabase Realtime):**
-    *   Used for live chat functionality.
-    *   Potentially for real-time notifications (new match, new message, new like, timeline updates).
-*   **Storage (Supabase Storage):**
-    *   Storing user-uploaded media: profile pictures, portfolio items (reels, photos, audios), dance journal content.
-    *   Access control integrated with RLS policies.
+### 3.3 Admin Portal
+*   **Platform:** Next.js on Cloudflare Pages
+*   **Language:** TypeScript
+*   **Deployment:** Cloudflare Pages + Functions
+*   **Core Features:**
+    *   Real-time dashboard
+    *   User management
+    *   Content moderation
+    *   Referral system management
+    *   Analytics & reporting
+    *   Waitlist management
+    *   Commission management
 
-## 5. Pre-Launch Strategy & Waitlist Management
+*   **Key Interfaces:**
+    *   **Dashboard:**
+        *   Real-time statistics and metrics
+        *   User growth and engagement charts
+        *   Waitlist/pre-launch signup monitoring
+        *   Revenue and commission tracking
+    
+    *   **User Management:**
+        *   Comprehensive user search and filtering
+        *   Waitlist review and approval workflow
+        *   User profile management
+        *   Account status control
+        *   Activity logs and audit trails
+    
+    *   **Content Moderation:**
+        *   Post/comment moderation queue
+        *   Report handling
+        *   Bulk content actions
+        *   Content filtering rules management
+    
+    *   **Referral System Management:**
+        *   Commission rate configuration
+        *   Referral tree visualization
+        *   Commission payout management
+        *   Dispute resolution tools
+    
+    *   **Analytics & Reporting:**
+        *   Custom report generation
+        *   Export capabilities
+        *   Trend analysis
+        *   User behavior insights
+
+### 3.4 User Sites
+*   **Platform:** Next.js on Cloudflare Pages
+*   **Language:** TypeScript
+*   **Deployment:** Cloudflare Pages + Functions
+*   **URLs:** `username.idance.live` or custom domain
+*   **Core Features:**
+    *   Public profile site
+    *   Portfolio showcase
+    *   Blog/journal
+    *   Contact forms
+    *   Media gallery
+    *   Custom domain support
+
+*   **Admin Interface (`/admin`):**
+    *   Site customization
+    *   Content management
+    *   Analytics
+    *   Media library
+    *   Profile management
+    *   Timeline management
+
+## 4. Pre-Launch Strategy & Waitlist Management
 
 The pre-launch strategy focuses on generating early interest, onboarding initial users directly into the platform with a 'waitlist' or 'pending approval' status, and incentivizing viral growth through the integrated referral system.
 
@@ -171,7 +225,7 @@ The pre-launch strategy focuses on generating early interest, onboarding initial
 
 This streamlined approach integrates users directly into the iDance ecosystem from day one, leveraging the platform's own capabilities for waitlist management and eliminating dependency on external CRM for this core function.
 
-## 6. User Tiers, Features & Domain Handling
+## 5. User Tiers, Features & Domain Handling
 
 iDance will offer distinct user tiers with varying levels of access and features:
 
@@ -206,85 +260,7 @@ iDance will offer distinct user tiers with varying levels of access and features
     *   Custom SSL certificates via Cloudflare
     *   Domain management interface in user's admin panel
 
-## 7. Admin/Backoffice Portal
-
-The admin portal is built as a standalone Next.js application hosted on Cloudflare Pages, providing a responsive and powerful interface for the internal team.
-
-*   **Technology Stack:**
-    *   Next.js (React) for the frontend
-    *   Cloudflare Pages for hosting
-    *   Cloudflare Functions for serverless backend logic
-    *   Direct Supabase integration for data access
-    *   Real-time updates via Supabase Realtime
-
-*   **Core Features:**
-    *   **Dashboard:**
-        *   Real-time statistics and metrics
-        *   User growth and engagement charts
-        *   Waitlist/pre-launch signup monitoring
-        *   Revenue and commission tracking
-    
-    *   **User Management:**
-        *   Comprehensive user search and filtering
-        *   Waitlist review and approval workflow
-        *   User profile management
-        *   Account status control
-        *   Activity logs and audit trails
-    
-    *   **Content Moderation:**
-        *   Post/comment moderation queue
-        *   Report handling
-        *   Bulk content actions
-        *   Content filtering rules management
-    
-    *   **Referral System Management:**
-        *   Commission rate configuration
-        *   Referral tree visualization
-        *   Commission payout management
-        *   Dispute resolution tools
-    
-    *   **Analytics & Reporting:**
-        *   Custom report generation
-        *   Export capabilities
-        *   Trend analysis
-        *   User behavior insights
-
-## 8. User Sites
-
-Each user gets a personalized website accessible via their subdomain (e.g., `user1.idance.live` or their own domain if they link it up), built using Next.js and hosted on Cloudflare Pages.
-
-*   **Technology Stack:**
-    *   Next.js for SSR and static generation
-    *   Cloudflare Pages for hosting
-    *   Cloudflare Functions for dynamic features
-    *   TailwindCSS for responsive design
-    *   iDrive E2 for media storage
-
-*   **Public Site (`user1.idance.live` or their own domain if they link it up):**
-    *   Responsive, modern design
-    *   Customizable templates
-    *   Portfolio showcase
-    *   Dance style proficiency display
-    *   Awards and achievements
-    *   Social media integration
-    *   Contact forms
-    *   SEO optimization
-    *   Blog/journal integration
-    *   Custom domain support
-
-*   **Admin Interface (`user1.idance.live/admin`):**
-    *   Protected by authentication
-    *   Site customization tools
-    *   Content management
-    *   Media library (iDrive E2 integration)
-    *   Analytics dashboard
-    *   Profile management
-    *   Timeline post management
-    *   Engagement metrics
-    *   Message center
-    *   Referral dashboard
-
-## 9. Storage Architecture
+## 6. Storage Architecture
 
 *   **iDrive E2 Storage Integration:**
     *   Primary storage for user media
@@ -298,7 +274,7 @@ Each user gets a personalized website accessible via their subdomain (e.g., `use
     *   Media type validation
     *   Virus scanning
 
-## 10. Deployment Strategy
+## 7. Deployment Strategy
 
 *   **Frontend (Mobile - `app/`):**
     *   EAS Build for creating and submitting builds to Apple App Store and Google Play Store.
@@ -313,7 +289,7 @@ Each user gets a personalized website accessible via their subdomain (e.g., `use
 *   **Admin Panel (`dashboard/` - Post-MVP):**
     *   Deployed as a web application (e.g., to Vercel, Netlify).
 
-## 11. Future Epics & Enhancements Roadmap (High-Level)
+## 8. Future Epics & Enhancements Roadmap (High-Level)
 
 *   **Epic 1: MVP Launch (Core Functionality)**
     *   Auth, Comprehensive Profiles (including dance styles/proficiency, social links, reels, photos, audios),
@@ -342,7 +318,7 @@ Each user gets a personalized website accessible via their subdomain (e.g., `use
     *   **Advanced Admin Dashboard with comprehensive analytics and user management tools.**
     *   **Vector Search for Content Discovery (profiles, journal posts).**
 
-## 12. Technology Choices Summary
+## 9. Technology Choices Summary
 
 *   **Mobile App:** React Native with Expo (JS)
 *   **Web App:** Modern Web Framework (e.g., Next.js, Remix, Astro, SvelteKit - TypeScript, TBD)
