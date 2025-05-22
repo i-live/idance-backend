@@ -346,8 +346,10 @@ Each user gets a personalized website accessible via their subdomain (e.g., `use
 
 *   **Mobile App:** React Native with Expo (JS)
 *   **Web App:** Modern Web Framework (e.g., Next.js, Remix, Astro, SvelteKit - TypeScript, TBD)
-*   **Backend:** Supabase (Postgres, Auth, Edge Functions, Realtime, Storage)
+*   **Backend:** Supabase (Postgres, Auth, Edge Functions, Realtime)
+*   **Storage** iDrive
 *   **Payment Processing:** Stripe
+*   **Registrar** Dynadot (for discounted 1st year price)
 *   **DNS/CDN (for `idance.live`):** Cloudflare
 *   **Package Management (Monorepo if adopted):** pnpm or similar (e.g., Turborepo, Nx)
 
