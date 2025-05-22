@@ -35,26 +35,26 @@ graph TD
     Admin -->|Web UI| Panel[Admin Panel]
     Panel -->|API| AdminFunc[Admin Functions]
     AdminFunc -->|Data| DB
-    AdminFunc -->|Manage Waitlist/Profile Status| DB
-    AdminFunc -->|Manage Referrals| DB
+    AdminFunc -->|"Manage Waitlist/Profile Status"| DB
+    AdminFunc -->|"Manage Referrals"| DB
 
     subgraph UserProfileSystem[User Profile & Customization]
         direction LR
-        UserDevice -->|View/Edit Profile| EdgeFuncs
-        EdgeFuncs -->|Profile Data| DB
-        UserDevice -->|Customize Site| EdgeFuncs
+        UserDevice -->|"View/Edit Profile"| EdgeFuncs
+        EdgeFuncs -->|"Profile Data"| DB
+        UserDevice -->|"Customize Site"| EdgeFuncs
     end
 
     subgraph PreLaunchSignup[Pre-Launch Signup Flow]
         direction LR
-        NewUser[Prospective User] -->|Visit Landing Page| WebFrontend[Web Frontend]
+        NewUser[Prospective User] -->|"Visit Landing Page"| WebFrontend[Web Frontend]
         WebFrontend -->|"Signup Form (with Referrer)"| EdgeFuncs
-        EdgeFuncs -->|Create User (status: waitlist)| AuthN
-        EdgeFuncs -->|Create Profile (status: waitlist)| DB
+        EdgeFuncs -->|"Create User (status: waitlist)"| AuthN
+        EdgeFuncs -->|"Create Profile (status: waitlist)"| DB
     end
 
-    UserDevice -->|View Timeline| EdgeFuncs
-    UserDevice -->|Post to Journal| EdgeFuncs
+    UserDevice -->|"View Timeline"| EdgeFuncs
+    UserDevice -->|"Post to Journal"| EdgeFuncs
 
     UserDevice -.->|Future| Competition[Competition Service]
     UserDevice -.->|Future| Verify[ID Verification]

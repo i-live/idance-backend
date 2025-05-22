@@ -140,20 +140,20 @@ erDiagram
 
     users ||--o{ profiles : "has one"
     users ||--o{ user_preferences : "configures"
-    users ||--o{ swipes : "initiates (swiper)"
-    users ||--o{ swipes : "receives (swiped)"
-    users ||--o{ matches : "is part of (user1 or user2)"
+    users ||--o{ swipes : "\"initiates (swiper)\""
+    users ||--o{ swipes : "\"receives (swiped)\""
+    users ||--o{ matches : "\"is part of (user1 or user2)\""
     users ||--o{ messages : "sends"
     users ||--o{ journal_posts : "creates"
     users ||--o{ referrals : "is referrer_user_id"
     users ||--o{ referrals : "is referred_user_id"
-    users ||--o{ commission_ledgers : "earns (earning_user_id)"
-    users ||--o{ commission_ledgers : "generates_from (paying_user_id)"
+    users ||--o{ commission_ledgers : "\"earns (earning_user_id)\""
+    users ||--o{ commission_ledgers : "\"generates_from (paying_user_id)\""
 
     matches ||--|| chats : "has one"
     chats ||--o{ messages : "contains"
     referrals ||--o{ commission_ledgers : "generates"
-    referrals ||--o{ referrals : "can_originate_from (originating_referral_id)"
+    referrals ||--o{ referrals : "\"can_originate_from (originating_referral_id)\""
 ```
 
 ## 2. Table Schemas
