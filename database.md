@@ -81,7 +81,7 @@ erDiagram
 
     chats {
         uuid id PK "Default: uuid_generate_v4()"
-        uuid match_id FK UK "References matches.id, Not Null"
+        uuid match_id FK "FK, UK, References matches.id, Not Null"
         uuid last_message_id FK "References messages.id, Nullable, ON DELETE SET NULL"
         timestamptz user1_last_read_at "Nullable"
         timestamptz user2_last_read_at "Nullable"
@@ -117,7 +117,7 @@ erDiagram
     referrals {
         uuid id PK "Default: uuid_generate_v4()"
         uuid referrer_user_id FK "References users.id, Not Null (The one who referred)"
-        uuid referred_user_id FK UK "References users.id, Not Null (The one who was referred)"
+        uuid referred_user_id FK "FK, UK, References users.id, Not Null (The one who was referred)"
         text status "Not Null, Default: 'pending_activation', CHECK: ('pending_activation', 'active_basic', 'active_pro', 'lapsed_pro', 'commission_eligible')"
         integer referral_level "Not Null, Default: 1 (1 for direct, 2 for secondary, etc.)"
         uuid originating_referral_id FK "References referrals.id, Nullable (for multi-level tracking)"
