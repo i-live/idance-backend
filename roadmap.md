@@ -3,14 +3,29 @@
 ## Development Phases
 
 ```mermaid
-timeline
+gantt
     title iDance Platform Evolution
+    dateFormat  YYYY-MM-DD
     section Phase 1: User Sites
-        MVP Launch : Personal dance websites
-                  : username.idance.live
-                  : Portfolio & media gallery
-                  : Basic analytics
-                  : Free tier with all features
+    MVP Launch: 2025-05-01, 90d
+    Personal Sites: 2025-05-01, 60d
+    Analytics & SEO: 2025-06-01, 30d
+    
+    section Phase 2: Growth
+    Enhanced Features: 2025-08-01, 60d
+    Community Tools: 2025-09-01, 45d
+    
+    section Phase 3: Mobile
+    App Development: 2025-10-15, 90d
+    Beta Testing: 2025-12-15, 30d
+    
+    section Phase 4: Pro
+    Pro Features: 2026-01-15, 60d
+    Payment System: 2026-02-15, 45d
+    
+    section Phase 5: AI
+    AI Development: 2026-04-01, 90d
+    Platform Integration: 2026-05-15, 45d
     section Phase 2: Growth
         Engagement : Enhanced analytics
                   : More themes

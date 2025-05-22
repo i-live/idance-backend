@@ -2,7 +2,7 @@
 
 ## 1. Overview
 
-iDance is a mobile application and web platform designed to facilitate connecting dancers to help find new dance partners, other dancers, dance jobs, building professional networks, and fostering a vibrant community.
+iDance is a mobile application and web platform designed to facilitate connecting dancers to showcase their dance talents, help find new dance partners, other dancers, dance jobs, building professional networks, and fostering a vibrant community.
 
 **Key Features:**
 - Comprehensive user profiles (dance styles, proficiency, media, awards)
@@ -235,49 +235,50 @@ iDance is a mobile application and web platform designed to facilitate connectin
 ## 6. Technical Architecture
 
 ```mermaid
-graph TD
-    UserDevice[Mobile App/Web] -->|HTTPS/WSS| Supabase[Supabase]
-    Supabase -->|Auth| AuthN[Authentication]
-    Supabase -->|Data| DB[(PostgreSQL)]
-    Supabase -->|Logic| EdgeFuncs[Edge Functions]
-    Supabase -->|Realtime| RT[Realtime]
-    Supabase -->|Storage| Store[Storage]
-
-    UserDevice -->|API| EdgeFuncs
-    EdgeFuncs -->|CRUD| DB
-    EdgeFuncs -->|Verify| AuthN
-    EdgeFuncs -->|Referral Logic| DB
-    EdgeFuncs -->|Timeline Logic| DB
-    UserDevice -->|Chat| RT
-    UserDevice -->|"Media (Profile, Journal)"| Store
-
-    Admin[Admin] -->|Interface| Dashboard[Supabase Dashboard/Custom Admin Panel]
-    Admin -->|Web UI| Panel[Admin Panel]
-    Panel -->|API| AdminFunc[Admin Functions]
-    AdminFunc -->|Data| DB
-    AdminFunc -->|"Manage Waitlist/Profile Status"| DB
-    AdminFunc -->|"Manage Referrals"| DB
-
-    subgraph UserProfileSystem[User Profile & Customization]
-        direction LR
-        UserDevice -->|"View/Edit Profile"| EdgeFuncs
-        EdgeFuncs -->|"Profile Data"| DB
-        UserDevice -->|"Customize Site"| EdgeFuncs
+flowchart TD
+    %% Main Infrastructure
+    User["User Sites/Web App"] -->|"HTTPS/API"| CF["Cloudflare"]
+    CF -->|"Routes"| Pages["Cloudflare Pages"]
+    Pages -->|"Supabase SDK"| Supabase["Supabase Platform"]
+    
+    %% Supabase Backend Services
+    subgraph Supabase["Supabase Backend"]
+        direction TB
+        Auth["Authentication"] --> DB[("PostgreSQL")]
+        Edge["Edge Functions"] --> DB
+        RT["Realtime"] --> DB
+        Store["Storage"] --> CDN["CDN"]
     end
-
-    subgraph PreLaunchSignup[Pre-Launch Signup Flow]
-        direction LR
-        NewUser[Prospective User] -->|"Visit Landing Page"| WebFrontend[Web Frontend]
-        WebFrontend -->|"Signup Form (with Referrer)"| EdgeFuncs
-        EdgeFuncs -->|"Create User (status: waitlist)"| AuthN
-        EdgeFuncs -->|"Create Profile (status: waitlist)"| DB
+    
+    %% User Sites MVP Features
+    subgraph UserSites["User Sites MVP"]
+        direction TB
+        Profile["Profile Sites"] --> Custom["Custom Domains"]
+        Gallery["Media Gallery"] --> Store
+        Blog["Dance Journal"] --> DB
+        Analytics["Site Analytics"] --> DB
     end
-
-    UserDevice -->|"View Timeline"| EdgeFuncs
-    UserDevice -->|"Post to Journal"| EdgeFuncs
-
-    UserDevice -.->|Future| Competition[Competition Service]
-    UserDevice -.->|Future| Verify[ID Verification]
+    
+    %% Admin Portal
+    subgraph AdminPortal["Admin Features"]
+        direction TB
+        Dashboard["Dashboard"] --> Edge
+        CMS["Content Management"] --> Store
+        SEO["SEO Tools"] --> Profile
+        Stats["Analytics"] --> DB
+    end
+    
+    %% Platform Connections
+    Pages --> UserSites
+    Pages --> AdminPortal
+    UserSites --> Supabase
+    AdminPortal --> Supabase
+    
+    %% Visual Styling
+    classDef primary fill:#f9f,stroke:#333,stroke-width:2px
+    classDef secondary fill:#bbf,stroke:#333,stroke-width:1px
+    class Supabase,UserSites,AdminPortal primary
+    class Auth,Edge,RT,Store,Profile,Dashboard secondary
 ```
 
 ## 7. Development & Deployment
