@@ -117,6 +117,22 @@ erDiagram
         TIMESTAMPTZ updated_at "Auto-updated"
     }
 
+    user_site_settings {
+        UUID user_id PK "FK profiles"
+        TEXT site_theme "Theme choice"
+        JSONB layout_config "Page layout"
+        BOOLEAN show_contact_form "Enable contact"
+        TEXT contact_email "Contact email"
+        TEXT custom_domain "User domain"
+        TEXT site_title "SEO title"
+        TEXT site_description "SEO description"
+        JSONB social_links_order "Display order"
+        JSONB featured_content "Pinned items"
+        JSONB custom_sections "Extra sections"
+        BOOLEAN use_app_profile "Sync with app"
+        TIMESTAMPTZ updated_at "Auto-updated"
+    }
+
     swipes {
         UUID swiper_user_id PK "FK users"
         UUID swiped_user_id PK "FK users"
@@ -224,6 +240,7 @@ erDiagram
     profiles ||--o{ user_interests: has
     profiles ||--o{ user_social_links: owns
     profiles ||--o{ user_portfolio_items: showcases
+    profiles ||--o| user_site_settings: configures
 
     dance_styles ||--o{ user_dance_styles: categorizes
     interests ||--o{ user_interests: categorizes
@@ -341,6 +358,21 @@ erDiagram
 *   `use_custom_location` (BOOLEAN, NOT NULL, Default: FALSE)
 *   `updated_at` (TIMESTAMPTZ, Default: now())
 
+### `user_site_settings`
+*   `user_id` (UUID, PK, FK to `profiles.user_id` ON DELETE CASCADE)
+*   `site_theme` (TEXT, NOT NULL, Default: 'default')
+*   `layout_config` (JSONB, NOT NULL, Default: '{}')
+*   `show_contact_form` (BOOLEAN, NOT NULL, Default: TRUE)
+*   `contact_email` (TEXT, NULLABLE)
+*   `custom_domain` (TEXT, UNIQUE, NULLABLE)
+*   `site_title` (TEXT, NULLABLE)
+*   `site_description` (TEXT, NULLABLE)
+*   `social_links_order` (JSONB, NOT NULL, Default: '[]'::jsonb)
+*   `featured_content` (JSONB, NOT NULL, Default: '{}')
+*   `custom_sections` (JSONB, NOT NULL, Default: '[]'::jsonb)
+*   `use_app_profile` (BOOLEAN, NOT NULL, Default: TRUE)
+*   `updated_at` (TIMESTAMPTZ, Default: now())
+
 ### `post_likes`
 *   `id` (UUID, PK, Default: uuid_generate_v4())
 *   `post_id` (UUID, NOT NULL, FK to `journal_posts.id` ON DELETE CASCADE)
@@ -388,6 +420,11 @@ erDiagram
 *   **`user_portfolio_items` table:**
     *   `CREATE INDEX idx_user_portfolio_items_user_id_display_order ON user_portfolio_items (user_id, display_order);`
     *   `CREATE INDEX idx_user_portfolio_items_item_type ON user_portfolio_items (item_type);`
+*   **`user_site_settings` table:**
+    *   `CREATE INDEX idx_user_site_settings_user_id ON user_site_settings (user_id);`
+    *   `CREATE INDEX idx_user_site_settings_custom_domain ON user_site_settings (custom_domain);`
+    *   `CREATE UNIQUE INDEX idx_user_site_settings_custom_domain_unique ON user_site_settings (LOWER(custom_domain)) WHERE custom_domain IS NOT NULL;`
+
 *   **`post_likes` table:**
     *   `CREATE INDEX idx_post_likes_post_id ON post_likes (post_id);`
     *   `CREATE INDEX idx_post_likes_user_id ON post_likes (user_id);`
@@ -400,6 +437,41 @@ erDiagram
     *   `CREATE INDEX idx_post_shares_user_id ON post_shares (user_id);`
 
 ## 5. Row Level Security (RLS) Policies
+
+### User Site Settings
+*   Only authenticated users can read/write their own site settings
+*   Authenticated users can read public site settings for any user's custom domain
+*   API services can read all site settings
+*   Example policies:
+    ```sql
+    -- Enable RLS
+    ALTER TABLE user_site_settings ENABLE ROW LEVEL SECURITY;
+
+    -- Policy for users to read their own settings
+    CREATE POLICY user_site_settings_select_own ON user_site_settings
+    FOR SELECT TO authenticated
+    USING (auth.uid() = user_id);
+
+    -- Policy for users to read public site settings by custom domain
+    CREATE POLICY user_site_settings_select_public ON user_site_settings
+    FOR SELECT TO authenticated
+    USING (true)
+    WITH CHECK (custom_domain IS NOT NULL);
+
+    -- Policy for users to modify their own settings
+    CREATE POLICY user_site_settings_modify_own ON user_site_settings
+    FOR ALL TO authenticated
+    USING (auth.uid() = user_id)
+    WITH CHECK (auth.uid() = user_id);
+
+    -- Policy for service role to access all settings
+    CREATE POLICY user_site_settings_service_all ON user_site_settings
+    FOR ALL TO service_role
+    USING (true)
+    WITH CHECK (true);
+    ```
+
+### Other RLS Policies
 *   Users can only read/write their own related entries in `user_dance_styles`, `user_awards`, `user_interests`, `user_social_links`, `user_portfolio_items`, `post_likes`, `post_comments`, `post_shares`
 *   Reference tables (`dance_styles`, `interests`, `social_platforms`) are public read-only
 *   All other RLS policies remain as previously defined
