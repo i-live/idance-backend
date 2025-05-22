@@ -1,22 +1,22 @@
-# iDance - System Architecture (MVP)
+# iDance - System Architecture
 
-This document outlines the proposed system architecture for the "iDance" mobile application's Minimum Viable Product (MVP).
+This document outlines the system architecture for the "iDance" mobile application and web platform.
 
 ## 1. Overview
 
-iDance is a mobile application designed to connect dancers for various purposes, including finding dance partners, showcasing talent, and building a community. The MVP focuses on core features like user authentication, profiles, swiping-based matching, and chat.
+iDance is a mobile application and web platform designed to connect dancers for various purposes, including finding dance partners, building professional networks, and fostering a vibrant community. It features comprehensive user profiles (showcasing dance styles, proficiency, reels, photos, awards, social links), a swipe-based search for connections, a personal dance journal that feeds into a main timeline, direct chat capabilities, and an integrated referral system. The initial development focuses on establishing these core functionalities alongside robust user authentication.
 
-**Guiding Principles for MVP Architecture:**
-*   **Rapid Development:** Prioritize technologies and approaches that enable quick iteration (React Native with Expo, Supabase).
+**Guiding Principles for Architecture:**
+*   **Rapid Development:** Prioritize technologies and approaches that enable quick iteration (React Native with Expo, Supabase, potentially a modern web framework like Next.js or Remix).
 *   **Scalability:** Choose a backend (Supabase) that can scale with user growth.
 *   **Cost-Effectiveness:** Leverage managed services and free/affordable tiers where possible.
-*   **Mobile-First:** Design primarily for iOS and Android.
+*   **Mobile-First & Web Presence:** Design primarily for iOS and Android, with a corresponding web presence for profiles, timeline, and core interactions.
 
 ## 2. High-Level Architecture Diagram
 
 ```mermaid
 graph TD
-    UserDevice[Mobile App] -->|HTTPS/WSS| Supabase[Supabase]
+    UserDevice[Mobile App/Web] -->|HTTPS/WSS| Supabase[Supabase]
     Supabase -->|Auth| AuthN[Authentication]
     Supabase -->|Data| DB[(PostgreSQL)]
     Supabase -->|Logic| EdgeFuncs[Edge Functions]
@@ -26,185 +26,230 @@ graph TD
     UserDevice -->|API| EdgeFuncs
     EdgeFuncs -->|CRUD| DB
     EdgeFuncs -->|Verify| AuthN
+    EdgeFuncs -->|Referral Logic| DB
+    EdgeFuncs -->|Timeline Logic| DB
     UserDevice -->|Chat| RT
-    UserDevice -->|Media| Store
+    UserDevice -->|Media (Profile, Journal)| Store
 
-    Admin[Admin] -->|Interface| Dashboard[Supabase Dashboard]
+    Admin[Admin] -->|Interface| Dashboard[Supabase Dashboard/Custom Admin Panel]
     Admin -->|Web UI| Panel[Admin Panel]
     Panel -->|API| AdminFunc[Admin Functions]
     AdminFunc -->|Data| DB
+    AdminFunc -->|Manage Waitlist/Profile Status| DB
+    AdminFunc -->|Manage Referrals| DB
 
-    subgraph PreLaunch[Pre-Launch System]
+    subgraph UserProfileSystem[User Profile & Customization]
         direction LR
-        User[User] -->|Visit| Website[Landing Page]
-        Website -->|Submit| Forms[Systeme.io Forms]
-        Forms -->|Webhook| Waitlist[Waitlist Table]
-        Forms -->|Store| CRM[Systeme.io CRM]
-        Admin -->|Review| CRM
-        Admin -->|Import| DB
+        UserDevice -->|View/Edit Profile| EdgeFuncs
+        EdgeFuncs -->|Profile Data| DB
+        UserDevice -->|Customize Site| EdgeFuncs
     end
 
-    subgraph ProUser[Pro User System]
+    subgraph PreLaunchSignup[Pre-Launch Signup Flow]
         direction LR
-        DNS[Custom DNS] -->|CNAME| CDN[Cloudflare]
-        CDN -->|Proxy| Logic[Profile Logic]
-        Logic --> DB
+        NewUser[Prospective User] -->|Visit Landing Page| WebFrontend[Web Frontend]
+        WebFrontend -->|Signup Form (with Referrer)| EdgeFuncs
+        EdgeFuncs -->|Create User (status: waitlist)| AuthN
+        EdgeFuncs -->|Create Profile (status: waitlist)| DB
     end
 
-    UserDevice -.->|Future| Timeline[Timeline Service]
+    UserDevice -->|View Timeline| EdgeFuncs
+    UserDevice -->|Post to Journal| EdgeFuncs
+
     UserDevice -.->|Future| Competition[Competition Service]
     UserDevice -.->|Future| Verify[ID Verification]
 ```
 
-## 3. Frontend: React Native with Expo
+## 3. Frontend: React Native with Expo & Web
 
-*   **Platform:** React Native with Expo (Managed Workflow + EAS Build).
+*   **Platform:** React Native with Expo (Managed Workflow + EAS Build) for mobile; A modern web framework (e.g., Next.js, Remix, Astro, SvelteKit - TBD) for the web frontend.
 *   **Language:** TypeScript.
 *   **Core Responsibilities:**
-    *   User Interface (UI) and User Experience (UX).
+    *   User Interface (UI) and User Experience (UX) across platforms.
     *   Client-side state management.
     *   Communication with Supabase backend (Auth, Database, Edge Functions, Storage, Realtime).
     *   Handling user input and gestures.
-    *   Requesting necessary device permissions (location, camera, photo library).
-*   **Key Modules/Screens (MVP - Epic 1):**
-    *   **Authentication:**
-        *   Signup Screen (Email/Password)
-        *   Login Screen
-        *   Password Reset Flow
-    *   **Onboarding/Waitlist Completion:**
-        *   Screens to complete profile details if invited from waitlist.
-    *   **Main App:**
-        *   Home/Swipe Screen: Displaying profiles, swipe gestures (like, pass, superlike).
-        *   Profile Screen:
-            *   View/Edit Own Profile (including `partner_seeking_status` toggle).
+    *   Requesting necessary device permissions (location, camera, photo library for mobile).
+*   **Key Modules/Screens (across Mobile & Web where applicable):**
+    *   **Authentication & Onboarding:**
+        *   Signup Screen (Email/Password, Referrer Code/Username input).
+        *   Login Screen.
+        *   Password Reset Flow.
+        *   Profile Creation/Completion Flow (for new users, including initial 'waitlist' or 'pending_approval' status).
+    *   **Main App Features:**
+        *   Timeline Feed Screen: Displaying dance journal posts from the community.
+        *   Swipe Screen (primarily mobile, potential web adaptation): Discovering and connecting with other dancers based on preferences.
+        *   Profile Screen (Publicly viewable via web, editable by owner):
+            *   View/Edit Own Profile: Comprehensive details - basic stats, description, preferences, dance styles (with proficiency levels), reels (videos), photos, audios, awards, other interests, social media links, looking for partners/jobs status, referrer information.
             *   View Other Users' Profiles.
-            *   Portfolio section (photos/videos).
+            *   Personal Dance Journal: Upload/manage posts (videos, vlogs, text).
         *   "Likes You" Screen: Grid of users who liked the current user.
         *   Matches Screen: List of mutual matches.
         *   Chat List Screen: List of ongoing conversations.
         *   Chat Screen: Individual conversation view.
-        *   Settings/Search Configuration Screen: User preferences for discovery (age, distance, dance styles, skill level).
-        *   Pro Subscription Screen (UI placeholder, functionality deferred).
-*   **Navigation:** React Navigation.
-*   **State Management:** Zustand, Redux Toolkit, or React Context (to be decided based on complexity, Zustand often a good balance).
+        *   Settings & Search Configuration Screen: User preferences for discovery (age, distance, dance styles, skill level, gender etc.).
+        *   Referral Dashboard Screen: Track referrals, commission status, and referral links/codes.
+        *   Subscription Management Screen: View current tier (Basic, Pro, VIP), manage Pro subscription.
+        *   Backoffice for Profile Site Customization.
+*   **Navigation:** React Navigation (Mobile), appropriate web routing solution (e.g., Next.js router).
+*   **State Management:** Zustand, Redux Toolkit, React Context, or framework-specific solutions (e.g., Svelte stores).
 *   **API Client:** Supabase JavaScript Client Library (`supabase-js`).
-*   **Deployment:** Expo Application Services (EAS) Build for creating development and production builds for iOS and Android app stores.
+*   **Deployment:**
+    *   Mobile: Expo Application Services (EAS) Build for app stores.
+    *   Web: Vercel, Netlify, Cloudflare Pages, or similar PaaS.
 
 ## 4. Backend: Supabase
 
 Supabase provides the BaaS (Backend as a Service) platform.
 
 *   **Authentication (Supabase Auth):**
-    *   Email/Password signup and login.
+    *   Email/Password signup and login (including referrer capture during signup).
     *   Secure JWT (JSON Web Token) handling.
     *   Row Level Security (RLS) policies on database tables to enforce data access rules.
-    *   Auth Hooks (e.g., to trigger an Edge Function on new user signup to create a profile).
+    *   Auth Hooks (e.g., to trigger an Edge Function on new user signup to create a profile with 'waitlist' status and process referrer).
 *   **Database (Supabase Postgres):**
     *   PostgreSQL database.
-    *   Schema detailed in `backend/database.md`.
+    *   Schema detailed in `database.md`.
     *   **PostGIS Extension:** Enabled for geospatial queries (location-based matching).
     *   RLS heavily utilized for data security.
 *   **Edge Functions (Supabase Functions - Deno/TypeScript):**
-    *   Serverless functions for custom backend logic.
-    *   Examples for MVP:
-        *   `on_user_signup`: Triggered by Auth to create an initial user profile.
-        *   `get_swipe_candidates`: Fetches profiles for the swipe screen based on user preferences and location (using PostGIS).
+    *   Serverless functions for custom backend logic. Examples:
+        *   `on_user_signup`: Triggered by Auth to create an initial user profile (with 'pending_waitlist_approval' status and handling referrer details).
+        *   `get_swipe_candidates`: Fetches profiles for the swipe screen based on user preferences and location.
         *   `process_swipe`: Handles like/pass/superlike logic, checks for new matches, creates match records.
-        *   `update_user_profile`: Handles profile updates.
-        *   `get_user_profile`: Fetches a specific user's profile.
+        *   `update_user_profile`: Handles comprehensive profile updates (dance styles, proficiency, awards, social links, etc.).
+        *   `get_user_profile`: Fetches a specific user's profile (public and private views).
         *   `get_likes_received`: Fetches users who liked the current user.
         *   `get_matches`: Fetches mutual matches.
-        *   `handle_pro_subscription_webhook`: (Deferred, for Pro Tier launch) Listens for Stripe webhooks to update subscription status.
-        *   Admin-specific functions for waitlist processing.
+        *   `handle_subscription_webhook`: Listens for Stripe webhooks to update Pro subscription status.
+        *   `process_referral_signup`: Validates referrer, links users, initializes referral status.
+        *   `calculate_commissions`: Calculates and potentially logs commissions for Pro referrals (multi-level).
+        *   `get_timeline_feed`: Aggregates and serves content for the main timeline from dance journals.
+        *   `create_journal_post`: Handles creation of new dance journal entries (videos, vlogs, text).
+        *   `manage_profile_status`: Admin function to approve/manage users (e.g., from 'pending_waitlist_approval' to 'active').
+        *   `get_referral_dashboard_data`: Fetches data for the user's referral dashboard.
+        *   Functions for profile site customization.
 *   **Realtime (Supabase Realtime):**
     *   Used for live chat functionality.
-    *   Potentially for real-time notifications (new match, new message, new like).
+    *   Potentially for real-time notifications (new match, new message, new like, timeline updates).
 *   **Storage (Supabase Storage):**
-    *   Storing user-uploaded media: profile pictures, portfolio photos/videos.
+    *   Storing user-uploaded media: profile pictures, portfolio items (reels, photos, audios), dance journal content.
     *   Access control integrated with RLS policies.
 
-## 5. Waitlist & Pre-Launch Strategy
+## 5. Pre-Launch Strategy & Waitlist Management
 
-*   **Phase 1: Initial Interest Capture (`prelaunch.idance.live`)**
-    *   A simple, attractive static landing page (e.g., built with a static site generator like Astro/Next.js static export, or a simple HTML/CSS/JS page).
-    *   Hosted on services like Vercel, Netlify, or GitHub Pages.
-    *   Clear Call to Action: "Join the iDance Pre-Launch Access!" or similar.
-    *   Embedded form or link to a form hosted on **Systeme.io** to capture email addresses. The depth of integration with Systeme.io (e.g., for direct data submission from `prelaunch.idance.live` to Systeme.io via API, or for affiliate tracking) will depend on the capabilities exposed by their API (`https://developer.systeme.io/reference/api`). Manual review of this documentation by the development team is required. Initial MVP will rely on Systeme.io's forms and built-in CRM/email features.
-*   **Phase 2: Detailed Application & CRM**
-    *   Users who submit their email receive an automated email (via Systeme.io).
-    *   Email links to a multi-step "application form" (hosted on Systeme.io) to collect detailed profile information (name, dance styles, bio, location intent, etc., mirroring fields in the `profiles` table).
-    *   Data collected and managed within Systeme.io CRM.
-    *   Systeme.io used for sending out hype-building email sequences.
-*   **Phase 3: Manual Review & Invitation**
-    *   Admin reviews applications in Systeme.io.
-    *   Approved applicants are marked. Data can be exported from Systeme.io and imported into the main Supabase `profiles` table (or a staging `waitlist_profiles` table) via a script or manual process for MVP.
-    *   Accepted users receive an email confirming their pre-launch access and eventual app download instructions.
+The pre-launch strategy focuses on generating early interest, onboarding initial users directly into the platform with a 'waitlist' or 'pending approval' status, and incentivizing viral growth through the integrated referral system.
 
-## 6. Pro User Features & Domain Handling
+*   **Phase 1: Initial Interest & Direct Signup (`idance.live`)**
+    *   **Landing Page:** A compelling landing page on `idance.live` showcasing the vision, core features (comprehensive profiles, swipe search, dance journal, timeline, referral system), and pre-launch benefits.
+    *   **Direct Signup:** Users sign up directly through the platform (web or early app version).
+        *   Signup includes email, password, and an optional referrer code/username.
+        *   Upon signup, user accounts are created in Supabase Auth.
+        *   Corresponding entries in the `profiles` table are created with a `profile_status` of 'pending_waitlist_approval' (or similar).
+    *   **"Outgoing AI" Briefing Narrative:** Marketing communications may include the concept of an "outgoing AI" that briefs potential prelaunch participants on the platform and its benefits, encouraging early adoption and social sharing.
 
-*   **Pro Subscription (Phased Rollout):**
-    *   The Pro tier and associated payment integration (Stripe) will be implemented after establishing an initial user base (e.g., ~10k users or as strategically decided), allowing the MVP to launch as a free service initially.
-    *   When active, Pro subscriptions will be managed via Stripe integration. Edge Functions will handle communication with Stripe API.
+*   **Phase 2: Profile Completion & Engagement**
+    *   Users are encouraged to start filling out their profiles even while on the waitlist to expedite activation and enhance their future visibility.
+    *   Automated emails (e.g., via Supabase custom SMTP or integrated email services like Resend/Postmark) can guide users, provide updates, and build anticipation.
+
+*   **Phase 3: Admin Review & Activation**
+    *   Administrators review profiles with 'pending_waitlist_approval' status via a custom admin panel or the Supabase dashboard.
+    *   Approved users have their `profile_status` changed to 'active'.
+    *   Activated users receive notification and gain full access to the platform's features.
+
+*   **Pre-Launch Perks for Early Signups:**
+    *   **Free Pro Membership:** One year of "Pro" membership (valued at $240).
+    *   **Personal Dance Website:** Full access to profile customization features, allowing them to use their iDance profile as their primary online dance presence.
+    *   **Professional Opportunities:** Early access to features designed to connect dancers with relevant professional opportunities.
+    *   **Early Commission Earning:** Participants who share their referral link/code on social media can start accumulating referrals. Commissions become active once they and their referrals meet Pro membership criteria and payments are processed.
+
+This streamlined approach integrates users directly into the iDance ecosystem from day one, leveraging the platform's own capabilities for waitlist management and eliminating dependency on external CRM for this core function.
+
+## 6. User Tiers, Features & Domain Handling
+
+iDance will offer distinct user tiers with varying levels of access and features:
+
+*   **Basic Tier (Free):**
+    *   Host a personal dance website/profile with standard customization.
+    *   Limited swipe search functionality (e.g., daily swipe cap).
+    *   Ability to post to dance journal and have reels/posts appear on the timeline (with potential limits).
+    *   Access to basic community features and chat.
+
+*   **Pro Tier (Paid Subscription):**
+    *   **Pricing:** $19.99/year or $24.95/month.
+    *   All Basic Tier features.
+    *   Enhanced profile customization options for their personal dance website.
+    *   Increased swipe match limits and potentially advanced search filters.
+    *   **Eligibility for Referral Commissions:** Pro members can earn commissions from their referred users' Pro subscriptions as per the multi-level referral system (e.g., direct, secondary, tertiary).
+    *   Potential future access to AI-powered profile optimization tools and other premium features.
+    *   Stripe integration will manage subscriptions, with Edge Functions handling webhook events for status updates.
+
+*   **VIP Tier (Unlocked, Not Paid):**
+    *   Achieved by meeting specific criteria (e.g., high engagement, significant number of views on dance journal content, community contributions, number of successful Pro referrals).
+    *   All Pro Tier benefits.
+    *   Exclusive perks, early access to new features, increased visibility, or special badges (details TBD).
+
 *   **User Profile URLs (`idance.live/username`):**
-    *   The primary URL structure for user profiles will be path-based (e.g., `idance.live/theirusername`) for better platform SEO. The `idance.live` domain will be managed via a DNS provider (e.g., Cloudflare). Application routing will handle serving the correct profile.
-*   **AI-Powered Profile Optimization (Future Pro Feature):**
-    *   Offer tools to Pro users to enhance their profile's discoverability within iDance. This includes content analysis for keyword suggestions and automatic generation of structured data (Schema.org) for their iDance profile page.
-*   **Custom Domains for Pro Users (Post-Pro Tier Launch):**
-    *   Pro users can map their own custom domains (e.g., `www.dancerjane.com`) to their iDance profile. This involves users pointing a CNAME record from their custom domain to an iDance endpoint.
-    *   Verification process needed (e.g., checking DNS records).
+    *   The primary URL structure for user profiles will be path-based (e.g., `idance.live/theirusername`) for better platform SEO and shareability. The `idance.live` domain will be managed via a DNS provider (e.g., Cloudflare). Application routing will handle serving the correct profile.
+
+*   **Custom Domains for Pro/VIP Users (Future Enhancement):**
+    *   Pro/VIP users may, in the future, be able to map their own custom domains (e.g., `www.dancerjane.com`) to their iDance profile. This would involve users pointing a CNAME record from their custom domain to an iDance endpoint, with a verification process.
 
 ## 7. Admin Panel
 
-*   **MVP Requirement:** Minimal functionality for reviewing and processing waitlist applications from Systeme.io (could be manual export/import initially, or a very simple secure web interface calling admin-specific Edge Functions).
+*   **MVP Requirement:** Functionality for reviewing and activating user profiles from the waitlist (those with 'pending_waitlist_approval' or similar status). Management of referral system parameters (e.g., commission rates) and basic oversight. This will be achieved via a custom admin panel or directly through the Supabase dashboard with appropriate helper functions/scripts.
 *   **Post-MVP:** A dedicated web application (`dashboard/` or `admin/` repo) for:
-    *   User management (view, suspend, delete).
-    *   Content moderation (future).
-    *   Viewing basic analytics.
+    *   User management (view, suspend, delete, manage roles/tiers, edit profiles).
+    *   Content moderation (timeline posts, profiles, journal entries).
+    *   Viewing platform analytics and user activity.
     *   Managing reported content.
+    *   Overseeing the referral program, commission payouts, and resolving disputes.
 
 ## 8. Deployment Strategy
 
-*   **Frontend (React Native App - `app/`):**
+*   **Frontend (Mobile - `app/`):**
     *   EAS Build for creating and submitting builds to Apple App Store and Google Play Store.
     *   EAS Update for over-the-air updates of JS bundle (for non-native changes).
+*   **Frontend (Web - `web/` or similar):**
+    *   Deployed to a static/SSR hosting provider (Vercel, Netlify, Cloudflare Pages).
 *   **Backend (Supabase):**
-    *   Database migrations managed via Supabase CLI or SQL scripts.
+    *   Database migrations managed via Supabase CLI or SQL scripts (version controlled).
     *   Edge Functions deployed via Supabase CLI.
-*   **Pre-Launch Site (`prelaunch/`):**
-    *   Deployed to a static hosting provider (Vercel, Netlify, Cloudflare Pages).
+*   **Landing Page (`idance.live` initially, then main web app):**
+    *   Deployed to a static hosting provider or as part of the main web application.
 *   **Admin Panel (`dashboard/` - Post-MVP):**
     *   Deployed as a web application (e.g., to Vercel, Netlify).
 
 ## 9. Future Epics & Enhancements Roadmap (High-Level)
 
 *   **Epic 1: MVP Launch (Core Functionality)**
-    *   Auth, Profiles, Swiping, Matching, Chat, Waitlist System, Pro Feature Foundation (Subscription deferred).
-    *   *Early Enhancement:* Simple auto-message prompt post-match.
-*   **Epic 2: Timeline Feature**
-    *   TikTok-style vertical video feed for general dance content.
-    *   Likes, comments, ranking.
+    *   Auth, Comprehensive Profiles (including dance styles/proficiency, awards, social links, reels, photos, audios), Swiping, Matching, Chat, Direct Waitlist System, Core Referral System (signup, tracking, multi-level structure), Dance Journal & Timeline, Basic/Pro/VIP Tier Foundation (Pro Subscription payments can be activated post-initial user seeding, but structure in place).
+    *   *Early Enhancement:* Simple auto-message prompt post-match, basic profile customization backoffice.
+*   **Epic 2: Full Pro Features & Monetization**
+    *   Full Stripe integration for Pro subscriptions and commission payouts.
+    *   Automated commission calculation and detailed dashboard for Referral System.
+    *   Enhanced Pro profile customization options.
+*   **Epic 3: Community & Engagement Features**
+    *   Advanced Timeline features (comments, advanced ranking/filtering, discovery algorithms).
     *   Content moderation tools (AI-assisted + manual).
-*   **Epic 3: Competition Feature**
-    *   User/Admin created competitions.
-    *   Voting mechanisms.
-    *   Sponsor branding placeholders.
+    *   Competition Feature (User/Admin created, voting mechanisms, sponsor branding placeholders).
 *   **Post-MVP Enhancements (Potential Order TBD):**
-    *   **ID Verification System:** For official government ID verification, integrate a 3rd party service (e.g., Persona, Veriff - recommended, post-MVP). For a lighter 'Profile Photo Liveness/Match' badge, explore in-house solutions with AI libraries/services (post-MVP).
-    *   **Advanced AI Matchmaking:** Beyond basic filters.
-    *   **AI Profile Optimization & SEO for Pro User Pages:** (As described in Pro Features).
+    *   **ID Verification System:** For enhanced trust and safety.
+    *   **Advanced AI Matchmaking:** Beyond basic filters, incorporating compatibility scores.
+    *   **AI Profile Optimization & SEO for Pro/VIP User Pages.**
     *   **AI Smart Replies/Icebreakers in Chat.**
-    *   **Full-Fledged Affiliate System:** (If Systeme.io isn't sufficient or deeper integration needed).
-    *   **Group Features/Events.**
-    *   **Advanced Admin Dashboard.**
-    *   **Vector Search for Content Discovery.**
+    *   **Advanced Referral System Features:** (e.g., detailed analytics dashboard for referrers, gamification).
+    *   **Group Features/Events/Local Communities.**
+    *   **Advanced Admin Dashboard with comprehensive analytics and user management tools.**
+    *   **Vector Search for Content Discovery (profiles, journal posts).**
 
 ## 10. Technology Choices Summary
 
 *   **Mobile App:** React Native with Expo (TypeScript)
+*   **Web App:** Modern Web Framework (e.g., Next.js, Remix, Astro, SvelteKit - TypeScript, TBD)
 *   **Backend:** Supabase (Postgres, Auth, Edge Functions, Realtime, Storage)
-*   **Pre-Launch/Waitlist CRM & Email:** Systeme.io
 *   **Payment Processing:** Stripe
 *   **DNS/CDN (for `idance.live`):** Cloudflare (recommended)
-*   **Package Management (Monorepo if adopted):** pnpm
+*   **Package Management (Monorepo if adopted):** pnpm or similar (e.g., Turborepo, Nx)
 
-This architecture aims to provide a solid foundation for the iDance MVP, balancing speed of development with scalability and future growth potential.
+This architecture aims to provide a solid foundation for iDance, balancing speed of development with scalability and future growth potential.
