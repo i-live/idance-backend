@@ -4,7 +4,7 @@ This document outlines the system architecture for the "iDance" mobile applicati
 
 ## 1. Overview
 
-iDance is a mobile application and web platform designed to facilitate connecting dancers to help find new dance partners, other dancers, dance jobs, building professional networks, and fostering a vibrant community. It features comprehensive user profiles (showcasing dance styles, proficiency, reels, photos, awards, social links), a swipe-based tinder-like matching system for connections, a tiktok-like timeline to showcase users' personal dance journal, direct chat capabilities, and an integrated referral system. The initial development focuses on establishing these core functionalities alongside robust user authentication.
+iDance is a mobile application and web platform designed to facilitate connecting dancers to help find new dance partners, other dancers, dance jobs, building professional networks, and fostering a vibrant community. It features comprehensive user profiles (showcasing dance styles, proficiency, reels, photos, awards, social links), a swipe-based tinder-like matching system for connections, a tiktok-like timeline to showcase users' dance journal, direct chat capabilities, and an integrated referral system. The initial development focuses on establishing these core functionalities alongside robust user authentication.
 
 **Guiding Principles for Architecture:**
 *   **Rapid Development:** Prioritize technologies and approaches that enable quick iteration (React Native with Expo, Supabase, potentially a modern web framework like Next.js or Remix).
@@ -60,7 +60,7 @@ graph TD
     UserDevice -.->|Future| Verify[ID Verification]
 ```
 
-## 3. Frontend: React Native with Expo & Web
+## 3. Frontend App: React Native with Expo & Web
 
 *   **Platform:** React Native with Expo (Managed Workflow + EAS Build) for mobile; A modern web framework (e.g., Next.js, Remix, Astro, SvelteKit - TBD) for the web frontend.
 *   **Language:** TypeScript.
@@ -77,7 +77,13 @@ graph TD
         *   Password Reset Flow.
         *   Profile Creation/Completion Flow (for new users, including initial 'waitlist' or 'pending_approval' status).
     *   **Main App Features:**
-        *   Timeline Feed Screen: Displaying dance journal posts from the community.
+        *   Timeline Feed Screen: Displaying dance journal posts with social interactions
+            *   Like/Unlike posts
+            *   Comment on posts
+            *   Share posts
+            *   View likes and comments
+            *   Engagement analytics for post owners
+        *   Post Detail Screen: Expanded view of a post with all comments
         *   Swipe Screen (primarily mobile, potential web adaptation): Discovering and connecting with other dancers based on preferences.
         *   Profile Screen (Publicly viewable via web, editable by owner):
             *   View/Edit Own Profile: Comprehensive details - basic stats, description, preferences, dance styles (with proficiency levels), reels (videos), photos, audios, awards, other interests, social media links, looking for partners/jobs status, referrer information.
@@ -129,6 +135,8 @@ Supabase provides the BaaS (Backend as a Service) platform.
         *   `manage_profile_status`: Admin function to approve/manage users (e.g., from 'pending_waitlist_approval' to 'active').
         *   `get_referral_dashboard_data`: Fetches data for the user's referral dashboard.
         *   Functions for profile site customization.
+        *   `handle_post_interaction`: Manages likes, comments, and other social interactions
+        *   `get_post_engagement`: Fetches likes, comments, and engagement metrics
 *   **Realtime (Supabase Realtime):**
     *   Used for live chat functionality.
     *   Potentially for real-time notifications (new match, new message, new like, timeline updates).
@@ -176,7 +184,7 @@ iDance will offer distinct user tiers with varying levels of access and features
     *   Access to basic community features and chat.
 
 *   **Pro Tier (Paid Subscription):**
-    *   **Pricing:** $19.99/year or $24.95/month.
+    *   **Pricing:** $19.99/month (annual subscription) or $24.95/month.
     *   All Basic Tier features.
     *   Enhanced profile customization options for their personal dance website.
     *   Increased swipe match limits and potentially advanced search filters.
@@ -184,34 +192,121 @@ iDance will offer distinct user tiers with varying levels of access and features
     *   Potential future access to AI-powered profile optimization tools and other premium features.
     *   Stripe integration will manage subscriptions, with Edge Functions handling webhook events for status updates.
 
-*   **VIP Tier (Unlocked, Not Paid):**
-    *   Achieved by meeting specific criteria (e.g., high engagement, significant number of views on dance journal content, community contributions, number of successful Pro referrals).
+*   **VIP Tier (Earned, Not Paid):**
+    *   Achieved by meeting specific criteria (e.g., high engagement, significant number of views on dance timeline content, community contributions, number of successful Pro referrals).
     *   All Pro Tier benefits.
     *   Exclusive perks, early access to new features, increased visibility, or special badges (details TBD).
 
 *   **User Profile URLs (`idance.live/username`):**
     *   The primary URL structure for user profiles will be path-based (e.g., `idance.live/theirusername`) for better platform SEO and shareability. The `idance.live` domain will be managed via a DNS provider (e.g., Cloudflare). Application routing will handle serving the correct profile.
 
-*   **Custom Domains for Pro/VIP Users (Future Enhancement):**
-    *   Pro/VIP users may, in the future, be able to map their own custom domains (e.g., `www.dancerjane.com`) to their iDance profile. This would involve users pointing a CNAME record from their custom domain to an iDance endpoint, with a verification process.
+*   **Custom Domains for Pro/VIP Users:**
+    *   Available from launch for all Pro/VIP users
+    *   Users can map their own custom domains (e.g., `www.dancerjane.com`) to their iDance profile
+    *   Simple CNAME-based setup with automated verification process
+    *   Included in Pro subscription benefits
+    *   Custom SSL certificates via Cloudflare
+    *   Domain management interface in user's admin panel
 
-## 7. Admin Panel
+## 7. Admin/Backoffice Portal
 
-*   **MVP Requirement:** Functionality for reviewing and activating user profiles from the waitlist (those with 'pending_waitlist_approval' or similar status). Management of referral system parameters (e.g., commission rates) and basic oversight. This will be achieved via a custom admin panel or directly through the Supabase dashboard with appropriate helper functions/scripts.
-*   **Post-MVP:** A dedicated web application (`dashboard/` or `admin/` repo) for:
-    *   User management (view, suspend, delete, manage roles/tiers, edit profiles).
-    *   Content moderation (timeline posts, profiles, journal entries).
-    *   Viewing platform analytics and user activity.
-    *   Managing reported content.
-    *   Overseeing the referral program, commission payouts, and resolving disputes.
+The admin portal is built as a standalone Next.js application hosted on Cloudflare Pages, providing a responsive and powerful interface for the internal team.
 
-## 8. Deployment Strategy
+*   **Technology Stack:**
+    *   Next.js (React) for the frontend
+    *   Cloudflare Pages for hosting
+    *   Cloudflare Functions for serverless backend logic
+    *   Direct Supabase integration for data access
+    *   Real-time updates via Supabase Realtime
+
+*   **Core Features:**
+    *   **Dashboard:**
+        *   Real-time statistics and metrics
+        *   User growth and engagement charts
+        *   Waitlist/pre-launch signup monitoring
+        *   Revenue and commission tracking
+    
+    *   **User Management:**
+        *   Comprehensive user search and filtering
+        *   Waitlist review and approval workflow
+        *   User profile management
+        *   Account status control
+        *   Activity logs and audit trails
+    
+    *   **Content Moderation:**
+        *   Post/comment moderation queue
+        *   Report handling
+        *   Bulk content actions
+        *   Content filtering rules management
+    
+    *   **Referral System Management:**
+        *   Commission rate configuration
+        *   Referral tree visualization
+        *   Commission payout management
+        *   Dispute resolution tools
+    
+    *   **Analytics & Reporting:**
+        *   Custom report generation
+        *   Export capabilities
+        *   Trend analysis
+        *   User behavior insights
+
+## 8. User Personal Frontend
+
+Each user gets a personalized frontend accessible via their subdomain (e.g., `user1.idance.live`), built using Next.js and hosted on Cloudflare Pages.
+
+*   **Technology Stack:**
+    *   Next.js for SSR and static generation
+    *   Cloudflare Pages for hosting
+    *   Cloudflare Functions for dynamic features
+    *   TailwindCSS for responsive design
+    *   iDrive E2 for media storage
+
+*   **Public Site (`user1.idance.live`):**
+    *   Responsive, modern design
+    *   Customizable templates
+    *   Portfolio showcase
+    *   Dance style proficiency display
+    *   Awards and achievements
+    *   Social media integration
+    *   Contact forms
+    *   SEO optimization
+    *   Blog/journal integration
+    *   Custom domain support
+
+*   **Admin Interface (`user1.idance.live/admin`):**
+    *   Protected by authentication
+    *   Site customization tools
+    *   Content management
+    *   Media library (iDrive E2 integration)
+    *   Analytics dashboard
+    *   Profile management
+    *   Timeline post management
+    *   Engagement metrics
+    *   Message center
+    *   Referral dashboard
+
+## 9. Storage Architecture
+
+*   **iDrive E2 Storage Integration:**
+    *   Primary storage for user media
+    *   Automatic image optimization and resizing
+    *   Video transcoding
+    *   CDN integration
+    *   Backup strategy
+    *   Access control via signed URLs
+    *   Direct upload from client
+    *   Storage quota management
+    *   Media type validation
+    *   Virus scanning
+
+## 10. Deployment Strategy
 
 *   **Frontend (Mobile - `app/`):**
     *   EAS Build for creating and submitting builds to Apple App Store and Google Play Store.
     *   EAS Update for over-the-air updates of JS bundle (for non-native changes).
 *   **Frontend (Web - `web/` or similar):**
-    *   Deployed to a static/SSR hosting provider (Vercel, Netlify, Cloudflare Pages).
+    *   Deployed to a static/SSR hosting provider (Cloudflare Pages).
 *   **Backend (Supabase):**
     *   Database migrations managed via Supabase CLI or SQL scripts (version controlled).
     *   Edge Functions deployed via Supabase CLI.
@@ -220,7 +315,7 @@ iDance will offer distinct user tiers with varying levels of access and features
 *   **Admin Panel (`dashboard/` - Post-MVP):**
     *   Deployed as a web application (e.g., to Vercel, Netlify).
 
-## 9. Future Epics & Enhancements Roadmap (High-Level)
+## 11. Future Epics & Enhancements Roadmap (High-Level)
 
 *   **Epic 1: MVP Launch (Core Functionality)**
     *   Auth, Comprehensive Profiles (including dance styles/proficiency, awards, social links, reels, photos, audios), Swiping, Matching, Chat, Direct Waitlist System, Core Referral System (signup, tracking, multi-level structure), Dance Journal & Timeline, Basic/Pro/VIP Tier Foundation (Pro Subscription payments can be activated post-initial user seeding, but structure in place).
@@ -243,13 +338,13 @@ iDance will offer distinct user tiers with varying levels of access and features
     *   **Advanced Admin Dashboard with comprehensive analytics and user management tools.**
     *   **Vector Search for Content Discovery (profiles, journal posts).**
 
-## 10. Technology Choices Summary
+## 12. Technology Choices Summary
 
 *   **Mobile App:** React Native with Expo (TypeScript)
 *   **Web App:** Modern Web Framework (e.g., Next.js, Remix, Astro, SvelteKit - TypeScript, TBD)
 *   **Backend:** Supabase (Postgres, Auth, Edge Functions, Realtime, Storage)
 *   **Payment Processing:** Stripe
-*   **DNS/CDN (for `idance.live`):** Cloudflare (recommended)
+*   **DNS/CDN (for `idance.live`):** Cloudflare
 *   **Package Management (Monorepo if adopted):** pnpm or similar (e.g., Turborepo, Nx)
 
 This architecture aims to provide a solid foundation for iDance, balancing speed of development with scalability and future growth potential.

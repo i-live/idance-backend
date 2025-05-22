@@ -160,6 +160,32 @@ erDiagram
         TIMESTAMPTZ created_at "Auto-generated"
     }
 
+    post_likes {
+        UUID id PK "Generated v4"
+        UUID post_id FK "FK journal_posts"
+        UUID user_id FK "FK users"
+        TIMESTAMPTZ created_at "Auto-generated"
+    }
+
+    post_comments {
+        UUID id PK "Generated v4"
+        UUID post_id FK "FK journal_posts"
+        UUID user_id FK "FK users"
+        TEXT content "Comment text"
+        JSONB metadata "Optional data"
+        INT reply_to_id FK "Self-reference"
+        TIMESTAMPTZ created_at "Auto-generated"
+        TIMESTAMPTZ updated_at "Auto-updated"
+    }
+
+    post_shares {
+        UUID id PK "Generated v4"
+        UUID post_id FK "FK journal_posts"
+        UUID user_id FK "FK users"
+        TEXT share_type "Platform type"
+        TIMESTAMPTZ created_at "Auto-generated"
+    }
+
     referrals {
         UUID id PK "Generated v4"
         UUID referrer_id FK "FK users"
@@ -188,6 +214,9 @@ erDiagram
     users ||--o{ matches: participates
     users ||--o{ messages: sends
     users ||--o{ journal_posts: creates
+    users ||--o{ post_likes: creates
+    users ||--o{ post_comments: writes
+    users ||--o{ post_shares: shares
     users ||--o{ referrals: refers
 
     profiles ||--o{ user_dance_styles: has
@@ -202,8 +231,12 @@ erDiagram
 
     matches ||--|| chats: enables
     chats ||--o{ messages: contains
+    journal_posts ||--o{ post_likes: has
+    journal_posts ||--o{ post_comments: has
+    journal_posts ||--o{ post_shares: tracks
     referrals ||--o{ commissions: generates
     referrals ||--o{ referrals: branches
+    post_comments ||--o{ post_comments: "replies to"
 ```
 
 ## 2. Table Schemas
@@ -308,6 +341,30 @@ erDiagram
 *   `use_custom_location` (BOOLEAN, NOT NULL, Default: FALSE)
 *   `updated_at` (TIMESTAMPTZ, Default: now())
 
+### `post_likes`
+*   `id` (UUID, PK, Default: uuid_generate_v4())
+*   `post_id` (UUID, NOT NULL, FK to `journal_posts.id` ON DELETE CASCADE)
+*   `user_id` (UUID, NOT NULL, FK to `users.id` ON DELETE CASCADE)
+*   `created_at` (TIMESTAMPTZ, Default: now())
+*   CONSTRAINT `unique_post_like` UNIQUE (`post_id`, `user_id`)
+
+### `post_comments`
+*   `id` (UUID, PK, Default: uuid_generate_v4())
+*   `post_id` (UUID, NOT NULL, FK to `journal_posts.id` ON DELETE CASCADE)
+*   `user_id` (UUID, NOT NULL, FK to `users.id` ON DELETE CASCADE)
+*   `content` (TEXT, NOT NULL)
+*   `metadata` (JSONB, NULLABLE)
+*   `reply_to_id` (UUID, NULLABLE, FK to `post_comments.id` ON DELETE CASCADE)
+*   `created_at` (TIMESTAMPTZ, Default: now())
+*   `updated_at` (TIMESTAMPTZ, Default: now())
+
+### `post_shares`
+*   `id` (UUID, PK, Default: uuid_generate_v4())
+*   `post_id` (UUID, NOT NULL, FK to `journal_posts.id` ON DELETE CASCADE)
+*   `user_id` (UUID, NOT NULL, FK to `users.id` ON DELETE CASCADE)
+*   `share_type` (TEXT, NOT NULL)
+*   `created_at` (TIMESTAMPTZ, Default: now())
+
 ## 3. Database Extensions
 *   **`uuid-ossp`**: For uuid_generate_v4()
 *   **`postgis`**: For geospatial queries
@@ -331,8 +388,18 @@ erDiagram
 *   **`user_portfolio_items` table:**
     *   `CREATE INDEX idx_user_portfolio_items_user_id_display_order ON user_portfolio_items (user_id, display_order);`
     *   `CREATE INDEX idx_user_portfolio_items_item_type ON user_portfolio_items (item_type);`
+*   **`post_likes` table:**
+    *   `CREATE INDEX idx_post_likes_post_id ON post_likes (post_id);`
+    *   `CREATE INDEX idx_post_likes_user_id ON post_likes (user_id);`
+*   **`post_comments` table:**
+    *   `CREATE INDEX idx_post_comments_post_id ON post_comments (post_id);`
+    *   `CREATE INDEX idx_post_comments_user_id ON post_comments (user_id);`
+    *   `CREATE INDEX idx_post_comments_reply_to_id ON post_comments (reply_to_id);`
+*   **`post_shares` table:**
+    *   `CREATE INDEX idx_post_shares_post_id ON post_shares (post_id);`
+    *   `CREATE INDEX idx_post_shares_user_id ON post_shares (user_id);`
 
 ## 5. Row Level Security (RLS) Policies
-*   Users can only read/write their own related entries in `user_dance_styles`, `user_awards`, `user_interests`, `user_social_links`, `user_portfolio_items`
+*   Users can only read/write their own related entries in `user_dance_styles`, `user_awards`, `user_interests`, `user_social_links`, `user_portfolio_items`, `post_likes`, `post_comments`, `post_shares`
 *   Reference tables (`dance_styles`, `interests`, `social_platforms`) are public read-only
 *   All other RLS policies remain as previously defined
