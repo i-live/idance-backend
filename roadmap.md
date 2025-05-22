@@ -5,47 +5,37 @@
 ```mermaid
 gantt
     title iDance Platform Evolution
-    dateFormat  YYYY-MM-DD
-    section Phase 1: User Sites
-    MVP Launch: 2025-05-01, 90d
-    Personal Sites: 2025-05-01, 60d
-    Analytics & SEO: 2025-06-01, 30d
+    dateFormat YYYY-MM-DD
+    axisFormat %Y-%m
+    
+    section Phase 1: MVP
+    User Sites Launch    :2025-05-01, 60d
+    Basic Analytics     :2025-06-01, 30d
+    SEO Tools          :2025-06-15, 30d
     
     section Phase 2: Growth
-    Enhanced Features: 2025-08-01, 60d
-    Community Tools: 2025-09-01, 45d
+    Enhanced Features   :2025-08-01, 60d
+    Premium Themes     :2025-08-15, 30d
+    Community Tools    :2025-09-01, 45d
+    SEO Improvements   :2025-09-15, 30d
     
     section Phase 3: Mobile
-    App Development: 2025-10-15, 90d
-    Beta Testing: 2025-12-15, 30d
+    App Development    :2025-10-15, 90d
+    Timeline & Feed    :2025-11-01, 45d
+    Swipe Matching    :2025-11-15, 45d
+    Chat System       :2025-12-01, 30d
+    Beta Testing      :2025-12-15, 30d
     
     section Phase 4: Pro
-    Pro Features: 2026-01-15, 60d
-    Payment System: 2026-02-15, 45d
+    Pro Features      :2026-01-15, 60d
+    Payment System    :2026-02-15, 45d
+    Commission Setup  :2026-03-01, 30d
     
     section Phase 5: AI
-    AI Development: 2026-04-01, 90d
-    Platform Integration: 2026-05-15, 45d
-    section Phase 2: Growth
-        Engagement : Enhanced analytics
-                  : More themes
-                  : SEO improvements
-                  : Community features
-    section Phase 3: Mobile App
-        Core Features : Timeline/feed
-                     : Swipe matching
-                     : Chat system
-                     : Mobile profiles
-    section Phase 4: Monetization
-        Pro Features : Premium themes
-                    : Advanced analytics
-                    : Priority support
-                    : Commission system
-    section Phase 5: Advanced
-        AI Features : Smart matching
-                   : Content recommendations
-                   : Auto SEO optimization
-                   : Profile suggestions
+    AI Development    :2026-04-01, 90d
+    Smart Matching    :2026-04-15, 45d
+    Content Rec      :2026-05-01, 45d
+    Platform AI      :2026-05-15, 45d
 ```
 
 ## 1. Phase One: User Sites (Current Focus)

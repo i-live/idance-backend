@@ -275,8 +275,8 @@ flowchart TD
     AdminPortal --> Supabase
     
     %% Visual Styling
-    classDef primary fill:#f9f,stroke:#333,stroke-width:2px
-    classDef secondary fill:#bbf,stroke:#333,stroke-width:1px
+    classDef primary fill:#ff69b4,stroke:#333,stroke-width:2px
+    classDef secondary fill:#87ceeb,stroke:#333,stroke-width:1px
     class Supabase,UserSites,AdminPortal primary
     class Auth,Edge,RT,Store,Profile,Dashboard secondary
 ```
