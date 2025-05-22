@@ -15,7 +15,7 @@ erDiagram
     }
 
     profiles {
-        uuid user_id PK FK "References users.id"
+        uuid user_id PK "PK, References users.id"
         text username UK "Unique, for profile URL (username.idance.live)"
         text first_name "Not Null"
         text last_name "Not Null"
@@ -50,7 +50,7 @@ erDiagram
     }
 
     user_preferences {
-        uuid user_id PK FK "References users.id"
+        uuid user_id PK "PK, References users.id"
         jsonb discovery_dance_styles "Array of text"
         jsonb discovery_skill_levels "Array of text"
         integer discovery_min_age "CHECK >= 18"
@@ -66,8 +66,8 @@ erDiagram
     }
 
     swipes {
-        uuid swiper_user_id PK FK "References users.id"
-        uuid swiped_user_id PK FK "References users.id"
+        uuid swiper_user_id PK "Part of PK, FK to users.id (swiper)"
+        uuid swiped_user_id PK "Part of PK, FK to users.id (swiped)"
         text swipe_type "Not Null, CHECK: ('like', 'pass', 'superlike')"
         timestamptz created_at "Default: now()"
     }
@@ -140,20 +140,20 @@ erDiagram
 
     users ||--o{ profiles : "has one"
     users ||--o{ user_preferences : "configures"
-    users ||--o{ swipes : "\"initiates (swiper)\""
-    users ||--o{ swipes : "\"receives (swiped)\""
-    users ||--o{ matches : "\"is part of (user1 or user2)\""
+    users ||--o{ swipes : "initiates (swiper)"
+    users ||--o{ swipes : "receives (swiped)"
+    users ||--o{ matches : "is part of (user1 or user2)"
     users ||--o{ messages : "sends"
     users ||--o{ journal_posts : "creates"
     users ||--o{ referrals : "is referrer_user_id"
     users ||--o{ referrals : "is referred_user_id"
-    users ||--o{ commission_ledgers : "\"earns (earning_user_id)\""
-    users ||--o{ commission_ledgers : "\"generates_from (paying_user_id)\""
+    users ||--o{ commission_ledgers : "earns (earning_user_id)"
+    users ||--o{ commission_ledgers : "generates_from (paying_user_id)"
 
     matches ||--|| chats : "has one"
     chats ||--o{ messages : "contains"
     referrals ||--o{ commission_ledgers : "generates"
-    referrals ||--o{ referrals : "\"can_originate_from (originating_referral_id)\""
+    referrals ||--o{ referrals : "can_originate_from (originating_referral_id)"
 ```
 
 ## 2. Table Schemas
