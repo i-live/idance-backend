@@ -9,7 +9,7 @@ gantt
     axisFormat %Y-%m
     %%{ init: { 'gantt': {'leftPadding': 200 } } }%%
 
-    section Phase 1: Pre-Launch + Web Launch
+    section Phase 1: Pre-Launch
     BackOffice         :2025-06-01, 5d
     User Sites         :2025-06-08, 14d
     Affiliate Tracking :2025-06-23, 3d
