@@ -205,27 +205,27 @@ erDiagram
         TIMESTAMPTZ created_at "Auto-generated"
     }
 
-    post_likes {
+    vlog_likes {
         UUID id PK "Generated v4"
-        UUID post_id FK "FK journal_posts"
+        UUID vlog_id FK "FK vlogs"
         UUID user_id FK "FK users"
         TIMESTAMPTZ created_at "Auto-generated"
     }
 
-    post_comments {
+    vlog_comments {
         UUID id PK "Generated v4"
-        UUID post_id FK "FK journal_posts"
+        UUID vlog_id FK "FK vlogs"
         UUID user_id FK "FK users"
         TEXT content "Comment text"
         JSONB metadata "Optional data"
-        INT reply_to_id FK "Self-reference"
+        UUID reply_to_id FK "Self-reference"
         TIMESTAMPTZ created_at "Auto-generated"
         TIMESTAMPTZ updated_at "Auto-updated"
     }
 
-    post_shares {
+    vlog_shares {
         UUID id PK "Generated v4"
-        UUID post_id FK "FK journal_posts"
+        UUID vlog_id FK "FK vlogs"
         UUID user_id FK "FK users"
         TEXT share_type "Platform type"
         TIMESTAMPTZ created_at "Auto-generated"
@@ -655,6 +655,17 @@ erDiagram
     *   `CREATE INDEX idx_vlogs_created_at ON vlogs (created_at);`
     *   `CREATE INDEX idx_vlogs_visibility ON vlogs (visibility);`
 
+*   **`vlog_likes` table:**
+    *   `CREATE INDEX idx_vlog_likes_vlog_id ON vlog_likes (vlog_id);`
+    *   `CREATE INDEX idx_vlog_likes_user_id ON vlog_likes (user_id);`
+*   **`vlog_comments` table:**
+    *   `CREATE INDEX idx_vlog_comments_vlog_id ON vlog_comments (vlog_id);`
+    *   `CREATE INDEX idx_vlog_comments_user_id ON vlog_comments (user_id);`
+    *   `CREATE INDEX idx_vlog_comments_reply_to_id ON vlog_comments (reply_to_id);`
+*   **`vlog_shares` table:**
+    *   `CREATE INDEX idx_vlog_shares_vlog_id ON vlog_shares (vlog_id);`
+    *   `CREATE INDEX idx_vlog_shares_user_id ON vlog_shares (user_id);`
+
 *   **`referrals` table:**
     *   `CREATE INDEX idx_referrals_referrer_id ON referrals (referrer_id);`
     *   `CREATE INDEX idx_referrals_status ON referrals (status);`
@@ -684,17 +695,6 @@ erDiagram
     *   `CREATE INDEX idx_media_assets_owner_type ON media_assets (owner_type);`
     *   `CREATE INDEX idx_media_assets_type ON media_assets (type);`
     *   `CREATE INDEX idx_media_assets_storage_path ON media_assets (storage_path);`
-
-*   **`vlog_likes` table:**
-    *   `CREATE INDEX idx_vlog_likes_vlog_id ON vlog_likes (vlog_id);`
-    *   `CREATE INDEX idx_vlog_likes_user_id ON vlog_likes (user_id);`
-*   **`vlog_comments` table:**
-    *   `CREATE INDEX idx_vlog_comments_vlog_id ON vlog_comments (vlog_id);`
-    *   `CREATE INDEX idx_vlog_comments_user_id ON vlog_comments (user_id);`
-    *   `CREATE INDEX idx_vlog_comments_reply_to_id ON vlog_comments (reply_to_id);`
-*   **`vlog_shares` table:**
-    *   `CREATE INDEX idx_vlog_shares_vlog_id ON vlog_shares (vlog_id);`
-    *   `CREATE INDEX idx_vlog_shares_user_id ON vlog_shares (user_id);`
 
 ## 5. Row Level Security (RLS) Policies
 
