@@ -135,14 +135,21 @@ iDance is a mobile application and web platform designed to facilitate connectin
 
 ## 3. Infrastructure & Services
 
-### 3.1 Storage (iDrive E2)
-*   **Features:**
-    - Media storage
+### 3.1 Storage Architecture
+*   **Primary Storage (iDrive E2):**
+    - Long-term media storage
     - Image optimization
     - Video transcoding
-    - CDN integration
     - Access control
     - Quota management
+    - Cost-effective for large storage volumes
+
+*   **Edge Caching (Cloudflare R2):**
+    - Fast edge-cached access to frequent assets
+    - Global distribution
+    - Seamless Cloudflare integration
+    - Automatic cache invalidation
+    - Pay-per-use pricing model
 
 ### 3.2 Deployment Infrastructure
 *   **Mobile App:**
@@ -339,7 +346,7 @@ flowchart TD
 ## 7. Development & Deployment
 
 ### 7.1 Development
-*   **Monorepo Structure:**
+*   **Repo Structure:**
     - pnpm workspace
     - Shared types
     - Consistent tooling
@@ -355,6 +362,7 @@ flowchart TD
     - EAS Build
     - TestFlight/Internal Testing
     - Production Release
+    - Github Actions
 
 *   **Web:**
     - Cloudflare Pages
@@ -364,7 +372,7 @@ flowchart TD
 ## 8. Technology Stack Summary
 *   **Frontend:** React Native (TypeScript), Next.js (TypeScript)
 *   **Backend:** Supabase, Edge Functions (TypeScript)
-*   **Storage:** iDrive E2
+*   **Storage:** iDrive E2 (primary storage), Cloudflare R2 (edge caching)
 *   **Infrastructure:** Cloudflare
 *   **Payment:** Stripe
 *   **Development Tools:**
