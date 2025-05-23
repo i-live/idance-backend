@@ -6,6 +6,20 @@ This document details the PostgreSQL database schema for the "iDance" applicatio
 
 ```mermaid
 erDiagram
+    users ||--o{ user_roles : has
+    users ||--o{ profiles : has
+    users ||--o{ group_members : belongs_to
+    users ||--o{ media_assets : owns
+    
+    roles ||--o{ user_roles : assigned_to
+    
+    groups ||--o{ group_members : contains
+    groups ||--o{ site_configs : has
+    groups ||--o{ media_assets : owns
+    
+    site_configs ||--o{ content_blocks : contains
+    site_configs ||--o{ site_analytics : tracks
+    
     users {
         UUID id PK "Auth User ID"
         TIMESTAMP created_at
