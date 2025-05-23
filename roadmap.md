@@ -12,12 +12,12 @@ gantt
     BackOffice         :2025-06-01, 5d
     User Sites         :2025-06-08, 14d
     Affiliate Tracking :2025-06-23, 3d
-    Marketing         :2025-06-01, 30d, #FF9999
+    Marketing         :2025-06-01, 30d
 
     section Phase 2: App Launch
     Build App         :2025-07-01, 30d
     Beta Launch       :2025-08-01, 30d
-    Marketing         :2025-09-01, 30d, #FF9999
+    Marketing         :2025-09-01, 30d
 
     section Phase 3: Monetization
     Company Formation :2025-10-01, 7d
@@ -26,8 +26,8 @@ gantt
     Pro Tier Launch  :2025-10-15, 30d
 
     section Phase 4: PR
-    PR               :2025-10-15, 60d, #FF9999
-    Affiliate Program:2025-10-15, 30d, #FF9999
+    PR               :2025-10-15, 60d
+    Affiliate Program:2025-10-15, 30d
 
     section Phase 5: Capital Raise
     Prepare Pitch    :2025-11-01, 30d
