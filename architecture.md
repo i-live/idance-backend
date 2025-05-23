@@ -3,20 +3,20 @@
 ```mermaid
 flowchart TD
     %% Main User Entry Points
-    MobileApp["Mobile App\n(React Native + Expo)"]
-    UserSites["User Sites\n(Next.js)"]
-    AdminPortal["Admin Portal\n(Next.js)"]
+    MobileApp["Mobile App<br>(React Native + Expo)"]
+    UserSites["User Sites<br>(Next.js)"]
+    AdminPortal["Admin Portal<br>(Next.js)"]
 
     %% Infrastructure & Hosting
-    CF["Cloudflare\nPages + DNS + CDN"]
+    CF["Cloudflare<br>Pages + DNS + CDN"]
     
     %% Storage Systems
-    iDriveE2["iDrive E2\nPrimary Storage"]
-    R2["Cloudflare R2\nEdge Cache"]
+    iDriveE2["iDrive E2<br>Primary Storage"]
+    R2["Cloudflare R2<br>Edge Cache"]
     
     %% Backend Systems
-    Supabase["Supabase Platform\nAuth + Database + Realtime"]
-    EdgeFuncs["Edge Functions\nBusiness Logic"]
+    Supabase["Supabase Platform<br>Auth + Database + Realtime"]
+    EdgeFuncs["Edge Functions<br>Business Logic"]
 
     %% User Access
     Users(("Users"))
