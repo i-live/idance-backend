@@ -8,46 +8,45 @@ gantt
     dateFormat YYYY-MM-DD
     axisFormat %Y-%m
     
-    section Phase 1: MVP
-    User Sites Launch    :2025-05-01, 60d
-    Basic Analytics     :2025-06-01, 30d
-    SEO Tools          :2025-06-15, 30d
+    section Phase 1: Pre-Launch + Web Launch
+    BackOffice  :2025-06-01, 5d
+    User Sites    :2025-06-08, 14d
+    Affiliate Tracking     :2025-06-23, 3d
+    Marketing      :2025-06-01, 30d
     
-    section Phase 2: Growth
-    Enhanced Features   :2025-08-01, 60d
-    Premium Themes     :2025-08-15, 30d
-    Community Tools    :2025-09-01, 45d
-    SEO Improvements   :2025-09-15, 30d
+    section Phase 2: App Launch
+    Build App   :2025-07-01, 30d
+    Beta Launch     :2025-08-01, 30d
+    Marketing    :2025-09-01, 30d
+
+    section Phase 3: Monetization
+    Company Formation    :2025-10-01, 7d
+    Business Bankig    :2025-10-08, 7d
+    Pro Tier    :2025-10-01, 14d
+    Pro Tier Launch       :2025-10-15, 30d
     
-    section Phase 3: Mobile
-    App Development    :2025-10-15, 90d
-    Timeline & Feed    :2025-11-01, 45d
-    Swipe Matching    :2025-11-15, 45d
-    Chat System       :2025-12-01, 30d
-    Beta Testing      :2025-12-15, 30d
+    section Phase 4: PR
+    PR      :2025-10-15, 60d
+    Affiliate Program    :2025-10-15, 30d
     
-    section Phase 4: Pro
-    Pro Features      :2026-01-15, 60d
-    Payment System    :2026-02-15, 45d
-    Commission Setup  :2026-03-01, 30d
+    section Phase 5: Capital Raise
+    Prepare Pitch    :2025-11-01, 30d
     
-    section Phase 5: AI
-    AI Development    :2026-04-01, 90d
-    Smart Matching    :2026-04-15, 45d
-    Content Rec      :2026-05-01, 45d
-    Platform AI      :2026-05-15, 45d
+    section Phase 6: AI Integration
+    AI Development    :2025-11-01, 90d
+    Smart Matching    :2026-11-15, 45d
 ```
 
-## 1. Phase One: User Sites (Current Focus)
+## 1. Phase One: Pre-Launch + Web Launch (June 2025)
 
 ### Core Features
+- Back office administration system
 - Personal dance websites (`username.idance.live`)
 - Media gallery and portfolio
-- Dance journal/blog
-- Contact forms
-- SEO optimization
-- Custom domain support (CNAME)
+- Affiliate tracking system
 - Basic analytics
+- SEO optimization
+- Marketing infrastructure
 
 ### Technical Implementation
 - Next.js + TypeScript stack
@@ -55,105 +54,112 @@ gantt
 - Supabase backend
 - Media optimization pipeline
 - User admin portal
+- Affiliate tracking system
 
-## 2. Phase Two: Growth & Engagement
+## 2. Phase Two: App Launch (July-September 2025)
 
-### Platform Enhancements
-- Enhanced analytics dashboard
-- Additional site themes
-- Improved SEO tools
-- Social sharing features
-- Community spotlights
-- Featured profiles
+### Core Features
+- Mobile application development
+- Beta testing program
+- User feedback integration
+- Marketing campaign
 
 ### Technical Focus
-- Analytics pipeline
-- Theme system
-- Social integrations
+- React Native implementation
+- Beta testing infrastructure
 - Performance optimization
-- Content delivery improvements
+- User engagement tracking
+- Marketing analytics
 
-## 3. Phase Three: Mobile App Launch
+## 3. Phase Three: Monetization (October 2025)
 
-### Core Mobile Features
-- Timeline/social feed
-- Swipe-based matching
-- Real-time chat
-- Mobile-optimized profiles
-- Cross-platform content sharing
-
-### Technical Requirements
-- React Native with TypeScript
-- Real-time communications
-- Media upload optimization
-- Location-based features
-- Push notifications
-
-## 4. Phase Four: Monetization
+### Business Setup
+- Company formation
+- Business banking setup
+- Pro tier feature development
+- Payment processing integration
 
 ### Pro Features
 - Premium site themes
 - Advanced analytics
 - Priority support system
-- Referral commissions
-- Enhanced customization
+- Enhanced customization options
 
-### Business Infrastructure
-- Payment processing
-- Commission tracking
-- Support system
-- Usage monitoring
-- Billing management
+## 4. Phase Four: PR (October-December 2025)
 
-## 5. Phase Five: Advanced Features
+### Focus Areas
+- Public relations campaign
+- Media outreach
+- Affiliate program launch
+- Community building
+- Brand awareness
 
-### AI & Automation
+### Implementation
+- PR strategy execution
+- Affiliate tracking and management
+- Community engagement tools
+- Social media presence
+
+## 5. Phase Five: Capital Raise (November 2025)
+
+### Key Activities
+- Pitch deck preparation
+- Financial projections
+- Market analysis
+- Investor outreach
+- Due diligence preparation
+
+## 6. Phase Six: AI Integration (November 2025 - January 2026)
+
+### AI Features
 - Smart dancer matching
 - Content recommendations
 - Automated SEO
 - Profile optimization
-- Content moderation
+- Smart matching system
 
-### Platform Evolution
-- Events & competitions
-- Virtual workshops
-- Professional networking
-- Talent marketplace
-- Dance studio integrations
+### Technical Implementation
+- AI development pipeline
+- Machine learning models
+- Data processing infrastructure
+- Integration testing
 
 ## Key Success Metrics
 
-### Phase 1
+### Phase 1: Pre-Launch + Web Launch
 - Number of active sites
 - Media uploads
 - Profile completion rate
-- Organic traffic
-- Referral signups
+- Affiliate sign-ups
+- Marketing reach
 
-### Phase 2
-- User engagement
-- Content creation
-- Social shares
-- SEO performance
-- Community growth
-
-### Phase 3
+### Phase 2: App Launch
 - App downloads
+- Beta tester engagement
+- User feedback metrics
 - Daily active users
-- Match rate
-- Chat engagement
-- Cross-platform usage
+- Feature adoption rate
 
-### Phase 4
-- Pro conversions
+### Phase 3: Monetization
+- Pro tier conversions
 - Revenue metrics
-- Commission payouts
+- Payment processing success
 - Customer satisfaction
-- Feature adoption
 
-### Phase 5
-- AI accuracy
-- Automation efficiency
-- Platform scalability
-- Market penetration
-- Industry partnerships
+### Phase 4: PR
+- Media coverage
+- Affiliate program growth
+- Social media engagement
+- Brand mention metrics
+
+### Phase 5: Capital Raise
+- Investor meetings
+- Pitch deck engagement
+- Due diligence completion
+- Term sheet discussions
+
+### Phase 6: AI Integration
+- AI model accuracy
+- Smart matching success rate
+- User satisfaction with AI features
+- System performance metrics
