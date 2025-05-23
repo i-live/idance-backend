@@ -599,6 +599,163 @@ erDiagram
 *   **`postgis`**: For geospatial queries
 
 ## 4. Key Indexes
+
+### Profile & User Related
+*   **`profiles` table:**
+    *   `CREATE INDEX idx_profiles_username ON profiles (username);`
+    *   `CREATE INDEX idx_profiles_location ON profiles USING GIST (ll_to_earth(latitude, longitude));`
+    *   `CREATE INDEX idx_profiles_last_active ON profiles (last_active_at);`
+    *   `CREATE INDEX idx_profiles_user_tier ON profiles (user_tier);`
+    *   `CREATE INDEX idx_profiles_looking_combo ON profiles (looking_for_partners, looking_for_jobs, looking_for_dancers);`
+    *   `CREATE INDEX idx_profiles_referrer ON profiles (referrer_id);`
+
+*   **`user_roles` table:**
+    *   `CREATE INDEX idx_user_roles_role_id ON user_roles (role_id);`
+    *   `CREATE INDEX idx_user_roles_scope_id ON user_roles (scope_id) WHERE scope_id IS NOT NULL;`
+    *   `CREATE INDEX idx_user_roles_granted ON user_roles (user_id, granted_at);`
+
+*   **`roles` table:**
+    *   `CREATE INDEX idx_roles_name ON roles (name);`
+
+### Dance & Interests
+*   **`dance_styles` table:**
+    *   `CREATE INDEX idx_dance_styles_name ON dance_styles (name);`
+
+*   **`user_dance_styles` table:**
+    *   `CREATE INDEX idx_user_dance_styles_style_id ON user_dance_styles (style_id);`
+    *   `CREATE INDEX idx_user_dance_styles_level ON user_dance_styles (user_id, proficiency_level);`
+
+*   **`user_awards` table:**
+    *   `CREATE INDEX idx_user_awards_user_id ON user_awards (user_id);`
+    *   `CREATE INDEX idx_user_awards_year ON user_awards (user_id, year DESC);`
+
+*   **`interests` table:**
+    *   `CREATE INDEX idx_interests_name ON interests (name);`
+
+*   **`user_interests` table:**
+    *   `CREATE INDEX idx_user_interests_interest_id ON user_interests (interest_id);`
+    *   `CREATE INDEX idx_user_interests_user ON user_interests (user_id, created_at);`
+
+### Social & Portfolio
+*   **`social_platforms` table:**
+    *   `CREATE INDEX idx_social_platforms_name ON social_platforms (name);`
+
+*   **`user_social_links` table:**
+    *   `CREATE INDEX idx_user_social_links_user_id ON user_social_links (user_id);`
+    *   `CREATE INDEX idx_user_social_links_platform_id ON user_social_links (platform_id);`
+
+*   **`user_portfolio_items` table:**
+    *   `CREATE INDEX idx_portfolio_user_order ON user_portfolio_items (user_id, display_order);`
+    *   `CREATE INDEX idx_portfolio_item_type ON user_portfolio_items (item_type);`
+
+### Groups & Members
+*   **`groups` table:**
+    *   `CREATE INDEX idx_groups_type ON groups (type);`
+    *   `CREATE INDEX idx_groups_subdomain ON groups (subdomain);`
+    *   `CREATE UNIQUE INDEX idx_groups_custom_domain_unique ON groups (LOWER(custom_domain)) WHERE custom_domain IS NOT NULL;`
+    *   `CREATE INDEX idx_groups_created ON groups (created_at DESC);`
+
+*   **`group_members` table:**
+    *   `CREATE INDEX idx_group_members_user_id ON group_members (user_id);`
+    *   `CREATE INDEX idx_group_members_role ON group_members (group_id, role);`
+    *   `CREATE INDEX idx_group_members_joined ON group_members (group_id, joined_at DESC);`
+
+### Matching & Chat
+*   **`user_search_preferences` table:**
+    *   `CREATE INDEX idx_search_prefs_location ON user_search_preferences USING GIST (ll_to_earth(search_latitude, search_longitude));`
+    *   `CREATE INDEX idx_search_prefs_distance ON user_search_preferences (discovery_distance_miles);`
+    *   `CREATE INDEX idx_search_prefs_age ON user_search_preferences (discovery_min_age, discovery_max_age);`
+
+*   **`swipes` table:**
+    *   `CREATE INDEX idx_swipes_swiped_user_id ON swipes (swiped_user_id);`
+    *   `CREATE INDEX idx_swipes_created_at ON swipes (created_at);`
+    *   `CREATE INDEX idx_swipes_combo ON swipes (swiper_user_id, swiped_user_id, swipe_type);`
+    *   `CREATE INDEX idx_recent_likes ON swipes (swiped_user_id, swipe_type, created_at DESC) WHERE swipe_type = 'like';`
+
+*   **`matches` table:**
+    *   `CREATE INDEX idx_matches_user1_id ON matches (user1_id);`
+    *   `CREATE INDEX idx_matches_user2_id ON matches (user2_id);`
+    *   `CREATE INDEX idx_matches_recent ON matches (matched_at DESC);`
+    *   `CREATE INDEX idx_matches_pair ON matches (LEAST(user1_id, user2_id), GREATEST(user1_id, user2_id));`
+
+*   **`chats` table:**
+    *   `CREATE INDEX idx_chats_match_id ON chats (match_id);`
+    *   `CREATE INDEX idx_chats_last_activity ON chats (last_activity DESC);`
+    *   `CREATE INDEX idx_active_chats ON chats (match_id, last_activity DESC);`
+
+*   **`messages` table:**
+    *   `CREATE INDEX idx_messages_chat_id ON messages (chat_id);`
+    *   `CREATE INDEX idx_messages_sender_id ON messages (sender_id);`
+    *   `CREATE INDEX idx_messages_sent_at ON messages (sent_at DESC);`
+    *   `CREATE INDEX idx_messages_recent ON messages (chat_id, sent_at DESC);`
+    *   `CREATE INDEX idx_messages_type ON messages (chat_id, content_type);`
+
+### Content & Media
+*   **`vlogs` table:**
+    *   `CREATE INDEX idx_vlogs_user_id ON vlogs (user_id);`
+    *   `CREATE INDEX idx_vlogs_post_type ON vlogs (post_type);`
+    *   `CREATE INDEX idx_vlogs_created_at ON vlogs (created_at DESC);`
+    *   `CREATE INDEX idx_vlogs_visibility ON vlogs (visibility);`
+    *   `CREATE INDEX idx_vlogs_engagement ON vlogs (user_id, created_at DESC, (engagement_counts->>'likes')::int DESC);`
+    *   `CREATE INDEX idx_public_vlogs ON vlogs (created_at DESC, user_id) WHERE visibility = 'public';`
+
+*   **`vlog_likes` table:**
+    *   `CREATE INDEX idx_vlog_likes_vlog_id ON vlog_likes (vlog_id);`
+    *   `CREATE INDEX idx_vlog_likes_user_id ON vlog_likes (user_id);`
+    *   `CREATE INDEX idx_vlog_likes_recent ON vlog_likes (vlog_id, created_at DESC);`
+
+*   **`vlog_comments` table:**
+    *   `CREATE INDEX idx_vlog_comments_vlog_id ON vlog_comments (vlog_id);`
+    *   `CREATE INDEX idx_vlog_comments_user_id ON vlog_comments (user_id);`
+    *   `CREATE INDEX idx_vlog_comments_reply_to_id ON vlog_comments (reply_to_id);`
+    *   `CREATE INDEX idx_vlog_comments_thread ON vlog_comments (vlog_id, reply_to_id, created_at DESC);`
+    *   `CREATE INDEX idx_vlog_comments_recent ON vlog_comments (vlog_id, created_at DESC);`
+
+*   **`vlog_shares` table:**
+    *   `CREATE INDEX idx_vlog_shares_vlog_id ON vlog_shares (vlog_id);`
+    *   `CREATE INDEX idx_vlog_shares_user_id ON vlog_shares (user_id);`
+    *   `CREATE INDEX idx_vlog_shares_recent ON vlog_shares (vlog_id, created_at DESC);`
+
+### Referrals & Commissions
+*   **`referrals` table:**
+    *   `CREATE INDEX idx_referrals_referrer_id ON referrals (referrer_id);`
+    *   `CREATE INDEX idx_referrals_status ON referrals (status);`
+    *   `CREATE INDEX idx_referrals_parent_id ON referrals (parent_referral_id) WHERE parent_referral_id IS NOT NULL;`
+    *   `CREATE INDEX idx_referrals_hierarchy ON referrals (referrer_id, level, created_at DESC);`
+
+*   **`commissions` table:**
+    *   `CREATE INDEX idx_commissions_referral_id ON commissions (referral_id);`
+    *   `CREATE INDEX idx_commissions_earner_id ON commissions (earner_id);`
+    *   `CREATE INDEX idx_commissions_payer_id ON commissions (payer_id);`
+    *   `CREATE INDEX idx_commissions_status ON commissions (status);`
+    *   `CREATE INDEX idx_commissions_created_at ON commissions (created_at DESC);`
+    *   `CREATE INDEX idx_commissions_earnings ON commissions (earner_id, status, created_at DESC);`
+
+### Sites & Content
+*   **`sites` table:**
+    *   `CREATE INDEX idx_sites_owner_id ON sites (owner_id);`
+    *   `CREATE INDEX idx_sites_owner_type ON sites (owner_type);`
+    *   `CREATE INDEX idx_sites_custom_domain ON sites (custom_domain);`
+    *   `CREATE UNIQUE INDEX idx_sites_custom_domain_unique ON sites (LOWER(custom_domain)) WHERE custom_domain IS NOT NULL;`
+
+*   **`site_analytics` table:**
+    *   `CREATE INDEX idx_site_analytics_site_id_date ON site_analytics (site_id, date);`
+    *   `CREATE INDEX idx_analytics_time_series ON site_analytics (site_id, date DESC);`
+    *   `CREATE INDEX idx_high_traffic ON site_analytics (site_id, visits DESC);`
+
+*   **`content_blocks` table:**
+    *   `CREATE INDEX idx_content_blocks_site_id_order ON content_blocks (site_id, order);`
+    *   `CREATE INDEX idx_published_content ON content_blocks (site_id, type, order) WHERE published = true;`
+    *   `CREATE INDEX idx_content_types ON content_blocks (site_id, type);`
+    *   `CREATE INDEX idx_content_recent ON content_blocks (site_id, updated_at DESC);`
+
+*   **`media_assets` table:**
+    *   `CREATE INDEX idx_media_assets_owner_id ON media_assets (owner_id);`
+    *   `CREATE INDEX idx_media_assets_owner_type ON media_assets (owner_type);`
+    *   `CREATE INDEX idx_media_assets_type ON media_assets (type);`
+    *   `CREATE INDEX idx_media_assets_storage_path ON media_assets (storage_path);`
+    *   `CREATE INDEX idx_media_recent ON media_assets (owner_id, owner_type, uploaded_at DESC);`
+    *   `CREATE INDEX idx_media_size ON media_assets (owner_id, size_bytes);`
 *   **`dance_styles` table:**
     *   `CREATE INDEX idx_dance_styles_name ON dance_styles (name);`
 *   **`user_dance_styles` table:**
@@ -634,6 +791,8 @@ erDiagram
 *   **`swipes` table:**
     *   `CREATE INDEX idx_swipes_swiped_user_id ON swipes (swiped_user_id);`
     *   `CREATE INDEX idx_swipes_created_at ON swipes (created_at);`
+    *   `CREATE INDEX idx_swipes_combo ON swipes (swiper_user_id, swiped_user_id, swipe_type);`
+    *   `CREATE INDEX idx_recent_likes ON swipes (swiped_user_id, swipe_type, created_at) WHERE swipe_type = 'like';`
 
 *   **`matches` table:**
     *   `CREATE INDEX idx_matches_user1_id ON matches (user1_id);`
@@ -643,17 +802,22 @@ erDiagram
 *   **`chats` table:**
     *   `CREATE INDEX idx_chats_match_id ON chats (match_id);`
     *   `CREATE INDEX idx_chats_last_activity ON chats (last_activity);`
+    *   `CREATE INDEX idx_active_chats ON chats (match_id, last_activity);`
 
 *   **`messages` table:**
     *   `CREATE INDEX idx_messages_chat_id ON messages (chat_id);`
     *   `CREATE INDEX idx_messages_sender_id ON messages (sender_id);`
     *   `CREATE INDEX idx_messages_sent_at ON messages (sent_at);`
+    *   `CREATE INDEX idx_messages_recent ON messages (chat_id, sent_at DESC);`
+    *   `CREATE INDEX idx_unread_messages ON messages (chat_id, sender_id, sent_at) WHERE read_at IS NULL;`
 
 *   **`vlogs` table:**
     *   `CREATE INDEX idx_vlogs_user_id ON vlogs (user_id);`
     *   `CREATE INDEX idx_vlogs_post_type ON vlogs (post_type);`
     *   `CREATE INDEX idx_vlogs_created_at ON vlogs (created_at);`
     *   `CREATE INDEX idx_vlogs_visibility ON vlogs (visibility);`
+    *   `CREATE INDEX idx_vlogs_engagement ON vlogs (user_id, created_at, (engagement_counts->>'likes')::int DESC);`
+    *   `CREATE INDEX idx_public_vlogs ON vlogs (created_at DESC) WHERE visibility = 'public';`
 
 *   **`vlog_likes` table:**
     *   `CREATE INDEX idx_vlog_likes_vlog_id ON vlog_likes (vlog_id);`
@@ -662,6 +826,7 @@ erDiagram
     *   `CREATE INDEX idx_vlog_comments_vlog_id ON vlog_comments (vlog_id);`
     *   `CREATE INDEX idx_vlog_comments_user_id ON vlog_comments (user_id);`
     *   `CREATE INDEX idx_vlog_comments_reply_to_id ON vlog_comments (reply_to_id);`
+    *   `CREATE INDEX idx_vlog_comments_thread ON vlog_comments (vlog_id, reply_to_id, created_at);`
 *   **`vlog_shares` table:**
     *   `CREATE INDEX idx_vlog_shares_vlog_id ON vlog_shares (vlog_id);`
     *   `CREATE INDEX idx_vlog_shares_user_id ON vlog_shares (user_id);`
@@ -686,15 +851,36 @@ erDiagram
 
 *   **`site_analytics` table:**
     *   `CREATE INDEX idx_site_analytics_site_id_date ON site_analytics (site_id, date);`
+    *   `CREATE INDEX idx_analytics_time_series ON site_analytics (site_id, date DESC);`
+    *   `CREATE INDEX idx_high_traffic ON site_analytics (site_id, visits DESC);`
 
 *   **`content_blocks` table:**
     *   `CREATE INDEX idx_content_blocks_site_id_order ON content_blocks (site_id, order);`
+    *   `CREATE INDEX idx_published_content ON content_blocks (site_id, type, order) WHERE published = true;`
+    *   `CREATE INDEX idx_content_types ON content_blocks (site_id, type);`
 
 *   **`media_assets` table:**
     *   `CREATE INDEX idx_media_assets_owner_id ON media_assets (owner_id);`
     *   `CREATE INDEX idx_media_assets_owner_type ON media_assets (owner_type);`
     *   `CREATE INDEX idx_media_assets_type ON media_assets (type);`
     *   `CREATE INDEX idx_media_assets_storage_path ON media_assets (storage_path);`
+    *   `CREATE INDEX idx_media_recent ON media_assets (owner_id, owner_type, uploaded_at DESC);`
+    *   `CREATE INDEX idx_media_size ON media_assets (owner_id, size_bytes);`
+
+*   **`profiles` table:**
+    *   `CREATE INDEX idx_profiles_username ON profiles (username);`
+    *   `CREATE INDEX idx_profiles_location ON profiles USING GIST (ll_to_earth(latitude, longitude));`
+    *   `CREATE INDEX idx_profiles_last_active ON profiles (last_active_at);`
+    *   `CREATE INDEX idx_profiles_user_tier ON profiles (user_tier);`
+    *   `CREATE INDEX idx_profiles_looking_combo ON profiles (looking_for_partners, looking_for_jobs, looking_for_dancers);`
+
+*   **`user_portfolio_items` table:**
+    *   `CREATE INDEX idx_portfolio_user_order ON user_portfolio_items (user_id, display_order);`
+    *   `CREATE INDEX idx_portfolio_item_type ON user_portfolio_items (item_type);`
+
+*   **`user_search_preferences` table:**
+    *   `CREATE INDEX idx_search_prefs_location ON user_search_preferences USING GIST (ll_to_earth(search_latitude, search_longitude));`
+    *   `CREATE INDEX idx_search_prefs_distance ON user_search_preferences (discovery_distance_miles);`
 
 ## 5. Row Level Security (RLS) Policies
 
