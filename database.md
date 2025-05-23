@@ -10,16 +10,16 @@ erDiagram
     users ||--o{ profiles : has
     users ||--o{ group_members : belongs_to
     users ||--o{ media_assets : owns
-    users ||--o{ site_configs : configures
+    users ||--o{ sites : configures
     
     roles ||--o{ user_roles : assigned_to
     
     groups ||--o{ group_members : contains
-    groups ||--o{ site_configs : has
+    groups ||--o{ sites : has
     groups ||--o{ media_assets : owns
     
-    site_configs ||--o{ content_blocks : contains
-    site_configs ||--o{ site_analytics : tracks
+    sites ||--o{ content_blocks : contains
+    sites ||--o{ site_analytics : tracks
     
     users {
         UUID id PK "Auth User ID"
@@ -524,7 +524,7 @@ erDiagram
 *   `status` (TEXT, NOT NULL, CHECK: `status IN ('pending', 'paid', 'cancelled')`)
 *   `created_at` (TIMESTAMPTZ, Default: now())
 
-### `site_configs`
+### `sites`
 *   `owner_id` (UUID, PK, FK to `auth.users.id` or `groups.id`)
 *   `owner_type` (TEXT, NOT NULL, CHECK: `owner_type IN ('user', 'group')`)
 *   `theme` (TEXT, NOT NULL)
@@ -542,7 +542,7 @@ erDiagram
 *   `updated_at` (TIMESTAMPTZ, Default: now())
 
 ### `site_analytics`
-*   `site_id` (UUID, PK, FK to `site_configs.owner_id` ON DELETE CASCADE)
+*   `site_id` (UUID, PK, FK to `sites.owner_id` ON DELETE CASCADE)
 *   `date` (DATE, PK, NOT NULL)
 *   `visits` (INTEGER, NOT NULL, Default: 0)
 *   `unique_visitors` (INTEGER, NOT NULL, Default: 0)
@@ -552,7 +552,7 @@ erDiagram
 
 ### `content_blocks`
 *   `id` (UUID, PK, Default: uuid_generate_v4())
-*   `site_id` (UUID, NOT NULL, FK to `site_configs.owner_id` ON DELETE CASCADE)
+*   `site_id` (UUID, NOT NULL, FK to `sites.owner_id` ON DELETE CASCADE)
 *   `type` (TEXT, NOT NULL, CHECK: `type IN ('text', 'gallery', 'blog', 'contact', 'etc')`)
 *   `order` (INTEGER, NOT NULL, Default: 0)
 *   `content` (JSONB, NOT NULL, Default: '{}')
@@ -678,11 +678,11 @@ erDiagram
     *   `CREATE INDEX idx_commissions_status ON commissions (status);`
     *   `CREATE INDEX idx_commissions_created_at ON commissions (created_at);`
 
-*   **`site_configs` table:**
-    *   `CREATE INDEX idx_site_configs_owner_id ON site_configs (owner_id);`
-    *   `CREATE INDEX idx_site_configs_owner_type ON site_configs (owner_type);`
-    *   `CREATE INDEX idx_site_configs_custom_domain ON site_configs (custom_domain);`
-    *   `CREATE UNIQUE INDEX idx_site_configs_custom_domain_unique ON site_configs (LOWER(custom_domain)) WHERE custom_domain IS NOT NULL;`
+*   **`sites` table:**
+    *   `CREATE INDEX idx_sites_owner_id ON sites (owner_id);`
+    *   `CREATE INDEX idx_sites_owner_type ON sites (owner_type);`
+    *   `CREATE INDEX idx_sites_custom_domain ON sites (custom_domain);`
+    *   `CREATE UNIQUE INDEX idx_sites_custom_domain_unique ON sites (LOWER(custom_domain)) WHERE custom_domain IS NOT NULL;`
 
 *   **`site_analytics` table:**
     *   `CREATE INDEX idx_site_analytics_site_id_date ON site_analytics (site_id, date);`
@@ -698,41 +698,41 @@ erDiagram
 
 ## 5. Row Level Security (RLS) Policies
 
-### Site Configurations
-*   Only authenticated users can read/write their own site configurations
-*   Groups can manage their own site configurations through group admins
+### Sites
+*   Only authenticated users can read/write their own sites
+*   Groups can manage their own sites through group admins
 *   Authenticated users can read public site settings for any custom domain
-*   API services can read all site configurations
+*   API services can read all sites
 *   Example policies:
     ```sql
     -- Enable RLS
-    ALTER TABLE site_configs ENABLE ROW LEVEL SECURITY;
+    ALTER TABLE sites ENABLE ROW LEVEL SECURITY;
 
     -- Policy for users to read their own settings
-    CREATE POLICY site_configs_select_own ON site_configs
+    CREATE POLICY sites_select_own ON sites
     FOR SELECT TO authenticated
     USING (
         (owner_type = 'user' AND owner_id = auth.uid()) OR 
         (owner_type = 'group' AND EXISTS (
             SELECT 1 FROM group_members 
-            WHERE group_members.group_id = site_configs.owner_id 
+            WHERE group_members.group_id = sites.owner_id 
             AND group_members.user_id = auth.uid()
         ))
     );
 
-    -- Policy for users to read public site configs by custom domain
-    CREATE POLICY site_configs_select_public ON site_configs
+    -- Policy for users to read public sites by custom domain
+    CREATE POLICY sites_select_public ON sites
     FOR SELECT TO authenticated
     USING (custom_domain IS NOT NULL);
 
     -- Policy for users to modify their own settings
-    CREATE POLICY site_configs_modify_own ON site_configs
+    CREATE POLICY sites_modify_own ON sites
     FOR ALL TO authenticated
     USING (
         (owner_type = 'user' AND owner_id = auth.uid()) OR 
         (owner_type = 'group' AND EXISTS (
             SELECT 1 FROM group_members 
-            WHERE group_members.group_id = site_configs.owner_id 
+            WHERE group_members.group_id = sites.owner_id 
             AND group_members.user_id = auth.uid()
             AND group_members.role IN ('owner', 'admin')
         ))
@@ -741,14 +741,14 @@ erDiagram
         (owner_type = 'user' AND owner_id = auth.uid()) OR 
         (owner_type = 'group' AND EXISTS (
             SELECT 1 FROM group_members 
-            WHERE group_members.group_id = site_configs.owner_id 
+            WHERE group_members.group_id = sites.owner_id 
             AND group_members.user_id = auth.uid()
             AND group_members.role IN ('owner', 'admin')
         ))
     );
 
     -- Policy for service role to access all settings
-    CREATE POLICY site_configs_service_all ON site_configs
+    CREATE POLICY sites_service_all ON sites
     FOR ALL TO service_role
     USING (true)
     WITH CHECK (true);
