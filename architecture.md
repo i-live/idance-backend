@@ -1,5 +1,64 @@
 # iDance - System Architecture
 
+```mermaid
+flowchart TD
+    %% Main User Entry Points
+    MobileApp["Mobile App\n(React Native + Expo)"]
+    UserSites["User Sites\n(Next.js)"]
+    AdminPortal["Admin Portal\n(Next.js)"]
+
+    %% Infrastructure & Hosting
+    CF["Cloudflare\nPages + DNS + CDN"]
+    
+    %% Storage Systems
+    iDriveE2["iDrive E2\nPrimary Storage"]
+    R2["Cloudflare R2\nEdge Cache"]
+    
+    %% Backend Systems
+    Supabase["Supabase Platform\nAuth + Database + Realtime"]
+    EdgeFuncs["Edge Functions\nBusiness Logic"]
+
+    %% User Access
+    Users(("Users"))
+    Admins(("Admins"))
+    
+    %% Flow Connections
+    Users --> MobileApp
+    Users --> UserSites
+    Admins --> AdminPortal
+    
+    %% Frontend to Infrastructure
+    UserSites --> CF
+    AdminPortal --> CF
+    
+    %% Infrastructure to Backend
+    CF --> Supabase
+    CF --> EdgeFuncs
+    CF --> R2
+    
+    %% Storage Flow
+    EdgeFuncs --> iDriveE2
+    iDriveE2 -.-> R2
+    
+    %% Mobile Direct Connections
+    MobileApp --> Supabase
+    MobileApp --> R2
+    
+    %% Backend Interconnections
+    EdgeFuncs <--> Supabase
+    
+    %% Styling
+    classDef primary fill:#2d3748,stroke:#cbd5e0,stroke-width:2px,color:white
+    classDef storage fill:#2c5282,stroke:#90cdf4,stroke-width:2px,color:white
+    classDef infrastructure fill:#1a365d,stroke:#4299e1,stroke-width:2px,color:white
+    classDef users fill:#742a2a,stroke:#fc8181,stroke-width:2px,color:white
+    
+    class MobileApp,UserSites,AdminPortal primary
+    class iDriveE2,R2 storage
+    class CF,Supabase,EdgeFuncs infrastructure
+    class Users,Admins users
+```
+
 ## 1. Overview
 
 iDance is a mobile application and web platform designed to facilitate connecting dancers to showcase their dance talents, help find new dance partners, other dancers, dance jobs, building professional networks, and fostering a vibrant community.
@@ -252,96 +311,7 @@ iDance is a mobile application and web platform designed to facilitate connectin
 
 ## 6. Technical Architecture
 
-```mermaid
-flowchart TD
-    %% Client Requests
-    User["Browser"] -->|"HTTPS"| CF["Cloudflare"]
-    CF -->|"admin.*"| Admin["Admin Portal"]
-    CF -->|"*.idance.live"| Sites["User Sites"]
-    CF -->|"custom domains"| Sites
 
-    %% Core Applications
-    subgraph CoreApps["Core Applications"]
-        direction TB
-        Admin -->|"Auth/Data"| Platform["Platform Services"]
-        Sites -->|"Auth/Data"| Platform
-        Mobile["Mobile App"] -->|"Auth/Data"| Platform
-    end
-
-    %% Platform Services
-    subgraph Platform["Platform Services"]
-        direction TB
-        Auth["Authentication"]
-        Data["Data API"]
-        Edge["Edge Functions"]
-        Storage["Media Storage"]
-    end
-
-    %% Data Layer
-    subgraph DataLayer["Data Layer"]
-        direction TB
-        DB[("PostgreSQL")]
-        Cache["Edge Cache"]
-        CDN["Media CDN"]
-    end
-
-    %% Connections
-    Auth --> DB
-    Data --> DB
-    Edge --> DB
-    Storage --> CDN
-    Platform --> Cache
-    
-    %% Site Generation
-    subgraph BuildSystem["Build System"]
-        direction TB
-        Builder["Site Builder Worker"] --> Templates["Site Templates"]
-        Builder --> Assets["Asset Pipeline"]
-        Templates --> Deploy["Deploy Service"]
-        Assets --> Deploy
-    end
-    
-    %% Supabase Backend Services
-    subgraph Supabase["Supabase Backend"]
-        direction TB
-        Auth["Authentication"] --> DB[("PostgreSQL")]
-        Edge["Edge Functions"] --> DB
-        RT["Realtime"] --> DB
-        Store["Storage"] --> CDN["CDN"]
-    end
-    
-    %% Dynamic Content
-    subgraph DynamicContent["Dynamic Content"]
-        direction TB
-        Profile["Profile Data"] --> DB
-        Media["Media Assets"] --> Store
-        Posts["Blog Posts"] --> DB
-        Stats["Analytics"] --> DB
-    end
-    
-    %% Control Flow
-    Edge -->|"Trigger Build"| Builder
-    DB -->|"Site Config"| Builder
-    Store -->|"Media"| Assets
-    Deploy -->|"Push"| CF
-    
-    %% Platform Connections
-    Pages --> UserSites
-    Pages --> AdminPortal
-    UserSites --> Supabase
-    AdminPortal --> Supabase
-    
-    %% Visual Styling
-    classDef primary fill:#2d3748,stroke:#cbd5e0,stroke-width:2px
-    classDef secondary fill:#1a202c,stroke:#718096,stroke-width:1px
-    classDef highlight fill:#2c5282,stroke:#90cdf4,stroke-width:2px
-    class Supabase,UserSites,AdminPortal primary
-    class Auth,Edge,RT,Store,Profile,Dashboard secondary
-    class User,CF,Pages highlight
-    
-    %% Default styling for all nodes
-    classDef default color:#e2e8f0,fill:#2d3748,stroke:#718096
-```
 
 ## 7. Development & Deployment
 
