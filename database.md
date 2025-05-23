@@ -11,12 +11,43 @@ erDiagram
         TIMESTAMP created_at
         TIMESTAMP updated_at
         STRING email
-        STRING role "(authenticated|admin)"
+    }
+
+    roles {
+        UUID id PK
+        TEXT name "site_admin|group_admin|pro_user|free_user"
+        JSONB permissions "Array of permission strings"
+        TIMESTAMP created_at
+    }
+
+    user_roles {
+        UUID user_id PK,FK "FK to users.id"
+        UUID role_id PK,FK "FK to roles.id"
+        UUID scope_id FK "FK to groups.id for group roles"
+        TIMESTAMP granted_at
+    }
+
+    groups {
+        UUID id PK
+        TEXT name "Group name"
+        TEXT type "company|studio|team"
+        TEXT subdomain UK "For group.idance.live"
+        TEXT custom_domain "Optional custom domain"
+        JSONB settings "Group settings"
+        UUID owner_id FK "FK to users.id"
+        TIMESTAMP created_at
+    }
+
+    group_members {
+        UUID group_id PK,FK "FK to groups.id"
+        UUID user_id PK,FK "FK to users.id"
+        TEXT role "owner|admin|member"
+        TIMESTAMP joined_at
     }
 
     profiles {
         UUID user_id PK "FK to users.id"
-        TEXT username UK "Unique username"
+        TEXT username UK "For username.idance.live"
         TEXT first_name "Not Null"
         TEXT last_name "Not Null"
         DATE date_of_birth "Not Null"
@@ -224,6 +255,49 @@ erDiagram
         TIMESTAMPTZ created_at "Auto-generated"
     }
 
+    site_configs {
+        UUID owner_id PK "FK to users.id or groups.id"
+        TEXT owner_type "user|group"
+        TEXT theme "Theme identifier"
+        JSONB layout "Page layout configuration"
+        JSONB settings "Site settings"
+        TEXT custom_domain "Optional custom domain"
+        TIMESTAMP updated_at
+    }
+
+    site_analytics {
+        UUID site_id PK "FK to site_configs.owner_id"
+        DATE date PK "Stats date"
+        INTEGER visits "Daily visits"
+        INTEGER unique_visitors "Unique visitors"
+        JSONB page_views "Page view counts"
+        JSONB traffic_sources "Traffic source data"
+        TIMESTAMP updated_at
+    }
+
+    content_blocks {
+        UUID id PK
+        UUID site_id FK "FK to site_configs.owner_id"
+        TEXT type "text|gallery|blog|contact|etc"
+        INTEGER order "Display order"
+        JSONB content "Block content"
+        BOOLEAN published "Published status"
+        TIMESTAMP created_at
+        TIMESTAMP updated_at
+    }
+
+    media_assets {
+        UUID id PK
+        UUID owner_id FK "FK to users.id or groups.id"
+        TEXT owner_type "user|group"
+        TEXT type "image|video|document"
+        TEXT filename "Original filename"
+        TEXT storage_path "Path in storage"
+        INTEGER size_bytes "File size"
+        JSONB metadata "Media metadata"
+        TIMESTAMP uploaded_at
+    }
+
     users ||--o| profiles: has
     users ||--o{ user_preferences: configures
     users ||--o{ swipes: initiates
@@ -373,6 +447,45 @@ erDiagram
 *   `use_app_profile` (BOOLEAN, NOT NULL, Default: TRUE)
 *   `updated_at` (TIMESTAMPTZ, Default: now())
 
+### `site_configs`
+*   `owner_id` (UUID, PK, FK to `auth.users.id` or `groups.id`)
+*   `owner_type` (TEXT, NOT NULL, CHECK: `owner_type IN ('user', 'group')`)
+*   `theme` (TEXT, NOT NULL)
+*   `layout` (JSONB, NOT NULL, Default: '{}')
+*   `settings` (JSONB, NOT NULL, Default: '{}')
+*   `custom_domain` (TEXT, UNIQUE, NULLABLE)
+*   `updated_at` (TIMESTAMPTZ, Default: now())
+
+### `site_analytics`
+*   `site_id` (UUID, PK, FK to `site_configs.owner_id` ON DELETE CASCADE)
+*   `date` (DATE, PK, NOT NULL)
+*   `visits` (INTEGER, NOT NULL, Default: 0)
+*   `unique_visitors` (INTEGER, NOT NULL, Default: 0)
+*   `page_views` (JSONB, NOT NULL, Default: '{}')
+*   `traffic_sources` (JSONB, NOT NULL, Default: '{}')
+*   `updated_at` (TIMESTAMPTZ, Default: now())
+
+### `content_blocks`
+*   `id` (UUID, PK, Default: uuid_generate_v4())
+*   `site_id` (UUID, NOT NULL, FK to `site_configs.owner_id` ON DELETE CASCADE)
+*   `type` (TEXT, NOT NULL, CHECK: `type IN ('text', 'gallery', 'blog', 'contact', 'etc')`)
+*   `order` (INTEGER, NOT NULL, Default: 0)
+*   `content` (JSONB, NOT NULL, Default: '{}')
+*   `published` (BOOLEAN, NOT NULL, Default: FALSE)
+*   `created_at` (TIMESTAMPTZ, Default: now())
+*   `updated_at` (TIMESTAMPTZ, Default: now())
+
+### `media_assets`
+*   `id` (UUID, PK, Default: uuid_generate_v4())
+*   `owner_id` (UUID, NOT NULL, FK to `auth.users.id` or `groups.id` ON DELETE CASCADE)
+*   `owner_type` (TEXT, NOT NULL, CHECK: `owner_type IN ('user', 'group')`)
+*   `type` (TEXT, NOT NULL, CHECK: `type IN ('image', 'video', 'document')`)
+*   `filename` (TEXT, NOT NULL)
+*   `storage_path` (TEXT, NOT NULL)
+*   `size_bytes` (INTEGER, NOT NULL)
+*   `metadata` (JSONB, NOT NULL, Default: '{}')
+*   `uploaded_at` (TIMESTAMPTZ, Default: now())
+
 ### `post_likes`
 *   `id` (UUID, PK, Default: uuid_generate_v4())
 *   `post_id` (UUID, NOT NULL, FK to `journal_posts.id` ON DELETE CASCADE)
@@ -424,6 +537,21 @@ erDiagram
     *   `CREATE INDEX idx_user_site_settings_user_id ON user_site_settings (user_id);`
     *   `CREATE INDEX idx_user_site_settings_custom_domain ON user_site_settings (custom_domain);`
     *   `CREATE UNIQUE INDEX idx_user_site_settings_custom_domain_unique ON user_site_settings (LOWER(custom_domain)) WHERE custom_domain IS NOT NULL;`
+
+*   **`site_configs` table:**
+    *   `CREATE INDEX idx_site_configs_owner_id ON site_configs (owner_id);`
+    *   `CREATE INDEX idx_site_configs_custom_domain ON site_configs (custom_domain);`
+    *   `CREATE UNIQUE INDEX idx_site_configs_custom_domain_unique ON site_configs (LOWER(custom_domain)) WHERE custom_domain IS NOT NULL;`
+
+*   **`site_analytics` table:**
+    *   `CREATE INDEX idx_site_analytics_site_id_date ON site_analytics (site_id, date);`
+
+*   **`content_blocks` table:**
+    *   `CREATE INDEX idx_content_blocks_site_id_order ON content_blocks (site_id, order);`
+
+*   **`media_assets` table:**
+    *   `CREATE INDEX idx_media_assets_owner_id ON media_assets (owner_id);`
+    *   `CREATE INDEX idx_media_assets_type ON media_assets (type);`
 
 *   **`post_likes` table:**
     *   `CREATE INDEX idx_post_likes_post_id ON post_likes (post_id);`

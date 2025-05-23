@@ -71,56 +71,67 @@ iDance is a mobile application and web platform designed to facilitate connectin
     - Media Handling
     - Analytics Collection
 
-### 2.3 Admin Portal
+### 2.3 Unified Admin Portal
 *   **Technology:**
-    - Next.js
-    - TypeScript
-    - Cloudflare Pages
+    - Next.js (TypeScript)
     - TailwindCSS
-    - Supabase Admin SDK
+    - Supabase Client SDK
+    - Cloudflare Pages
+
+*   **Access Levels:**
+    - Site Administrators (iDance Team)
+    - Group Administrators (Dance Companies/Studios)
+    - Pro Users
+    - Free Users
 
 *   **Core Features:**
-    - Real-time Dashboard
-    - User Management
+    - Role-based Dashboard
+    - User/Group Management
     - Content Moderation
-    - Referral Management
     - Analytics & Reports
     - System Configuration
+    - Site Customization
+    - Media Management
+    - SEO Tools
 
 *   **Key Interfaces:**
-    - Admin Dashboard
-    - User Management
-    - Content Moderation
-    - Referral System
-    - Analytics & Reports
+    - Global Admin Dashboard
+    - Group Management Console
+    - User Site Editor
+    - Analytics Dashboard
+    - Content Manager
+    - System Settings
 
-### 2.4 User Sites (Primary MVP Product)
+### 2.4 Dynamic User Sites
 *   **Technology:**
-    - Next.js
-    - TypeScript
-    - Cloudflare Pages
+    - Next.js (TypeScript)
     - TailwindCSS
-    - iDrive E2
+    - Cloudflare Pages
+    - Edge Functions
+
+*   **Architecture:**
+    - Single Next.js application
+    - Dynamic routing per user/group
+    - Edge-based content resolution
+    - Real-time data updates
+    - Global CDN distribution
 
 *   **Core Features:**
-    - Personal dance website at `username.idance.live`
-    - Professional portfolio showcase
-    - Media gallery with optimization
-    - Dance journal/blog
-    - SEO-optimized profiles
-    - Custom domain mapping
-    - Social media integration
-    - Contact forms with spam protection
+    - Personal/Group subdomains
+    - Custom domain support
+    - Dynamic content rendering
+    - Media optimization
+    - SEO enhancement
+    - Contact forms
+    - Blog/Updates
+    - Analytics tracking
 
-*   **User Admin Portal:**
-    - Site theme customization
-    - Content management system
-    - Visitor analytics
-    - Referral tracking dashboard
-    - Media library
-    - Domain settings
-    - SEO tools
-    - Commission tracking
+*   **Performance Features:**
+    - Edge caching
+    - Image optimization
+    - Incremental Static Regeneration
+    - Analytics per site
+    - Regional distribution
 
 ## 3. Infrastructure & Services
 
@@ -236,12 +247,43 @@ iDance is a mobile application and web platform designed to facilitate connectin
 
 ```mermaid
 flowchart TD
-    %% Main Infrastructure
-    User["User Browser"] -->|"HTTPS"| CF["Cloudflare"]
-    CF -->|"*.idance.live"| Worker["Site Router Worker"]
-    Worker -->|"Subdomain Route"| Pages["Main App"]
-    Worker -->|"Custom Domain"| Pages
-    Pages -->|"Supabase SDK"| Supabase["Supabase Platform"]
+    %% Client Requests
+    User["Browser"] -->|"HTTPS"| CF["Cloudflare"]
+    CF -->|"admin.*"| Admin["Admin Portal"]
+    CF -->|"*.idance.live"| Sites["User Sites"]
+    CF -->|"custom domains"| Sites
+
+    %% Core Applications
+    subgraph CoreApps["Core Applications"]
+        direction TB
+        Admin -->|"Auth/Data"| Platform["Platform Services"]
+        Sites -->|"Auth/Data"| Platform
+        Mobile["Mobile App"] -->|"Auth/Data"| Platform
+    end
+
+    %% Platform Services
+    subgraph Platform["Platform Services"]
+        direction TB
+        Auth["Authentication"]
+        Data["Data API"]
+        Edge["Edge Functions"]
+        Storage["Media Storage"]
+    end
+
+    %% Data Layer
+    subgraph DataLayer["Data Layer"]
+        direction TB
+        DB[("PostgreSQL")]
+        Cache["Edge Cache"]
+        CDN["Media CDN"]
+    end
+
+    %% Connections
+    Auth --> DB
+    Data --> DB
+    Edge --> DB
+    Storage --> CDN
+    Platform --> Cache
     
     %% Site Generation
     subgraph BuildSystem["Build System"]
