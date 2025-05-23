@@ -7,6 +7,7 @@ gantt
     title iDance Platform Evolution
     dateFormat YYYY-MM-DD
     axisFormat %Y-%m
+    %%{ init: { 'gantt': {'leftPadding': 200 } } }%%
 
     section Phase 1: Pre-Launch + Web Launch
     BackOffice         :2025-06-01, 5d
