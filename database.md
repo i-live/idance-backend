@@ -337,6 +337,8 @@ erDiagram
     profiles ||--o{ user_awards: earns
     profiles ||--o{ user_interests: has
     profiles ||--o{ user_social_links: owns
+    profiles ||--o| user_site_settings: configures
+    profiles ||--o{ user_portfolio_items: has
 
     dance_styles ||--o{ user_dance_styles: categorizes
     interests ||--o{ user_interests: categorizes
