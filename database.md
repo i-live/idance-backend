@@ -49,7 +49,6 @@ erDiagram
         TEXT subdomain UK "For group.idance.live"
         TEXT custom_domain "Optional custom domain"
         JSONB settings "Group settings"
-        UUID owner_id FK "FK to users.id"
         TIMESTAMP created_at
     }
 
@@ -592,13 +591,12 @@ erDiagram
     CREATE POLICY site_configs_select_own ON site_configs
     FOR SELECT TO authenticated
     USING (
-        owner_id = auth.uid() OR 
-        EXISTS (
+        (owner_type = 'user' AND owner_id = auth.uid()) OR 
+        (owner_type = 'group' AND EXISTS (
             SELECT 1 FROM group_members 
             WHERE group_members.group_id = site_configs.owner_id 
             AND group_members.user_id = auth.uid()
-            AND group_members.role IN ('owner', 'admin')
-        )
+        ))
     );
 
     -- Policy for users to read public site configs by custom domain
@@ -610,22 +608,22 @@ erDiagram
     CREATE POLICY site_configs_modify_own ON site_configs
     FOR ALL TO authenticated
     USING (
-        owner_id = auth.uid() OR 
-        EXISTS (
+        (owner_type = 'user' AND owner_id = auth.uid()) OR 
+        (owner_type = 'group' AND EXISTS (
             SELECT 1 FROM group_members 
             WHERE group_members.group_id = site_configs.owner_id 
             AND group_members.user_id = auth.uid()
             AND group_members.role IN ('owner', 'admin')
-        )
+        ))
     )
     WITH CHECK (
-        owner_id = auth.uid() OR 
-        EXISTS (
+        (owner_type = 'user' AND owner_id = auth.uid()) OR 
+        (owner_type = 'group' AND EXISTS (
             SELECT 1 FROM group_members 
             WHERE group_members.group_id = site_configs.owner_id 
             AND group_members.user_id = auth.uid()
             AND group_members.role IN ('owner', 'admin')
-        )
+        ))
     );
 
     -- Policy for service role to access all settings
@@ -647,35 +645,144 @@ erDiagram
     CREATE POLICY media_assets_select_own ON media_assets
     FOR SELECT TO authenticated
     USING (
-        owner_id = auth.uid() OR 
-        EXISTS (
+        (owner_type = 'user' AND owner_id = auth.uid()) OR 
+        (owner_type = 'group' AND EXISTS (
             SELECT 1 FROM group_members 
             WHERE group_members.group_id = media_assets.owner_id 
             AND group_members.user_id = auth.uid()
-        )
+        ))
     );
 
     -- Policy for users to modify their own media assets
     CREATE POLICY media_assets_modify_own ON media_assets
     FOR ALL TO authenticated
     USING (
-        owner_id = auth.uid() OR 
-        EXISTS (
+        (owner_type = 'user' AND owner_id = auth.uid()) OR 
+        (owner_type = 'group' AND EXISTS (
             SELECT 1 FROM group_members 
             WHERE group_members.group_id = media_assets.owner_id 
+            AND group_members.user_id = auth.uid()
+            AND group_members.role IN ('owner', 'admin')
+        ))
+    )
+    WITH CHECK (
+        (owner_type = 'user' AND owner_id = auth.uid()) OR 
+        (owner_type = 'group' AND EXISTS (
+            SELECT 1 FROM group_members 
+            WHERE group_members.group_id = media_assets.owner_id 
+            AND group_members.user_id = auth.uid()
+            AND group_members.role IN ('owner', 'admin')
+        ))
+    );
+    ```
+
+### Groups
+*   Any authenticated user can read group details
+*   Only group owners and admins can modify group settings
+*   Example policies:
+    ```sql
+    -- Enable RLS
+    ALTER TABLE groups ENABLE ROW LEVEL SECURITY;
+
+    -- Policy for users to read any group
+    CREATE POLICY groups_select_all ON groups
+    FOR SELECT TO authenticated
+    USING (true);
+
+    -- Policy for users to modify groups they own/admin
+    CREATE POLICY groups_modify_as_owner_admin ON groups
+    FOR ALL TO authenticated
+    USING (
+        EXISTS (
+            SELECT 1 FROM group_members 
+            WHERE group_members.group_id = groups.id 
             AND group_members.user_id = auth.uid()
             AND group_members.role IN ('owner', 'admin')
         )
     )
     WITH CHECK (
-        owner_id = auth.uid() OR 
         EXISTS (
             SELECT 1 FROM group_members 
-            WHERE group_members.group_id = media_assets.owner_id 
+            WHERE group_members.group_id = groups.id 
             AND group_members.user_id = auth.uid()
             AND group_members.role IN ('owner', 'admin')
         )
     );
+
+    -- Policy for service role to access all groups
+    CREATE POLICY groups_service_all ON groups
+    FOR ALL TO service_role
+    USING (true)
+    WITH CHECK (true);
+    ```
+
+### Group Members
+*   Group members can see other members in their groups
+*   Only group owners can add new owners
+*   Group owners and admins can add/remove regular members and admins
+*   Example policies:
+    ```sql
+    -- Enable RLS
+    ALTER TABLE group_members ENABLE ROW LEVEL SECURITY;
+
+    -- Policy for members to read other members in their groups
+    CREATE POLICY group_members_select_own_groups ON group_members
+    FOR SELECT TO authenticated
+    USING (
+        EXISTS (
+            SELECT 1 FROM group_members my_groups
+            WHERE my_groups.group_id = group_members.group_id
+            AND my_groups.user_id = auth.uid()
+        )
+    );
+
+    -- Policy for owners to manage all members (including other owners)
+    CREATE POLICY group_members_manage_as_owner ON group_members
+    FOR ALL TO authenticated
+    USING (
+        EXISTS (
+            SELECT 1 FROM group_members owner_check
+            WHERE owner_check.group_id = group_members.group_id
+            AND owner_check.user_id = auth.uid()
+            AND owner_check.role = 'owner'
+        )
+    )
+    WITH CHECK (
+        EXISTS (
+            SELECT 1 FROM group_members owner_check
+            WHERE owner_check.group_id = group_members.group_id
+            AND owner_check.user_id = auth.uid()
+            AND owner_check.role = 'owner'
+        )
+    );
+
+    -- Policy for admins to manage regular members
+    CREATE POLICY group_members_manage_as_admin ON group_members
+    FOR ALL TO authenticated
+    USING (
+        EXISTS (
+            SELECT 1 FROM group_members admin_check
+            WHERE admin_check.group_id = group_members.group_id
+            AND admin_check.user_id = auth.uid()
+            AND admin_check.role = 'admin'
+        )
+        AND group_members.role = 'member'
+    )
+    WITH CHECK (
+        EXISTS (
+            SELECT 1 FROM group_members admin_check
+            WHERE admin_check.group_id = group_members.group_id
+            AND admin_check.user_id = auth.uid()
+            AND admin_check.role = 'admin'
+        )
+        AND NEW.role = 'member'
+    );
+
+    -- Policy for service role to access all members
+    CREATE POLICY group_members_service_all ON group_members
+    FOR ALL TO service_role
+    USING (true)
+    WITH CHECK (true);
     ```
 
 ### Other RLS Policies
