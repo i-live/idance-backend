@@ -369,6 +369,18 @@ erDiagram
 *   `created_at` (TIMESTAMPTZ, Default: now())
 *   `updated_at` (TIMESTAMPTZ, Default: now())
 
+### `roles`
+*   `id` (UUID, PK, Default: uuid_generate_v4())
+*   `name` (TEXT, NOT NULL, CHECK: `name IN ('site_admin', 'group_admin', 'pro_user', 'free_user')`)
+*   `permissions` (JSONB, NOT NULL, Default: '[]'::jsonb)
+*   `created_at` (TIMESTAMPTZ, Default: now())
+
+### `user_roles`
+*   `user_id` (UUID, PK, FK to `users.id` ON DELETE CASCADE)
+*   `role_id` (UUID, PK, FK to `roles.id` ON DELETE CASCADE)
+*   `scope_id` (UUID, NULLABLE, FK to `groups.id` ON DELETE CASCADE)
+*   `granted_at` (TIMESTAMPTZ, Default: now())
+
 ### `dance_styles`
 *   `id` (SERIAL, PK)
 *   `name` (TEXT, UNIQUE, NOT NULL)
@@ -437,6 +449,80 @@ erDiagram
 *   `search_longitude` (FLOAT8, NULLABLE)
 *   `use_custom_location` (BOOLEAN, NOT NULL, Default: FALSE)
 *   `updated_at` (TIMESTAMPTZ, Default: now())
+
+### `groups`
+*   `id` (UUID, PK, Default: uuid_generate_v4())
+*   `name` (TEXT, NOT NULL)
+*   `type` (TEXT, NOT NULL, CHECK: `type IN ('company', 'studio', 'team')`)
+*   `subdomain` (TEXT, UNIQUE, NOT NULL)
+*   `custom_domain` (TEXT, UNIQUE, NULLABLE)
+*   `settings` (JSONB, NOT NULL, Default: '{}')
+*   `created_at` (TIMESTAMPTZ, Default: now())
+
+### `group_members`
+*   `group_id` (UUID, PK, FK to `groups.id` ON DELETE CASCADE)
+*   `user_id` (UUID, PK, FK to `users.id` ON DELETE CASCADE)
+*   `role` (TEXT, NOT NULL, CHECK: `role IN ('owner', 'admin', 'member')`)
+*   `joined_at` (TIMESTAMPTZ, Default: now())
+
+### `swipes`
+*   `swiper_user_id` (UUID, PK, FK to `users.id` ON DELETE CASCADE)
+*   `swiped_user_id` (UUID, PK, FK to `users.id` ON DELETE CASCADE)
+*   `swipe_type` (TEXT, NOT NULL, CHECK: `swipe_type IN ('like', 'dislike', 'superlike')`)
+*   `created_at` (TIMESTAMPTZ, Default: now())
+
+### `matches`
+*   `id` (UUID, PK, Default: uuid_generate_v4())
+*   `user1_id` (UUID, NOT NULL, FK to `users.id` ON DELETE CASCADE)
+*   `user2_id` (UUID, NOT NULL, FK to `users.id` ON DELETE CASCADE)
+*   `matched_at` (TIMESTAMPTZ, Default: now())
+*   CONSTRAINT `unique_match_pair` UNIQUE (`user1_id`, `user2_id`)
+
+### `chats`
+*   `id` (UUID, PK, Default: uuid_generate_v4())
+*   `match_id` (UUID, UNIQUE, NOT NULL, FK to `matches.id` ON DELETE CASCADE)
+*   `last_message_id` (UUID, NULLABLE, FK to `messages.id`)
+*   `last_activity` (TIMESTAMPTZ, Default: now())
+
+### `messages`
+*   `id` (UUID, PK, Default: uuid_generate_v4())
+*   `chat_id` (UUID, NOT NULL, FK to `chats.id` ON DELETE CASCADE)
+*   `sender_id` (UUID, NOT NULL, FK to `users.id` ON DELETE CASCADE)
+*   `content_type` (TEXT, NOT NULL, CHECK: `content_type IN ('text', 'image', 'video', 'audio')`)
+*   `content` (TEXT, NOT NULL)
+*   `media_url` (TEXT, NULLABLE, CHECK: valid URL)
+*   `sent_at` (TIMESTAMPTZ, Default: now())
+
+### `journal_posts`
+*   `id` (UUID, PK, Default: uuid_generate_v4())
+*   `user_id` (UUID, NOT NULL, FK to `users.id` ON DELETE CASCADE)
+*   `post_type` (TEXT, NOT NULL, CHECK: `post_type IN ('text', 'image', 'video', 'blog')`)
+*   `title` (TEXT, NULLABLE)
+*   `caption` (TEXT, NULLABLE)
+*   `media_items` (JSONB, NOT NULL, Default: '[]'::jsonb)
+*   `engagement_counts` (JSONB, NOT NULL, Default: '{"likes": 0, "comments": 0, "shares": 0}'::jsonb)
+*   `visibility` (TEXT, NOT NULL, CHECK: `visibility IN ('public', 'private', 'followers')`)
+*   `created_at` (TIMESTAMPTZ, Default: now())
+
+### `referrals`
+*   `id` (UUID, PK, Default: uuid_generate_v4())
+*   `referrer_id` (UUID, NOT NULL, FK to `users.id` ON DELETE CASCADE)
+*   `referred_id` (UUID, UNIQUE, NOT NULL, FK to `users.id` ON DELETE CASCADE)
+*   `status` (TEXT, NOT NULL, CHECK: `status IN ('pending', 'confirmed', 'paid')`)
+*   `level` (INTEGER, NOT NULL, CHECK: `level > 0`)
+*   `parent_referral_id` (UUID, NULLABLE, FK to `referrals.id` ON DELETE SET NULL)
+*   `created_at` (TIMESTAMPTZ, Default: now())
+
+### `commissions`
+*   `id` (UUID, PK, Default: uuid_generate_v4())
+*   `referral_id` (UUID, NOT NULL, FK to `referrals.id` ON DELETE CASCADE)
+*   `earner_id` (UUID, NOT NULL, FK to `users.id` ON DELETE CASCADE)
+*   `payer_id` (UUID, NOT NULL, FK to `users.id` ON DELETE CASCADE)
+*   `amount` (NUMERIC, NOT NULL, CHECK: `amount > 0`)
+*   `currency` (TEXT, NOT NULL, Default: 'USD')
+*   `type` (TEXT, NOT NULL, CHECK: `type IN ('signup', 'subscription', 'purchase')`)
+*   `status` (TEXT, NOT NULL, CHECK: `status IN ('pending', 'paid', 'cancelled')`)
+*   `created_at` (TIMESTAMPTZ, Default: now())
 
 ### `site_configs`
 *   `owner_id` (UUID, PK, FK to `auth.users.id` or `groups.id`)
@@ -528,6 +614,58 @@ erDiagram
 *   **`user_social_links` table:**
     *   `CREATE INDEX idx_user_social_links_user_id ON user_social_links (user_id);`
     *   `CREATE INDEX idx_user_social_links_platform_id ON user_social_links (platform_id);`
+
+*   **`roles` table:**
+    *   `CREATE INDEX idx_roles_name ON roles (name);`
+
+*   **`user_roles` table:**
+    *   `CREATE INDEX idx_user_roles_role_id ON user_roles (role_id);`
+    *   `CREATE INDEX idx_user_roles_scope_id ON user_roles (scope_id) WHERE scope_id IS NOT NULL;`
+
+*   **`groups` table:**
+    *   `CREATE INDEX idx_groups_type ON groups (type);`
+    *   `CREATE INDEX idx_groups_subdomain ON groups (subdomain);`
+    *   `CREATE UNIQUE INDEX idx_groups_custom_domain_unique ON groups (LOWER(custom_domain)) WHERE custom_domain IS NOT NULL;`
+
+*   **`group_members` table:**
+    *   `CREATE INDEX idx_group_members_user_id ON group_members (user_id);`
+    *   `CREATE INDEX idx_group_members_role ON group_members (group_id, role);`
+
+*   **`swipes` table:**
+    *   `CREATE INDEX idx_swipes_swiped_user_id ON swipes (swiped_user_id);`
+    *   `CREATE INDEX idx_swipes_created_at ON swipes (created_at);`
+
+*   **`matches` table:**
+    *   `CREATE INDEX idx_matches_user1_id ON matches (user1_id);`
+    *   `CREATE INDEX idx_matches_user2_id ON matches (user2_id);`
+    *   `CREATE INDEX idx_matches_matched_at ON matches (matched_at);`
+
+*   **`chats` table:**
+    *   `CREATE INDEX idx_chats_match_id ON chats (match_id);`
+    *   `CREATE INDEX idx_chats_last_activity ON chats (last_activity);`
+
+*   **`messages` table:**
+    *   `CREATE INDEX idx_messages_chat_id ON messages (chat_id);`
+    *   `CREATE INDEX idx_messages_sender_id ON messages (sender_id);`
+    *   `CREATE INDEX idx_messages_sent_at ON messages (sent_at);`
+
+*   **`journal_posts` table:**
+    *   `CREATE INDEX idx_journal_posts_user_id ON journal_posts (user_id);`
+    *   `CREATE INDEX idx_journal_posts_post_type ON journal_posts (post_type);`
+    *   `CREATE INDEX idx_journal_posts_created_at ON journal_posts (created_at);`
+    *   `CREATE INDEX idx_journal_posts_visibility ON journal_posts (visibility);`
+
+*   **`referrals` table:**
+    *   `CREATE INDEX idx_referrals_referrer_id ON referrals (referrer_id);`
+    *   `CREATE INDEX idx_referrals_status ON referrals (status);`
+    *   `CREATE INDEX idx_referrals_parent_id ON referrals (parent_referral_id) WHERE parent_referral_id IS NOT NULL;`
+
+*   **`commissions` table:**
+    *   `CREATE INDEX idx_commissions_referral_id ON commissions (referral_id);`
+    *   `CREATE INDEX idx_commissions_earner_id ON commissions (earner_id);`
+    *   `CREATE INDEX idx_commissions_payer_id ON commissions (payer_id);`
+    *   `CREATE INDEX idx_commissions_status ON commissions (status);`
+    *   `CREATE INDEX idx_commissions_created_at ON commissions (created_at);`
 
 *   **`site_configs` table:**
     *   `CREATE INDEX idx_site_configs_owner_id ON site_configs (owner_id);`
