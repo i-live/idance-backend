@@ -144,7 +144,7 @@ erDiagram
         TIMESTAMPTZ created_at "Auto-generated"
     }
 
-    user_preferences {
+    user_search_preferences {
         UUID user_id PK "FK users"
         JSONB discovery_dance_styles "ID array"
         JSONB discovery_skill_levels "Level array"
@@ -306,7 +306,7 @@ erDiagram
     }
 
     users ||--o| profiles: has
-    users ||--o{ user_preferences: configures
+    users ||--o{ user_search_preferences: configures
     users ||--o{ swipes: initiates
     users ||--o{ matches: participates
     users ||--o{ messages: sends
@@ -421,7 +421,7 @@ erDiagram
 *   `display_order` (INTEGER, NOT NULL, Default: 0)
 *   `created_at` (TIMESTAMPTZ, Default: now())
 
-### `user_preferences`
+### `user_search_preferences`
 *   `user_id` (UUID, PK, FK to `auth.users.id` ON DELETE CASCADE)
 *   `discovery_dance_styles` (JSONB, NULLABLE, Default: '[]'::jsonb)
 *   `discovery_skill_levels` (JSONB, NULLABLE, Default: '[]'::jsonb)
