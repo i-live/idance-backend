@@ -5,36 +5,30 @@
 ```mermaid
 gantt
     title iDance Platform Evolution
-    dateFormat YYYY-MM-DD
-    axisFormat %Y-%m
-    
-    section Phase 1: Pre-Launch___
-    BackOffice           :2025-06-01, 5d
-    User Sites           :2025-06-08, 14d
-    Affiliate Tracking   :2025-06-23, 3d
-    Marketing           :2025-06-01, 30d, #FF9999
-    
-    section Phase 2: App___
-    Build App           :2025-07-01, 30d
-    Beta Launch         :2025-08-01, 30d
-    Marketing          :2025-09-01, 30d, #FF9999
-
-    section Phase 3: Money___
-    Company Formation   :2025-10-01, 7d
-    Business Banking    :2025-10-08, 7d
-    Pro Tier           :2025-10-01, 14d
-    Pro Tier Launch    :2025-10-15, 30d
-    
-    section Phase 4: PR___
-    PR                 :2025-10-15, 60d, #FF9999
-    Affiliate Program  :2025-10-15, 30d, #FF9999
-    
-    section Phase 5: Capital___
-    Prepare Pitch      :2025-11-01, 30d
-    
-    section Phase 6: AI___
-    AI Development     :2025-11-01, 30d
-    Smart Matching     :2025-11-15, 15d
+    dateFormat  YYYY-MM-DD
+    axisFormat  %Y-%m
+    section Phase 1 [Pre-Launch]
+    BackOffice          :a1, 2025-06-01, 5d
+    User Sites          :a2, after a1, 14d
+    Affiliate Tracking  :a3, after a2, 3d
+    Marketing          :a4, 2025-06-01, 30d, #FF9999
+    section Phase 2 [App]
+    Build App          :b1, 2025-07-01, 30d
+    Beta Launch        :b2, 2025-08-01, 30d
+    Marketing          :b3, 2025-09-01, 30d, #FF9999
+    section Phase 3 [Money]
+    Company Formation  :c1, 2025-10-01, 7d
+    Business Banking   :c2, 2025-10-08, 7d
+    Pro Tier          :c3, 2025-10-01, 14d
+    Pro Tier Launch   :c4, 2025-10-15, 30d
+    section Phase 4 [PR]
+    PR                :d1, 2025-10-15, 60d, #FF9999
+    Affiliate Program :d2, 2025-10-15, 30d, #FF9999
+    section Phase 5 [Capital]
+    Prepare Pitch     :e1, 2025-11-01, 30d
+    section Phase 6 [AI]
+    AI Development    :f1, 2025-11-01, 30d
+    Smart Matching    :f2, 2025-11-15, 15d
 ```
 
 ## 1. Phase One: Pre-Launch + Web Launch (June 2025)
