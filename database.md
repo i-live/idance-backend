@@ -130,11 +130,10 @@ erDiagram
 
     user_social_links {
         UUID id PK "Default uuid_generate_v4()"
-        UUID user_id FK "FK to profiles.user_id, Not Null"
-        INT platform_id FK "FK to social_platforms.id, Not Null"
+        UUID user_id FK,UK "FK to profiles.user_id, Not Null"
+        INT platform_id FK,UK "FK to social_platforms.id, Not Null"
         TEXT url "Valid URL (app-level validation), Not Null"
         TIMESTAMPTZ created_at "Default now()"
-        CONSTRAINT unique_user_platform_link UNIQUE (user_id, platform_id)
     }
 
     user_portfolio_items {
@@ -167,21 +166,17 @@ erDiagram
     }
 
     swipes {
-        UUID swiper_user_id PK,FK "FK to auth.users.id"
-        UUID swiped_user_id PK,FK "FK to auth.users.id"
+        UUID swiper_user_id PK,FK "FK to auth.users.id, must be different from swiped_user_id"
+        UUID swiped_user_id PK,FK "FK to auth.users.id, must be different from swiper_user_id"
         TEXT swipe_type "like|dislike|superlike, Not Null"
         TIMESTAMPTZ created_at "Default now()"
-        CONSTRAINT check_different_users CHECK (swiper_user_id <> swiped_user_id)
     }
 
     matches {
         UUID id PK "Default uuid_generate_v4()"
-        UUID user1_id FK "FK to auth.users.id, Not Null"
-        UUID user2_id FK "FK to auth.users.id, Not Null"
+        UUID user1_id FK,UK "FK to auth.users.id, Not Null"
+        UUID user2_id FK,UK "FK to auth.users.id, Not Null"
         TIMESTAMPTZ matched_at "Default now()"
-        CONSTRAINT unique_match_pair UNIQUE (user1_id, user2_id)
-        CONSTRAINT check_different_users_match CHECK (user1_id <> user2_id)
-        CONSTRAINT check_user_order_match CHECK (user1_id < user2_id)
     }
 
     chats {
@@ -216,10 +211,9 @@ erDiagram
 
     vlog_likes {
         UUID id PK "Default uuid_generate_v4()"
-        UUID vlog_id FK "FK to vlogs.id, Not Null"
-        UUID user_id FK "FK to auth.users.id, Not Null"
+        UUID vlog_id FK,UK "FK to vlogs.id, Not Null"
+        UUID user_id FK,UK "FK to auth.users.id, Not Null"
         TIMESTAMPTZ created_at "Default now()"
-        CONSTRAINT unique_vlog_user_like UNIQUE (vlog_id, user_id)
     }
 
     vlog_comments {
@@ -249,20 +243,18 @@ erDiagram
         INT level "Referral depth, default 1, Not Null"
         UUID parent_referral_id FK "Nullable, Self-ref to referrals.id ON DELETE SET NULL"
         TIMESTAMPTZ created_at "Default now()"
-        CONSTRAINT check_different_referrer_referred CHECK (referrer_id <> referred_id)
     }
 
     commissions {
         UUID id PK "Default uuid_generate_v4()"
         UUID referral_id FK "FK to referrals.id, Not Null"
-        UUID earner_id FK "FK to auth.users.id, Not Null"
-        UUID payer_id FK "FK to auth.users.id, Not Null"
+        UUID earner_id FK "FK to auth.users.id, Not Null, must be different from payer_id"
+        UUID payer_id FK "FK to auth.users.id, Not Null, must be different from earner_id"
         NUMERIC amount "Positive value, Not Null"
         TEXT currency "Default USD, Not Null"
         TEXT type "Commission type, Not Null"
         TEXT status "Payment status, default 'pending', Not Null"
         TIMESTAMPTZ created_at "Default now()"
-        CONSTRAINT check_different_earner_payer CHECK (earner_id <> payer_id)
     }
 
     sites {
