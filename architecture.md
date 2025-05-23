@@ -237,9 +237,20 @@ iDance is a mobile application and web platform designed to facilitate connectin
 ```mermaid
 flowchart TD
     %% Main Infrastructure
-    User["User Sites/Web App"] -->|"HTTPS/API"| CF["Cloudflare"]
-    CF -->|"Routes"| Pages["Cloudflare Pages"]
+    User["User Browser"] -->|"HTTPS"| CF["Cloudflare"]
+    CF -->|"*.idance.live"| Worker["Site Router Worker"]
+    Worker -->|"Subdomain Route"| Pages["Main App"]
+    Worker -->|"Custom Domain"| Pages
     Pages -->|"Supabase SDK"| Supabase["Supabase Platform"]
+    
+    %% Site Generation
+    subgraph BuildSystem["Build System"]
+        direction TB
+        Builder["Site Builder Worker"] --> Templates["Site Templates"]
+        Builder --> Assets["Asset Pipeline"]
+        Templates --> Deploy["Deploy Service"]
+        Assets --> Deploy
+    end
     
     %% Supabase Backend Services
     subgraph Supabase["Supabase Backend"]
@@ -250,23 +261,20 @@ flowchart TD
         Store["Storage"] --> CDN["CDN"]
     end
     
-    %% User Sites MVP Features
-    subgraph UserSites["User Sites MVP"]
+    %% Dynamic Content
+    subgraph DynamicContent["Dynamic Content"]
         direction TB
-        Profile["Profile Sites"] --> Custom["Custom Domains"]
-        Gallery["Media Gallery"] --> Store
-        Blog["Dance Journal"] --> DB
-        Analytics["Site Analytics"] --> DB
-    end
-    
-    %% Admin Portal
-    subgraph AdminPortal["Admin Features"]
-        direction TB
-        Dashboard["Dashboard"] --> Edge
-        CMS["Content Management"] --> Store
-        SEO["SEO Tools"] --> Profile
+        Profile["Profile Data"] --> DB
+        Media["Media Assets"] --> Store
+        Posts["Blog Posts"] --> DB
         Stats["Analytics"] --> DB
     end
+    
+    %% Control Flow
+    Edge -->|"Trigger Build"| Builder
+    DB -->|"Site Config"| Builder
+    Store -->|"Media"| Assets
+    Deploy -->|"Push"| CF
     
     %% Platform Connections
     Pages --> UserSites
