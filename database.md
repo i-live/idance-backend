@@ -253,7 +253,7 @@ erDiagram
         TIMESTAMPTZ created_at "Auto-generated"
     }
 
-    site_configs {
+    sites {
         UUID owner_id PK "FK to users.id or groups.id"
         TEXT owner_type "user|group"
         TEXT theme "Theme identifier"
