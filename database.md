@@ -328,12 +328,12 @@ erDiagram
 
     matches ||--|| chats: enables
     chats ||--o{ messages: contains
-    vlogs ||--o{ post_likes: has
-    vlogs ||--o{ post_comments: has
-    vlogs ||--o{ post_shares: tracks
+    vlogs ||--o{ vlog_likes: has
+    vlogs ||--o{ vlog_comments: has
+    vlogs ||--o{ vlog_shares: tracks
     referrals ||--o{ commissions: generates
     referrals ||--o{ referrals: branches
-    post_comments ||--o{ post_comments: "replies to"
+    vlog_comments ||--o{ vlog_comments: "replies to"
 ```
 
 ## 2. Table Schemas
@@ -570,26 +570,26 @@ erDiagram
 *   `size_bytes` (INTEGER, NOT NULL)
 *   `url` (TEXT, NOT NULL, CHECK: valid URL)
 
-### `post_likes`
+### `vlog_likes`
 *   `id` (UUID, PK, Default: uuid_generate_v4())
-*   `post_id` (UUID, NOT NULL, FK to `vlogs.id` ON DELETE CASCADE)
+*   `vlog_id` (UUID, NOT NULL, FK to `vlogs.id` ON DELETE CASCADE)
 *   `user_id` (UUID, NOT NULL, FK to `users.id` ON DELETE CASCADE)
 *   `created_at` (TIMESTAMPTZ, Default: now())
-*   CONSTRAINT `unique_post_like` UNIQUE (`post_id`, `user_id`)
+*   CONSTRAINT `unique_vlog_like` UNIQUE (`vlog_id`, `user_id`)
 
-### `post_comments`
+### `vlog_comments`
 *   `id` (UUID, PK, Default: uuid_generate_v4())
-*   `post_id` (UUID, NOT NULL, FK to `vlogs.id` ON DELETE CASCADE)
+*   `vlog_id` (UUID, NOT NULL, FK to `vlogs.id` ON DELETE CASCADE)
 *   `user_id` (UUID, NOT NULL, FK to `users.id` ON DELETE CASCADE)
 *   `content` (TEXT, NOT NULL)
 *   `metadata` (JSONB, NULLABLE)
-*   `reply_to_id` (UUID, NULLABLE, FK to `post_comments.id` ON DELETE CASCADE)
+*   `reply_to_id` (UUID, NULLABLE, FK to `vlog_comments.id` ON DELETE CASCADE)
 *   `created_at` (TIMESTAMPTZ, Default: now())
 *   `updated_at` (TIMESTAMPTZ, Default: now())
 
-### `post_shares`
+### `vlog_shares`
 *   `id` (UUID, PK, Default: uuid_generate_v4())
-*   `post_id` (UUID, NOT NULL, FK to `vlogs.id` ON DELETE CASCADE)
+*   `vlog_id` (UUID, NOT NULL, FK to `vlogs.id` ON DELETE CASCADE)
 *   `user_id` (UUID, NOT NULL, FK to `users.id` ON DELETE CASCADE)
 *   `share_type` (TEXT, NOT NULL)
 *   `created_at` (TIMESTAMPTZ, Default: now())
@@ -685,16 +685,16 @@ erDiagram
     *   `CREATE INDEX idx_media_assets_type ON media_assets (type);`
     *   `CREATE INDEX idx_media_assets_storage_path ON media_assets (storage_path);`
 
-*   **`post_likes` table:**
-    *   `CREATE INDEX idx_post_likes_post_id ON post_likes (post_id);`
-    *   `CREATE INDEX idx_post_likes_user_id ON post_likes (user_id);`
-*   **`post_comments` table:**
-    *   `CREATE INDEX idx_post_comments_post_id ON post_comments (post_id);`
-    *   `CREATE INDEX idx_post_comments_user_id ON post_comments (user_id);`
-    *   `CREATE INDEX idx_post_comments_reply_to_id ON post_comments (reply_to_id);`
-*   **`post_shares` table:**
-    *   `CREATE INDEX idx_post_shares_post_id ON post_shares (post_id);`
-    *   `CREATE INDEX idx_post_shares_user_id ON post_shares (user_id);`
+*   **`vlog_likes` table:**
+    *   `CREATE INDEX idx_vlog_likes_vlog_id ON vlog_likes (vlog_id);`
+    *   `CREATE INDEX idx_vlog_likes_user_id ON vlog_likes (user_id);`
+*   **`vlog_comments` table:**
+    *   `CREATE INDEX idx_vlog_comments_vlog_id ON vlog_comments (vlog_id);`
+    *   `CREATE INDEX idx_vlog_comments_user_id ON vlog_comments (user_id);`
+    *   `CREATE INDEX idx_vlog_comments_reply_to_id ON vlog_comments (reply_to_id);`
+*   **`vlog_shares` table:**
+    *   `CREATE INDEX idx_vlog_shares_vlog_id ON vlog_shares (vlog_id);`
+    *   `CREATE INDEX idx_vlog_shares_user_id ON vlog_shares (user_id);`
 
 ## 5. Row Level Security (RLS) Policies
 
@@ -907,6 +907,6 @@ erDiagram
     ```
 
 ### Other RLS Policies
-*   Users can only read/write their own related entries in `user_dance_styles`, `user_awards`, `user_interests`, `user_social_links`, `post_likes`, `post_comments`, `post_shares`
+*   Users can only read/write their own related entries in `user_dance_styles`, `user_awards`, `user_interests`, `user_social_links`, `vlog_likes`, `vlog_comments`, `vlog_shares`
 *   Reference tables (`dance_styles`, `interests`, `social_platforms`) are public read-only
 *   All other RLS policies remain as previously defined
