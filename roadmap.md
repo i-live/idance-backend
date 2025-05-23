@@ -33,8 +33,8 @@ gantt
     Prepare Pitch    :2025-11-01, 30d
     
     section Phase 6: AI Integration
-    AI Development    :2025-11-01, 90d
-    Smart Matching    :2026-11-15, 45d
+    AI Development    :2025-11-01, 30d
+    Smart Matching    :2025-11-15, 15d
 ```
 
 ## 1. Phase One: Pre-Launch + Web Launch (June 2025)
