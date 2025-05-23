@@ -162,22 +162,6 @@ erDiagram
         TIMESTAMPTZ updated_at "Auto-updated"
     }
 
-    user_site_settings {
-        UUID user_id PK "FK profiles"
-        TEXT site_theme "Theme choice"
-        JSONB layout_config "Page layout"
-        BOOLEAN show_contact_form "Enable contact"
-        TEXT contact_email "Contact email"
-        TEXT custom_domain "User domain"
-        TEXT site_title "SEO title"
-        TEXT site_description "SEO description"
-        JSONB social_links_order "Display order"
-        JSONB featured_content "Pinned items"
-        JSONB custom_sections "Extra sections"
-        BOOLEAN use_app_profile "Sync with app"
-        TIMESTAMPTZ updated_at "Auto-updated"
-    }
-
     swipes {
         UUID swiper_user_id PK "FK users"
         UUID swiped_user_id PK "FK users"
@@ -336,7 +320,6 @@ erDiagram
     profiles ||--o{ user_awards: earns
     profiles ||--o{ user_interests: has
     profiles ||--o{ user_social_links: owns
-    profiles ||--o| user_site_settings: configures
     profiles ||--o{ user_portfolio_items: has
 
     dance_styles ||--o{ user_dance_styles: categorizes
