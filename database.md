@@ -193,7 +193,7 @@ erDiagram
         TIMESTAMPTZ sent_at "Auto-generated"
     }
 
-    journal_posts {
+    vlogs {
         UUID id PK "Generated v4"
         UUID user_id FK "FK users"
         TEXT post_type "Content type"
@@ -310,10 +310,10 @@ erDiagram
     users ||--o{ swipes: initiates
     users ||--o{ matches: participates
     users ||--o{ messages: sends
-    users ||--o{ journal_posts: creates
-    users ||--o{ post_likes: creates
-    users ||--o{ post_comments: writes
-    users ||--o{ post_shares: shares
+    users ||--o{ vlogs: creates
+    users ||--o{ vlog_likes: creates
+    users ||--o{ vlog_comments: writes
+    users ||--o{ vlog_shares: shares
     users ||--o{ referrals: refers
 
     profiles ||--o{ user_dance_styles: has
@@ -328,9 +328,9 @@ erDiagram
 
     matches ||--|| chats: enables
     chats ||--o{ messages: contains
-    journal_posts ||--o{ post_likes: has
-    journal_posts ||--o{ post_comments: has
-    journal_posts ||--o{ post_shares: tracks
+    vlogs ||--o{ post_likes: has
+    vlogs ||--o{ post_comments: has
+    vlogs ||--o{ post_shares: tracks
     referrals ||--o{ commissions: generates
     referrals ||--o{ referrals: branches
     post_comments ||--o{ post_comments: "replies to"
@@ -493,10 +493,10 @@ erDiagram
 *   `media_url` (TEXT, NULLABLE, CHECK: valid URL)
 *   `sent_at` (TIMESTAMPTZ, Default: now())
 
-### `journal_posts`
+### `vlogs`
 *   `id` (UUID, PK, Default: uuid_generate_v4())
 *   `user_id` (UUID, NOT NULL, FK to `users.id` ON DELETE CASCADE)
-*   `post_type` (TEXT, NOT NULL, CHECK: `post_type IN ('text', 'image', 'video', 'blog')`)
+*   `post_type` (TEXT, NOT NULL, CHECK: `post_type IN ('text', 'image', 'video', 'story')`)
 *   `title` (TEXT, NULLABLE)
 *   `caption` (TEXT, NULLABLE)
 *   `media_items` (JSONB, NOT NULL, Default: '[]'::jsonb)
@@ -572,14 +572,14 @@ erDiagram
 
 ### `post_likes`
 *   `id` (UUID, PK, Default: uuid_generate_v4())
-*   `post_id` (UUID, NOT NULL, FK to `journal_posts.id` ON DELETE CASCADE)
+*   `post_id` (UUID, NOT NULL, FK to `vlogs.id` ON DELETE CASCADE)
 *   `user_id` (UUID, NOT NULL, FK to `users.id` ON DELETE CASCADE)
 *   `created_at` (TIMESTAMPTZ, Default: now())
 *   CONSTRAINT `unique_post_like` UNIQUE (`post_id`, `user_id`)
 
 ### `post_comments`
 *   `id` (UUID, PK, Default: uuid_generate_v4())
-*   `post_id` (UUID, NOT NULL, FK to `journal_posts.id` ON DELETE CASCADE)
+*   `post_id` (UUID, NOT NULL, FK to `vlogs.id` ON DELETE CASCADE)
 *   `user_id` (UUID, NOT NULL, FK to `users.id` ON DELETE CASCADE)
 *   `content` (TEXT, NOT NULL)
 *   `metadata` (JSONB, NULLABLE)
@@ -589,7 +589,7 @@ erDiagram
 
 ### `post_shares`
 *   `id` (UUID, PK, Default: uuid_generate_v4())
-*   `post_id` (UUID, NOT NULL, FK to `journal_posts.id` ON DELETE CASCADE)
+*   `post_id` (UUID, NOT NULL, FK to `vlogs.id` ON DELETE CASCADE)
 *   `user_id` (UUID, NOT NULL, FK to `users.id` ON DELETE CASCADE)
 *   `share_type` (TEXT, NOT NULL)
 *   `created_at` (TIMESTAMPTZ, Default: now())
@@ -649,11 +649,11 @@ erDiagram
     *   `CREATE INDEX idx_messages_sender_id ON messages (sender_id);`
     *   `CREATE INDEX idx_messages_sent_at ON messages (sent_at);`
 
-*   **`journal_posts` table:**
-    *   `CREATE INDEX idx_journal_posts_user_id ON journal_posts (user_id);`
-    *   `CREATE INDEX idx_journal_posts_post_type ON journal_posts (post_type);`
-    *   `CREATE INDEX idx_journal_posts_created_at ON journal_posts (created_at);`
-    *   `CREATE INDEX idx_journal_posts_visibility ON journal_posts (visibility);`
+*   **`vlogs` table:**
+    *   `CREATE INDEX idx_vlogs_user_id ON vlogs (user_id);`
+    *   `CREATE INDEX idx_vlogs_post_type ON vlogs (post_type);`
+    *   `CREATE INDEX idx_vlogs_created_at ON vlogs (created_at);`
+    *   `CREATE INDEX idx_vlogs_visibility ON vlogs (visibility);`
 
 *   **`referrals` table:**
     *   `CREATE INDEX idx_referrals_referrer_id ON referrals (referrer_id);`
