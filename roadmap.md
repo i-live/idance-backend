@@ -8,31 +8,31 @@ gantt
     dateFormat YYYY-MM-DD
     axisFormat %Y-%m
     
-    section Phase 1: Pre-Launch + Web Launch
+    section Phase 1: Pre-Launch + Web     %% Added extra spaces to move phase name left
     BackOffice  :2025-06-01, 5d
     User Sites    :2025-06-08, 14d
     Affiliate Tracking     :2025-06-23, 3d
-    Marketing      :2025-06-01, 30d
+    Marketing      :2025-06-01, 30d, #FF9999
     
-    section Phase 2: App Launch
+    section Phase 2: App Launch     %% Added extra spaces to move phase name left
     Build App   :2025-07-01, 30d
     Beta Launch     :2025-08-01, 30d
-    Marketing    :2025-09-01, 30d
+    Marketing    :2025-09-01, 30d, #FF9999
 
-    section Phase 3: Monetization
+    section Phase 3: Monetization     %% Added extra spaces to move phase name left
     Company Formation    :2025-10-01, 7d
     Business Bankig    :2025-10-08, 7d
     Pro Tier    :2025-10-01, 14d
     Pro Tier Launch       :2025-10-15, 30d
     
-    section Phase 4: PR
-    PR      :2025-10-15, 60d
-    Affiliate Program    :2025-10-15, 30d
+    section Phase 4: PR      %% Added extra spaces to move phase name left
+    PR      :2025-10-15, 60d, #FF9999
+    Affiliate Program    :2025-10-15, 30d, #FF9999
     
-    section Phase 5: Capital Raise
+    section Phase 5: Capital Raise      %% Added extra spaces to move phase name left
     Prepare Pitch    :2025-11-01, 30d
     
-    section Phase 6: AI Integration
+    section Phase 6: AI Integration      %% Added extra spaces to move phase name left
     AI Development    :2025-11-01, 30d
     Smart Matching    :2025-11-15, 15d
 ```
