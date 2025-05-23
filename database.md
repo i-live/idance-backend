@@ -10,6 +10,7 @@ erDiagram
     users ||--o{ profiles : has
     users ||--o{ group_members : belongs_to
     users ||--o{ media_assets : owns
+    users ||--o{ site_configs : configures
     
     roles ||--o{ user_roles : assigned_to
     
@@ -276,6 +277,14 @@ erDiagram
         JSONB layout "Page layout configuration"
         JSONB settings "Site settings"
         TEXT custom_domain "Optional custom domain"
+        TEXT site_title "SEO title"
+        TEXT site_description "SEO description"
+        BOOLEAN use_app_profile "Sync with app"
+        BOOLEAN show_contact_form "Enable contact"
+        TEXT contact_email "Contact email"
+        JSONB social_links "Social links"
+        JSONB featured_content "Pinned items"
+        JSONB custom_sections "Extra sections"
         TIMESTAMP updated_at
     }
 
@@ -308,6 +317,7 @@ erDiagram
         TEXT filename "Original filename"
         TEXT storage_path "Path in storage"
         INTEGER size_bytes "File size"
+        TEXT url "Valid URL"
         JSONB metadata "Media metadata"
         TIMESTAMP uploaded_at
     }
@@ -327,8 +337,6 @@ erDiagram
     profiles ||--o{ user_awards: earns
     profiles ||--o{ user_interests: has
     profiles ||--o{ user_social_links: owns
-    profiles ||--o{ user_portfolio_items: showcases
-    profiles ||--o| user_site_settings: configures
 
     dance_styles ||--o{ user_dance_styles: categorizes
     interests ||--o{ user_interests: categorizes
@@ -446,21 +454,6 @@ erDiagram
 *   `use_custom_location` (BOOLEAN, NOT NULL, Default: FALSE)
 *   `updated_at` (TIMESTAMPTZ, Default: now())
 
-### `user_site_settings`
-*   `user_id` (UUID, PK, FK to `profiles.user_id` ON DELETE CASCADE)
-*   `site_theme` (TEXT, NOT NULL, Default: 'default')
-*   `layout_config` (JSONB, NOT NULL, Default: '{}')
-*   `show_contact_form` (BOOLEAN, NOT NULL, Default: TRUE)
-*   `contact_email` (TEXT, NULLABLE)
-*   `custom_domain` (TEXT, UNIQUE, NULLABLE)
-*   `site_title` (TEXT, NULLABLE)
-*   `site_description` (TEXT, NULLABLE)
-*   `social_links_order` (JSONB, NOT NULL, Default: '[]'::jsonb)
-*   `featured_content` (JSONB, NOT NULL, Default: '{}')
-*   `custom_sections` (JSONB, NOT NULL, Default: '[]'::jsonb)
-*   `use_app_profile` (BOOLEAN, NOT NULL, Default: TRUE)
-*   `updated_at` (TIMESTAMPTZ, Default: now())
-
 ### `site_configs`
 *   `owner_id` (UUID, PK, FK to `auth.users.id` or `groups.id`)
 *   `owner_type` (TEXT, NOT NULL, CHECK: `owner_type IN ('user', 'group')`)
@@ -468,6 +461,14 @@ erDiagram
 *   `layout` (JSONB, NOT NULL, Default: '{}')
 *   `settings` (JSONB, NOT NULL, Default: '{}')
 *   `custom_domain` (TEXT, UNIQUE, NULLABLE)
+*   `site_title` (TEXT, NULLABLE)
+*   `site_description` (TEXT, NULLABLE)
+*   `use_app_profile` (BOOLEAN, NOT NULL, Default: TRUE)
+*   `show_contact_form` (BOOLEAN, NOT NULL, Default: TRUE)
+*   `contact_email` (TEXT, NULLABLE)
+*   `social_links` (JSONB, NOT NULL, Default: '[]'::jsonb)
+*   `featured_content` (JSONB, NOT NULL, Default: '[]'::jsonb)
+*   `custom_sections` (JSONB, NOT NULL, Default: '[]'::jsonb)
 *   `updated_at` (TIMESTAMPTZ, Default: now())
 
 ### `site_analytics`
@@ -497,8 +498,7 @@ erDiagram
 *   `filename` (TEXT, NOT NULL)
 *   `storage_path` (TEXT, NOT NULL)
 *   `size_bytes` (INTEGER, NOT NULL)
-*   `metadata` (JSONB, NOT NULL, Default: '{}')
-*   `uploaded_at` (TIMESTAMPTZ, Default: now())
+*   `url` (TEXT, NOT NULL, CHECK: valid URL)
 
 ### `post_likes`
 *   `id` (UUID, PK, Default: uuid_generate_v4())
@@ -544,16 +544,10 @@ erDiagram
 *   **`user_social_links` table:**
     *   `CREATE INDEX idx_user_social_links_user_id ON user_social_links (user_id);`
     *   `CREATE INDEX idx_user_social_links_platform_id ON user_social_links (platform_id);`
-*   **`user_portfolio_items` table:**
-    *   `CREATE INDEX idx_user_portfolio_items_user_id_display_order ON user_portfolio_items (user_id, display_order);`
-    *   `CREATE INDEX idx_user_portfolio_items_item_type ON user_portfolio_items (item_type);`
-*   **`user_site_settings` table:**
-    *   `CREATE INDEX idx_user_site_settings_user_id ON user_site_settings (user_id);`
-    *   `CREATE INDEX idx_user_site_settings_custom_domain ON user_site_settings (custom_domain);`
-    *   `CREATE UNIQUE INDEX idx_user_site_settings_custom_domain_unique ON user_site_settings (LOWER(custom_domain)) WHERE custom_domain IS NOT NULL;`
 
 *   **`site_configs` table:**
     *   `CREATE INDEX idx_site_configs_owner_id ON site_configs (owner_id);`
+    *   `CREATE INDEX idx_site_configs_owner_type ON site_configs (owner_type);`
     *   `CREATE INDEX idx_site_configs_custom_domain ON site_configs (custom_domain);`
     *   `CREATE UNIQUE INDEX idx_site_configs_custom_domain_unique ON site_configs (LOWER(custom_domain)) WHERE custom_domain IS NOT NULL;`
 
@@ -565,7 +559,9 @@ erDiagram
 
 *   **`media_assets` table:**
     *   `CREATE INDEX idx_media_assets_owner_id ON media_assets (owner_id);`
+    *   `CREATE INDEX idx_media_assets_owner_type ON media_assets (owner_type);`
     *   `CREATE INDEX idx_media_assets_type ON media_assets (type);`
+    *   `CREATE INDEX idx_media_assets_storage_path ON media_assets (storage_path);`
 
 *   **`post_likes` table:**
     *   `CREATE INDEX idx_post_likes_post_id ON post_likes (post_id);`
@@ -580,40 +576,107 @@ erDiagram
 
 ## 5. Row Level Security (RLS) Policies
 
-### User Site Settings
-*   Only authenticated users can read/write their own site settings
-*   Authenticated users can read public site settings for any user's custom domain
-*   API services can read all site settings
+### Site Configurations
+*   Only authenticated users can read/write their own site configurations
+*   Groups can manage their own site configurations through group admins
+*   Authenticated users can read public site settings for any custom domain
+*   API services can read all site configurations
 *   Example policies:
     ```sql
     -- Enable RLS
-    ALTER TABLE user_site_settings ENABLE ROW LEVEL SECURITY;
+    ALTER TABLE site_configs ENABLE ROW LEVEL SECURITY;
 
     -- Policy for users to read their own settings
-    CREATE POLICY user_site_settings_select_own ON user_site_settings
+    CREATE POLICY site_configs_select_own ON site_configs
     FOR SELECT TO authenticated
-    USING (auth.uid() = user_id);
+    USING (
+        owner_id = auth.uid() OR 
+        EXISTS (
+            SELECT 1 FROM group_members 
+            WHERE group_members.group_id = site_configs.owner_id 
+            AND group_members.user_id = auth.uid()
+            AND group_members.role IN ('owner', 'admin')
+        )
+    );
 
-    -- Policy for users to read public site settings by custom domain
-    CREATE POLICY user_site_settings_select_public ON user_site_settings
+    -- Policy for users to read public site configs by custom domain
+    CREATE POLICY site_configs_select_public ON site_configs
     FOR SELECT TO authenticated
-    USING (true)
-    WITH CHECK (custom_domain IS NOT NULL);
+    USING (custom_domain IS NOT NULL);
 
     -- Policy for users to modify their own settings
-    CREATE POLICY user_site_settings_modify_own ON user_site_settings
+    CREATE POLICY site_configs_modify_own ON site_configs
     FOR ALL TO authenticated
-    USING (auth.uid() = user_id)
-    WITH CHECK (auth.uid() = user_id);
+    USING (
+        owner_id = auth.uid() OR 
+        EXISTS (
+            SELECT 1 FROM group_members 
+            WHERE group_members.group_id = site_configs.owner_id 
+            AND group_members.user_id = auth.uid()
+            AND group_members.role IN ('owner', 'admin')
+        )
+    )
+    WITH CHECK (
+        owner_id = auth.uid() OR 
+        EXISTS (
+            SELECT 1 FROM group_members 
+            WHERE group_members.group_id = site_configs.owner_id 
+            AND group_members.user_id = auth.uid()
+            AND group_members.role IN ('owner', 'admin')
+        )
+    );
 
     -- Policy for service role to access all settings
-    CREATE POLICY user_site_settings_service_all ON user_site_settings
+    CREATE POLICY site_configs_service_all ON site_configs
     FOR ALL TO service_role
     USING (true)
     WITH CHECK (true);
     ```
 
+### Media Assets
+*   Users can read/write their own media assets
+*   Groups can manage their media assets through group members
+*   Example policies:
+    ```sql
+    -- Enable RLS
+    ALTER TABLE media_assets ENABLE ROW LEVEL SECURITY;
+
+    -- Policy for users to read their own media assets
+    CREATE POLICY media_assets_select_own ON media_assets
+    FOR SELECT TO authenticated
+    USING (
+        owner_id = auth.uid() OR 
+        EXISTS (
+            SELECT 1 FROM group_members 
+            WHERE group_members.group_id = media_assets.owner_id 
+            AND group_members.user_id = auth.uid()
+        )
+    );
+
+    -- Policy for users to modify their own media assets
+    CREATE POLICY media_assets_modify_own ON media_assets
+    FOR ALL TO authenticated
+    USING (
+        owner_id = auth.uid() OR 
+        EXISTS (
+            SELECT 1 FROM group_members 
+            WHERE group_members.group_id = media_assets.owner_id 
+            AND group_members.user_id = auth.uid()
+            AND group_members.role IN ('owner', 'admin')
+        )
+    )
+    WITH CHECK (
+        owner_id = auth.uid() OR 
+        EXISTS (
+            SELECT 1 FROM group_members 
+            WHERE group_members.group_id = media_assets.owner_id 
+            AND group_members.user_id = auth.uid()
+            AND group_members.role IN ('owner', 'admin')
+        )
+    );
+    ```
+
 ### Other RLS Policies
-*   Users can only read/write their own related entries in `user_dance_styles`, `user_awards`, `user_interests`, `user_social_links`, `user_portfolio_items`, `post_likes`, `post_comments`, `post_shares`
+*   Users can only read/write their own related entries in `user_dance_styles`, `user_awards`, `user_interests`, `user_social_links`, `post_likes`, `post_comments`, `post_shares`
 *   Reference tables (`dance_styles`, `interests`, `social_platforms`) are public read-only
 *   All other RLS policies remain as previously defined
