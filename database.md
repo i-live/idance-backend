@@ -291,7 +291,7 @@ erDiagram
         UUID id PK "Default uuid_generate_v4()"
         UUID site_id FK "FK to sites.id, Not Null"
         TEXT type "text|gallery|blog|contact|etc, Not Null"
-        INTEGER "order" "Display order, default 0, Not Null"
+        INTEGER display_order "Display order, default 0, Not Null"
         JSONB content "Block content"
         BOOLEAN published "Published status, default false, Not Null"
         TIMESTAMPTZ created_at "Default now()"
