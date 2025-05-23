@@ -1,210 +1,364 @@
-# iDance - System Architecture (MVP)
+# iDance - System Architecture
 
-This document outlines the proposed system architecture for the "iDance" mobile application's Minimum Viable Product (MVP).
+```mermaid
+flowchart TD
+    %% Main User Entry Points
+    MobileApp["Mobile App<br>(React Native + Expo)"]
+    UserSites["User Sites<br>(Next.js)"]
+    AdminPortal["Admin Portal<br>(Next.js)"]
+
+    %% Infrastructure & Hosting
+    CF["Cloudflare<br>Pages + DNS + CDN"]
+    
+    %% Storage Systems
+    iDriveE2["iDrive E2<br>Primary Storage"]
+    R2["Cloudflare R2<br>Edge Cache"]
+    
+    %% Backend Systems
+    Supabase["Supabase Platform<br>Auth + Database + Realtime"]
+    EdgeFuncs["Edge Functions<br>Business Logic"]
+
+    %% User Access
+    Users(("Users"))
+    Admins(("Admins"))
+    
+    %% Flow Connections
+    Users --> MobileApp
+    Users --> UserSites
+    Admins --> AdminPortal
+    
+    %% Frontend to Infrastructure
+    UserSites --> CF
+    AdminPortal --> CF
+    
+    %% Infrastructure to Backend
+    CF --> Supabase
+    CF --> EdgeFuncs
+    CF --> R2
+    
+    %% Storage Flow
+    EdgeFuncs --> iDriveE2
+    iDriveE2 -.-> R2
+    
+    %% Mobile Direct Connections
+    MobileApp --> Supabase
+    MobileApp --> R2
+    
+    %% Backend Interconnections
+    EdgeFuncs <--> Supabase
+    
+    %% Styling
+    classDef primary fill:#2d3748,stroke:#cbd5e0,stroke-width:2px,color:white
+    classDef storage fill:#2c5282,stroke:#90cdf4,stroke-width:2px,color:white
+    classDef infrastructure fill:#1a365d,stroke:#4299e1,stroke-width:2px,color:white
+    classDef users fill:#742a2a,stroke:#fc8181,stroke-width:2px,color:white
+    
+    class MobileApp,UserSites,AdminPortal primary
+    class iDriveE2,R2 storage
+    class CF,Supabase,EdgeFuncs infrastructure
+    class Users,Admins users
+```
 
 ## 1. Overview
 
-iDance is a mobile application designed to connect dancers for various purposes, including finding dance partners, showcasing talent, and building a community. The MVP focuses on core features like user authentication, profiles, swiping-based matching, and chat.
+iDance is a mobile application and web platform designed to facilitate connecting dancers to showcase their dance talents, help find new dance partners, other dancers, dance jobs, building professional networks, and fostering a vibrant community.
 
-**Guiding Principles for MVP Architecture:**
-*   **Rapid Development:** Prioritize technologies and approaches that enable quick iteration (React Native with Expo, Supabase).
-*   **Scalability:** Choose a backend (Supabase) that can scale with user growth.
-*   **Cost-Effectiveness:** Leverage managed services and free/affordable tiers where possible.
-*   **Mobile-First:** Design primarily for iOS and Android.
+**Key Features:**
+- Comprehensive user profiles (dance styles, proficiency, media, awards)
+- Swipe-based matching system
+- TikTok-like timeline and dance journal
+- Direct chat capabilities
+- Multi-level referral system
+- Custom user websites
 
-## 2. High-Level Architecture Diagram
+**Guiding Principles:**
+*   **Mobile-First:** Primary focus on iOS and Android apps
+*   **Rapid Development:** Using React Native, Expo, Supabase
+*   **Scalability:** Cloud-native architecture with Supabase
+*   **Cost-Effectiveness:** Leveraging affordable managed services
 
-```mermaid
-graph TD
-    UserDevice[Mobile App] -->|HTTPS/WSS| Supabase[Supabase]
-    Supabase -->|Auth| AuthN[Authentication]
-    Supabase -->|Data| DB[(PostgreSQL)]
-    Supabase -->|Logic| EdgeFuncs[Edge Functions]
-    Supabase -->|Realtime| RT[Realtime]
-    Supabase -->|Storage| Store[Storage]
+## 2. Core Software Components
 
-    UserDevice -->|API| EdgeFuncs
-    EdgeFuncs -->|CRUD| DB
-    EdgeFuncs -->|Verify| AuthN
-    UserDevice -->|Chat| RT
-    UserDevice -->|Media| Store
+### 2.1 Mobile App (iOS/Android)
+*   **Technology:**
+    - React Native with Expo
+    - TypeScript
+    - EAS Build + Updates
+    - Supabase Client SDK
+    - React Navigation
 
-    Admin[Admin] -->|Interface| Dashboard[Supabase Dashboard]
-    Admin -->|Web UI| Panel[Admin Panel]
-    Panel -->|API| AdminFunc[Admin Functions]
-    AdminFunc -->|Data| DB
+*   **Key Features:**
+    - Authentication & profile management
+    - Swipe-based matching
+    - Timeline/social features
+    - Chat system
+    - Media management
+    - Location-based search
+    - Referral dashboard
 
-    subgraph PreLaunch[Pre-Launch System]
-        direction LR
-        User[User] -->|Visit| Website[Landing Page]
-        Website -->|Submit| Forms[Systeme.io Forms]
-        Forms -->|Webhook| Waitlist[Waitlist Table]
-        Forms -->|Store| CRM[Systeme.io CRM]
-        Admin -->|Review| CRM
-        Admin -->|Import| DB
-    end
+*   **Key Screens:**
+    - Auth & Onboarding
+    - Timeline Feed
+    - Swipe Discovery
+    - Profile Management
+    - Chat & Messages
+    - Settings & Preferences
+    - Referral Dashboard
 
-    subgraph ProUser[Pro User System]
-        direction LR
-        DNS[Custom DNS] -->|CNAME| CDN[Cloudflare]
-        CDN -->|Proxy| Logic[Profile Logic]
-        Logic --> DB
-    end
+### 2.2 Backend Services
+*   **Technology:**
+    - Supabase Platform
+    - Edge Functions (TypeScript)
+    - PostgreSQL + PostGIS
+    - iDrive E2 Storage
+    - Supabase Realtime
 
-    UserDevice -.->|Future| Timeline[Timeline Service]
-    UserDevice -.->|Future| Competition[Competition Service]
-    UserDevice -.->|Future| Verify[ID Verification]
-```
+*   **Core Services:**
+    - User Authentication
+    - Database & Data Access
+    - Media Storage
+    - Real-time Features
+    - Business Logic (Edge Functions)
+    - Geospatial Search
 
-## 3. Frontend: React Native with Expo
+*   **Key Functions:**
+    - User Management
+    - Profile Operations
+    - Matching Logic
+    - Timeline Processing
+    - Referral System
+    - Media Handling
+    - Analytics Collection
 
-*   **Platform:** React Native with Expo (Managed Workflow + EAS Build).
-*   **Language:** TypeScript.
-*   **Core Responsibilities:**
-    *   User Interface (UI) and User Experience (UX).
-    *   Client-side state management.
-    *   Communication with Supabase backend (Auth, Database, Edge Functions, Storage, Realtime).
-    *   Handling user input and gestures.
-    *   Requesting necessary device permissions (location, camera, photo library).
-*   **Key Modules/Screens (MVP - Epic 1):**
-    *   **Authentication:**
-        *   Signup Screen (Email/Password)
-        *   Login Screen
-        *   Password Reset Flow
-    *   **Onboarding/Waitlist Completion:**
-        *   Screens to complete profile details if invited from waitlist.
-    *   **Main App:**
-        *   Home/Swipe Screen: Displaying profiles, swipe gestures (like, pass, superlike).
-        *   Profile Screen:
-            *   View/Edit Own Profile (including `partner_seeking_status` toggle).
-            *   View Other Users' Profiles.
-            *   Portfolio section (photos/videos).
-        *   "Likes You" Screen: Grid of users who liked the current user.
-        *   Matches Screen: List of mutual matches.
-        *   Chat List Screen: List of ongoing conversations.
-        *   Chat Screen: Individual conversation view.
-        *   Settings/Search Configuration Screen: User preferences for discovery (age, distance, dance styles, skill level).
-        *   Pro Subscription Screen (UI placeholder, functionality deferred).
-*   **Navigation:** React Navigation.
-*   **State Management:** Zustand, Redux Toolkit, or React Context (to be decided based on complexity, Zustand often a good balance).
-*   **API Client:** Supabase JavaScript Client Library (`supabase-js`).
-*   **Deployment:** Expo Application Services (EAS) Build for creating development and production builds for iOS and Android app stores.
+### 2.3 Unified Admin Portal
+*   **Technology:**
+    - Next.js (TypeScript)
+    - TailwindCSS
+    - Supabase Client SDK
+    - Cloudflare Pages
 
-## 4. Backend: Supabase
+*   **Access Levels:**
+    - Site Administrators (iDance Team)
+    - Group Administrators (Dance Companies/Studios)
+    - Pro Users
+    - Free Users
 
-Supabase provides the BaaS (Backend as a Service) platform.
+*   **Core Features:**
+    - Role-based Dashboard
+    - User/Group Management
+    - Content Moderation
+    - Analytics & Reports
+    - System Configuration
+    - Site Customization
+    - Media Management
+    - SEO Tools
 
-*   **Authentication (Supabase Auth):**
-    *   Email/Password signup and login.
-    *   Secure JWT (JSON Web Token) handling.
-    *   Row Level Security (RLS) policies on database tables to enforce data access rules.
-    *   Auth Hooks (e.g., to trigger an Edge Function on new user signup to create a profile).
-*   **Database (Supabase Postgres):**
-    *   PostgreSQL database.
-    *   Schema detailed in `backend/database.md`.
-    *   **PostGIS Extension:** Enabled for geospatial queries (location-based matching).
-    *   RLS heavily utilized for data security.
-*   **Edge Functions (Supabase Functions - Deno/TypeScript):**
-    *   Serverless functions for custom backend logic.
-    *   Examples for MVP:
-        *   `on_user_signup`: Triggered by Auth to create an initial user profile.
-        *   `get_swipe_candidates`: Fetches profiles for the swipe screen based on user preferences and location (using PostGIS).
-        *   `process_swipe`: Handles like/pass/superlike logic, checks for new matches, creates match records.
-        *   `update_user_profile`: Handles profile updates.
-        *   `get_user_profile`: Fetches a specific user's profile.
-        *   `get_likes_received`: Fetches users who liked the current user.
-        *   `get_matches`: Fetches mutual matches.
-        *   `handle_pro_subscription_webhook`: (Deferred, for Pro Tier launch) Listens for Stripe webhooks to update subscription status.
-        *   Admin-specific functions for waitlist processing.
-*   **Realtime (Supabase Realtime):**
-    *   Used for live chat functionality.
-    *   Potentially for real-time notifications (new match, new message, new like).
-*   **Storage (Supabase Storage):**
-    *   Storing user-uploaded media: profile pictures, portfolio photos/videos.
-    *   Access control integrated with RLS policies.
+*   **Key Interfaces:**
+    - Global Admin Dashboard
+    - Group Management Console
+    - User Site Editor
+    - Analytics Dashboard
+    - Content Manager
+    - System Settings
 
-## 5. Waitlist & Pre-Launch Strategy
+### 2.4 Dynamic User Sites
+*   **Technology:**
+    - Next.js (TypeScript)
+    - TailwindCSS
+    - Cloudflare Pages
+    - Edge Functions
 
-*   **Phase 1: Initial Interest Capture (`prelaunch.idance.live`)**
-    *   A simple, attractive static landing page (e.g., built with a static site generator like Astro/Next.js static export, or a simple HTML/CSS/JS page).
-    *   Hosted on services like Vercel, Netlify, or GitHub Pages.
-    *   Clear Call to Action: "Join the iDance Pre-Launch Access!" or similar.
-    *   Embedded form or link to a form hosted on **Systeme.io** to capture email addresses. The depth of integration with Systeme.io (e.g., for direct data submission from `prelaunch.idance.live` to Systeme.io via API, or for affiliate tracking) will depend on the capabilities exposed by their API (`https://developer.systeme.io/reference/api`). Manual review of this documentation by the development team is required. Initial MVP will rely on Systeme.io's forms and built-in CRM/email features.
-*   **Phase 2: Detailed Application & CRM**
-    *   Users who submit their email receive an automated email (via Systeme.io).
-    *   Email links to a multi-step "application form" (hosted on Systeme.io) to collect detailed profile information (name, dance styles, bio, location intent, etc., mirroring fields in the `profiles` table).
-    *   Data collected and managed within Systeme.io CRM.
-    *   Systeme.io used for sending out hype-building email sequences.
-*   **Phase 3: Manual Review & Invitation**
-    *   Admin reviews applications in Systeme.io.
-    *   Approved applicants are marked. Data can be exported from Systeme.io and imported into the main Supabase `profiles` table (or a staging `waitlist_profiles` table) via a script or manual process for MVP.
-    *   Accepted users receive an email confirming their pre-launch access and eventual app download instructions.
+*   **Architecture:**
+    - Single Next.js application
+    - Dynamic routing per user/group
+    - Edge-based content resolution
+    - Real-time data updates
+    - Global CDN distribution
 
-## 6. Pro User Features & Domain Handling
+*   **Core Features:**
+    - Personal/Group subdomains
+    - Custom domain support
+    - Dynamic content rendering
+    - Media optimization
+    - SEO enhancement
+    - Contact forms
+    - Blog/Updates
+    - Analytics tracking
 
-*   **Pro Subscription (Phased Rollout):**
-    *   The Pro tier and associated payment integration (Stripe) will be implemented after establishing an initial user base (e.g., ~10k users or as strategically decided), allowing the MVP to launch as a free service initially.
-    *   When active, Pro subscriptions will be managed via Stripe integration. Edge Functions will handle communication with Stripe API.
-*   **User Profile URLs (`idance.live/username`):**
-    *   The primary URL structure for user profiles will be path-based (e.g., `idance.live/theirusername`) for better platform SEO. The `idance.live` domain will be managed via a DNS provider (e.g., Cloudflare). Application routing will handle serving the correct profile.
-*   **AI-Powered Profile Optimization (Future Pro Feature):**
-    *   Offer tools to Pro users to enhance their profile's discoverability within iDance. This includes content analysis for keyword suggestions and automatic generation of structured data (Schema.org) for their iDance profile page.
-*   **Custom Domains for Pro Users (Post-Pro Tier Launch):**
-    *   Pro users can map their own custom domains (e.g., `www.dancerjane.com`) to their iDance profile. This involves users pointing a CNAME record from their custom domain to an iDance endpoint.
-    *   Verification process needed (e.g., checking DNS records).
+*   **Performance Features:**
+    - Edge caching
+    - Image optimization
+    - Incremental Static Regeneration
+    - Analytics per site
+    - Regional distribution
 
-## 7. Admin Panel
+## 3. Infrastructure & Services
 
-*   **MVP Requirement:** Minimal functionality for reviewing and processing waitlist applications from Systeme.io (could be manual export/import initially, or a very simple secure web interface calling admin-specific Edge Functions).
-*   **Post-MVP:** A dedicated web application (`dashboard/` or `admin/` repo) for:
-    *   User management (view, suspend, delete).
-    *   Content moderation (future).
-    *   Viewing basic analytics.
-    *   Managing reported content.
+### 3.1 Storage Architecture
+*   **Primary Storage (iDrive E2):**
+    - Long-term media storage
+    - Image optimization
+    - Video transcoding
+    - Access control
+    - Quota management
+    - Cost-effective for large storage volumes
 
-## 8. Deployment Strategy
+*   **Edge Caching (Cloudflare R2):**
+    - Fast edge-cached access to frequent assets
+    - Global distribution
+    - Seamless Cloudflare integration
+    - Automatic cache invalidation
+    - Pay-per-use pricing model
 
-*   **Frontend (React Native App - `app/`):**
-    *   EAS Build for creating and submitting builds to Apple App Store and Google Play Store.
-    *   EAS Update for over-the-air updates of JS bundle (for non-native changes).
-*   **Backend (Supabase):**
-    *   Database migrations managed via Supabase CLI or SQL scripts.
-    *   Edge Functions deployed via Supabase CLI.
-*   **Pre-Launch Site (`prelaunch/`):**
-    *   Deployed to a static hosting provider (Vercel, Netlify, Cloudflare Pages).
-*   **Admin Panel (`dashboard/` - Post-MVP):**
-    *   Deployed as a web application (e.g., to Vercel, Netlify).
+### 3.2 Deployment Infrastructure
+*   **Mobile App:**
+    - EAS Build (iOS/Android)
+    - EAS Update (OTA updates)
 
-## 9. Future Epics & Enhancements Roadmap (High-Level)
+*   **Web Components:**
+    - Cloudflare Pages (SSR/Static)
+    - Cloudflare Functions
+    - Custom Domain Support
 
-*   **Epic 1: MVP Launch (Core Functionality)**
-    *   Auth, Profiles, Swiping, Matching, Chat, Waitlist System, Pro Feature Foundation (Subscription deferred).
-    *   *Early Enhancement:* Simple auto-message prompt post-match.
-*   **Epic 2: Timeline Feature**
-    *   TikTok-style vertical video feed for general dance content.
-    *   Likes, comments, ranking.
-    *   Content moderation tools (AI-assisted + manual).
-*   **Epic 3: Competition Feature**
-    *   User/Admin created competitions.
-    *   Voting mechanisms.
-    *   Sponsor branding placeholders.
-*   **Post-MVP Enhancements (Potential Order TBD):**
-    *   **ID Verification System:** For official government ID verification, integrate a 3rd party service (e.g., Persona, Veriff - recommended, post-MVP). For a lighter 'Profile Photo Liveness/Match' badge, explore in-house solutions with AI libraries/services (post-MVP).
-    *   **Advanced AI Matchmaking:** Beyond basic filters.
-    *   **AI Profile Optimization & SEO for Pro User Pages:** (As described in Pro Features).
-    *   **AI Smart Replies/Icebreakers in Chat.**
-    *   **Full-Fledged Affiliate System:** (If Systeme.io isn't sufficient or deeper integration needed).
-    *   **Group Features/Events.**
-    *   **Advanced Admin Dashboard.**
-    *   **Vector Search for Content Discovery.**
+*   **Backend:**
+    - Supabase Platform
+    - Database Migrations
+    - Edge Functions
 
-## 10. Technology Choices Summary
+### 3.3 Domain & DNS
+*   **Core Setup:**
+    - Cloudflare for `idance.live` domain
+    - Automatic SSL for all subdomains
+    - CDN for global performance
+    - CNAME setup for custom domains
 
-*   **Mobile App:** React Native with Expo (TypeScript)
-*   **Backend:** Supabase (Postgres, Auth, Edge Functions, Realtime, Storage)
-*   **Pre-Launch/Waitlist CRM & Email:** Systeme.io
-*   **Payment Processing:** Stripe
-*   **DNS/CDN (for `idance.live`):** Cloudflare (recommended)
-*   **Package Management (Monorepo if adopted):** pnpm
+*   **Custom Domain Support:**
+    - Simple documentation for CNAME setup
+    - Users can point their domains to `sites.idance.live`
+    - Automatic SSL via Cloudflare
+    - Zero additional cost for the platform
 
-This architecture aims to provide a solid foundation for the iDance MVP, balancing speed of development with scalability and future growth potential.
+## 4. Business Features
+
+### 4.1 User Tiers
+*   **Initial Launch (Free):**
+    - Personal `username.idance.live` subdomain
+    - Full featured portfolio site
+    - Media gallery and blog
+    - Contact form
+    - Basic analytics
+    - Custom domain support (via CNAME)
+    - Basic SEO tools
+    - Referral tracking
+
+*   **Pro Tier (Future):**
+    - To be introduced after company setup
+    - Enhanced analytics
+    - Priority support
+    - Premium themes
+    - Advanced SEO tools
+    - Commission payouts
+
+*   **VIP (Future - Earned):**
+    - Recognition for top creators
+    - Special profile badges
+    - Early feature access
+    - Community leadership opportunities
+
+### 4.2 Referral System
+*   **Features:**
+    - Multi-level structure
+    - Commission tracking
+    - Automated payouts
+    - Analytics dashboard
+
+## 5. Launch Strategy: User Sites First
+
+### 5.1 Initial Launch: Personal Dance Sites
+*   **Direct Value Proposition**
+    - Instant `username.idance.live` subdomain upon signup
+    - Portfolio site with media gallery and blog
+    - Built-in SEO optimization
+    - Contact forms and social links
+    - Custom domain support
+    - Analytics dashboard
+
+*   **Admin Portal Access**
+    - Site customization tools
+    - Content management
+    - Visitor analytics
+    - Referral system tracking
+    - SEO settings
+
+*   **Built-in Growth Engine**
+    - Users share their iDance sites on social media
+    - Referral tracking from day one
+    - Commission system for Pro signups
+    - SEO drives organic growth
+
+### 5.2 Phase Two: Mobile App Launch
+*   **Data-Driven Features**
+    - Pre-built network of verified dancers
+    - Existing content for timeline/social features
+    - Ready user base for matching algorithm
+    - Proven user engagement metrics
+
+*   **Natural Platform Evolution**
+    - Web users transition to mobile features
+    - Integration between sites and app
+    - Cross-platform content sharing
+    - Unified analytics and tracking
+
+## 6. Technical Architecture
+
+
+
+## 7. Development & Deployment
+
+### 7.1 Development
+*   **Repo Structure:**
+    - pnpm workspace
+    - Shared types
+    - Consistent tooling
+
+*   **Key Tools:**
+    - TypeScript
+    - ESLint/Prettier
+    - Jest/Testing Library
+    - Storybook
+
+### 7.2 CI/CD
+*   **Mobile:**
+    - EAS Build
+    - TestFlight/Internal Testing
+    - Production Release
+    - Github Actions
+
+*   **Web:**
+    - Cloudflare Pages
+    - Preview Deployments
+    - Production Release
+
+## 8. Technology Stack Summary
+*   **Frontend:** React Native (TypeScript), Next.js (TypeScript)
+*   **Backend:** Supabase, Edge Functions (TypeScript)
+*   **Storage:** iDrive E2 (primary storage), Cloudflare R2 (edge caching)
+*   **Infrastructure:** Cloudflare
+*   **Payment:** Stripe
+*   **Development Tools:**
+    *   TypeScript for all components (mobile, web, backend)
+    *   pnpm for package management
+    *   ESLint + Prettier for code formatting
+    *   Jest for testing
+    *   GitHub Actions for CI/CD
+
+### Type Safety & Code Sharing
+
+*   Shared TypeScript types between:
+    *   Mobile app and web components
+    *   Frontend and backend (Supabase)
+    *   API interfaces and database schema
+*   Automatic type generation from database schema
+*   Strong typing for API responses and requests
+
+This architecture emphasizes type safety, code reuse, and maintainable development practices while enabling rapid iteration and scalability.
