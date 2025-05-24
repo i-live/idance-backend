@@ -1,1231 +1,962 @@
-# iDance - Database Schema (Implemented on Supabase)
+# iDance - Database Schema (SurrealDB)
 
-This document details the PostgreSQL database schema for the "iDance" application, hosted on Supabase, reflecting the version implemented as of May 23, 2025. Row Level Security (RLS) is enabled on all tables containing user data.
+This document outlines the SurrealDB schema for the iDance application, hosted at `wss://idance.cloud.surrealdb.com` (namespace: `idance`, database: `dev` or `prod`), as of May 24, 2025. It provides table definitions, relationships, security rules, setup instructions, and design decisions for the mobile-first dance community platform.
 
-## 1. Entity Relationship Diagram (ERD)
+## 1. Overview
+
+iDance uses SurrealDB to manage user profiles, social interactions, media, sites, and notifications, focusing on dancers, including cheerleaders seeking partners and jobs. Key features include:
+- **Authentication**: JWT-based for users (email/password, OAuth via NextAuth.js) and Cloudflare Workers.
+- **Real-time**: WebSocket `LIVE SELECT` for notifications (e.g., likes, matches).
+- **Geospatial Search**: MTREE index for location-based dancer discovery.
+- **Scalability**: Cloud-hosted, with iDrive E2 for media storage and Cloudflare R2 for edge caching.
+- **Security**: Record-level permissions via `DEFINE ACCESS` and SurrealDB functions.
+- **Business Logic**: Core access control in SurrealDB functions; complex workflows (e.g., swipe matching, notifications) in Cloudflare Workers.
+
+The schema supports a React Native mobile app, Next.js-based User Sites and Admin Portal, and Cloudflare Workers for notifications and business logic. The `user` table holds generic fields for reusability across future `modelling_profile` and `acting_profile` tables, while the `profile` table contains dancer-specific data.
+
+## 2. Entity Relationship Diagram (ERD)
 
 ```mermaid
 erDiagram
-    users ||--o{ user_roles : has
-    users ||--o{ profiles : has
-    users ||--o{ group_members : belongs_to
-    users ||--o{ media_assets : owns
-    users ||--o{ sites : "owns/configures"
-    
-    roles ||--o{ user_roles : assigned_to
-    
-    groups ||--o{ group_members : contains
-    groups ||--o{ sites : "owns/has"
-    groups ||--o{ media_assets : owns
-    
-    sites ||--o{ content_blocks : contains
-    sites ||--o{ site_analytics : tracks
-    
-    users {
-        UUID id PK "Auth User ID (from auth.users)"
-        TIMESTAMP created_at "From auth.users"
-        TIMESTAMP updated_at "From auth.users"
-        STRING email "From auth.users"
-    }
+    user ||--o{ profile : has
+    user ||--o{ user_role : has
+    user ||--o{ group_member : belongs_to
+    user ||--o{ media_asset : owns
+    user ||--o{ site : owns
+    user ||--o{ user_search_preference : configures
+    user ||--o{ swipe : initiates
+    user ||--o{ match : participates
+    user ||--o{ message : sends
+    user ||--o{ vlog : creates
+    user ||--o{ vlog_like : creates
+    user ||--o{ vlog_comment : writes
+    user ||--o{ vlog_share : shares
+    user ||--o{ referral : refers
+    user ||--o{ device : registers
+    user ||--o{ notification : receives
 
-    profiles {
-        UUID user_id PK "FK to auth.users.id"
-        TEXT username UK "For username.idance.live, 3-30 chars, slug format"
-        TEXT first_name "Not Null"
-        TEXT last_name "Not Null"
-        DATE date_of_birth "Not Null"
-        TEXT gender "Enum type"
-        TEXT bio "Max 2000 chars"
-        BOOLEAN looking_for_partners "Default false"
-        BOOLEAN looking_for_jobs "Default false"
-        BOOLEAN looking_for_dancers "Default false"
-        UUID referrer_id FK "References auth.users.id"
-        TEXT referral_code UK "Unique code"
-        TEXT commission_tier "Tier level"
-        TEXT profile_status "Status type, default pending_waitlist_approval"
-        TEXT profile_picture_url "URL (app-level validation)"
-        TEXT user_tier "Account tier, default basic"
-        TEXT stripe_customer_id UK "External ID"
-        TEXT location_city
-        TEXT location_state
-        TEXT location_country
-        FLOAT8 latitude 
-        FLOAT8 longitude 
-        TIMESTAMPTZ last_active_at "Default now()"
-        TIMESTAMPTZ created_at "Default now()"
-        TIMESTAMPTZ updated_at "Default now(), auto-updated by trigger"
-    }
+    role ||--o{ user_role : assigned_to
 
-    roles {
-        UUID id PK "Default uuid_generate_v4()"
-        TEXT name "site_admin|group_admin|pro_user|free_user"
-        JSONB permissions "Array of permission strings, default '[]'"
-        TIMESTAMP created_at "Default now()"
-    }
+    group ||--o{ group_member : contains
+    group ||--o{ site : owns
+    group ||--o{ media_asset : owns
 
-    user_roles {
-        UUID user_id PK,FK "FK to auth.users.id"
-        UUID role_id PK,FK "FK to roles.id"
-        UUID scope_id FK "Nullable, FK to groups.id for group roles"
-        TIMESTAMP granted_at "Default now()"
-    }
+    site ||--o{ content_block : contains
+    site ||--o{ site_analytic : tracks
 
-    groups {
-        UUID id PK "Default uuid_generate_v4()"
-        TEXT name "Group name, Not Null"
-        TEXT type "company|studio|team, Not Null"
-        TEXT subdomain UK "For group.idance.live, Not Null"
-        TEXT custom_domain UK "Optional custom domain"
-        JSONB settings "Group settings, default '{}'"
-        TIMESTAMP created_at "Default now()"
-        TIMESTAMPTZ updated_at "Default now(), auto-updated by trigger"
-    }
+    profile ||--o{ user_dance_style : has
+    profile ||--o{ user_award : earns
+    profile ||--o{ user_interest : has
+    profile ||--o{ user_social_link : owns
+    profile ||--o{ user_portfolio_item : has
 
-    group_members {
-        UUID group_id PK,FK "FK to groups.id"
-        UUID user_id PK,FK "FK to auth.users.id"
-        TEXT role "owner|admin|member, Not Null"
-        TIMESTAMP joined_at "Default now()"
-    }
+    dance_style ||--o{ user_dance_style : categorizes
+    interest ||--o{ user_interest : categorizes
+    social_platform ||--o{ user_social_link : platforms
 
-    dance_styles {
-        INT id PK "SERIAL"
-        TEXT name UK "Style name, Not Null"
-        TIMESTAMPTZ created_at "Default now()"
-    }
-
-    user_dance_styles {
-        UUID user_id PK,FK "FK to profiles.user_id"
-        INT style_id PK,FK "FK to dance_styles.id"
-        TEXT proficiency_level "Skill level, Not Null"
-        TIMESTAMPTZ created_at "Default now()"
-    }
-
-    user_awards {
-        UUID id PK "Default uuid_generate_v4()"
-        UUID user_id FK "FK to profiles.user_id, Not Null"
-        TEXT name "Award name, Not Null"
-        INT year "Optional"
-        TEXT description "Optional"
-        TIMESTAMPTZ created_at "Default now()"
-    }
-
-    interests {
-        INT id PK "SERIAL"
-        TEXT name UK "Interest name, Not Null"
-        TIMESTAMPTZ created_at "Default now()"
-    }
-
-    user_interests {
-        UUID user_id PK,FK "FK to profiles.user_id"
-        INT interest_id PK,FK "FK to interests.id"
-        TIMESTAMPTZ created_at "Default now()"
-    }
-
-    social_platforms {
-        INT id PK "SERIAL"
-        TEXT name UK "Platform name, Not Null"
-        TIMESTAMPTZ created_at "Default now()"
-    }
-
-    user_social_links {
-        UUID id PK "Default uuid_generate_v4()"
-        UUID user_id FK,UK "FK to profiles.user_id, Not Null"
-        INT platform_id FK,UK "FK to social_platforms.id, Not Null"
-        TEXT url "Valid URL (app-level validation), Not Null"
-        TIMESTAMPTZ created_at "Default now()"
-    }
-
-    user_portfolio_items {
-        UUID id PK "Default uuid_generate_v4()"
-        UUID user_id FK "FK to profiles.user_id, Not Null"
-        TEXT item_type "Media type, Not Null"
-        TEXT url "Media URL (app-level validation), Not Null"
-        TEXT caption "Optional"
-        TEXT thumbnail_url "Preview URL (app-level validation)"
-        INT display_order "Sorting, default 0"
-        TIMESTAMPTZ created_at "Default now()"
-    }
-
-    user_search_preferences {
-        UUID user_id PK,FK "FK to auth.users.id"
-        JSONB discovery_dance_styles "ID array, default '[]'"
-        JSONB discovery_skill_levels "Level array, default '[]'"
-        INT discovery_min_age "Min 18"
-        INT discovery_max_age "Age limit, >= min_age"
-        INT discovery_distance_miles "Range, default 50"
-        JSONB discovery_gender_preference "Preferences, default '[]'"
-        BOOLEAN notifications_enabled "Default true"
-        TEXT search_location_city
-        TEXT search_location_state
-        TEXT search_location_country
-        FLOAT8 search_latitude
-        FLOAT8 search_longitude
-        BOOLEAN use_custom_location "Default false"
-        TIMESTAMPTZ updated_at "Default now(), auto-updated by trigger"
-    }
-
-    swipes {
-        UUID swiper_user_id PK,FK "FK to auth.users.id, must be different from swiped_user_id"
-        UUID swiped_user_id PK,FK "FK to auth.users.id, must be different from swiper_user_id"
-        TEXT swipe_type "like|dislike|superlike, Not Null"
-        TIMESTAMPTZ created_at "Default now()"
-    }
-
-    matches {
-        UUID id PK "Default uuid_generate_v4()"
-        UUID user1_id FK,UK "FK to auth.users.id, Not Null"
-        UUID user2_id FK,UK "FK to auth.users.id, Not Null"
-        TIMESTAMPTZ matched_at "Default now()"
-    }
-
-    chats {
-        UUID id PK "Default uuid_generate_v4()"
-        UUID match_id UK,FK "FK to matches.id, Not Null"
-        UUID last_message_id FK "Nullable, FK to messages.id ON DELETE SET NULL"
-        TIMESTAMPTZ last_activity "Default now(), auto-updated by trigger"
-    }
-
-    messages {
-        UUID id PK "Default uuid_generate_v4()"
-        UUID chat_id FK "FK to chats.id, Not Null"
-        UUID sender_id FK "FK to auth.users.id, Not Null"
-        TEXT content_type "text|image|video|audio, Not Null"
-        TEXT content "Body, Not Null"
-        TEXT media_url "Optional URL (app-level validation)"
-        TIMESTAMPTZ sent_at "Default now()"
-    }
-
-    vlogs {
-        UUID id PK "Default uuid_generate_v4()"
-        UUID user_id FK "FK to auth.users.id, Not Null"
-        TEXT post_type "text|image|video|story, Not Null"
-        TEXT title "Optional"
-        TEXT caption "Optional"
-        JSONB media_items "Media array, default '[]'"
-        JSONB engagement_counts "Statistics, default '{}'"
-        TEXT visibility "public|followers|private, default public, Not Null"
-        TIMESTAMPTZ created_at "Default now()"
-        TIMESTAMPTZ updated_at "Default now(), auto-updated by trigger"
-    }
-
-    vlog_likes {
-        UUID id PK "Default uuid_generate_v4()"
-        UUID vlog_id FK,UK "FK to vlogs.id, Not Null"
-        UUID user_id FK,UK "FK to auth.users.id, Not Null"
-        TIMESTAMPTZ created_at "Default now()"
-    }
-
-    vlog_comments {
-        UUID id PK "Default uuid_generate_v4()"
-        UUID vlog_id FK "FK to vlogs.id, Not Null"
-        UUID user_id FK "FK to auth.users.id, Not Null"
-        TEXT content "Comment text, Not Null"
-        JSONB metadata "Optional data"
-        UUID reply_to_id FK "Nullable, Self-reference to vlog_comments.id"
-        TIMESTAMPTZ created_at "Default now()"
-        TIMESTAMPTZ updated_at "Default now(), auto-updated by trigger"
-    }
-
-    vlog_shares {
-        UUID id PK "Default uuid_generate_v4()"
-        UUID vlog_id FK "FK to vlogs.id, Not Null"
-        UUID user_id FK "FK to auth.users.id, Not Null"
-        TEXT share_type "Platform type, Not Null"
-        TIMESTAMPTZ created_at "Default now()"
-    }
-
-    referrals {
-        UUID id PK "Default uuid_generate_v4()"
-        UUID referrer_id FK "FK to auth.users.id ON DELETE SET NULL, Not Null"
-        UUID referred_id UK,FK "FK to auth.users.id ON DELETE CASCADE, Not Null"
-        TEXT status "Current state, default 'pending', Not Null"
-        INT level "Referral depth, default 1, Not Null"
-        UUID parent_referral_id FK "Nullable, Self-ref to referrals.id ON DELETE SET NULL"
-        TIMESTAMPTZ created_at "Default now()"
-    }
-
-    commissions {
-        UUID id PK "Default uuid_generate_v4()"
-        UUID referral_id FK "FK to referrals.id, Not Null"
-        UUID earner_id FK "FK to auth.users.id, Not Null, must be different from payer_id"
-        UUID payer_id FK "FK to auth.users.id, Not Null, must be different from earner_id"
-        NUMERIC amount "Positive value, Not Null"
-        TEXT currency "Default USD, Not Null"
-        TEXT type "Commission type, Not Null"
-        TEXT status "Payment status, default 'pending', Not Null"
-        TIMESTAMPTZ created_at "Default now()"
-    }
-
-    sites {
-        UUID id PK "Default uuid_generate_v4()"
-        UUID owner_id "Not Null"
-        TEXT owner_type "user|group, Not Null"
-        TEXT theme "Theme identifier"
-        JSONB layout "Page layout configuration"
-        JSONB settings "Site settings"
-        TEXT custom_domain UK "Optional custom domain"
-        TEXT site_title "SEO title"
-        TEXT site_description "SEO description"
-        BOOLEAN use_app_profile "Sync with app, default false"
-        BOOLEAN show_contact_form "Enable contact, default false"
-        TEXT contact_email "Contact email"
-        JSONB social_links "Social links"
-        JSONB featured_content "Pinned items"
-        JSONB custom_sections "Extra sections"
-        TIMESTAMPTZ created_at "Default now()"
-        TIMESTAMPTZ updated_at "Default now(), auto-updated by trigger"
-    }
-
-    site_analytics {
-        UUID site_id PK,FK "FK to sites.id"
-        DATE date PK "Stats date"
-        INTEGER visits "Daily visits, default 0"
-        INTEGER unique_visitors "Unique visitors, default 0"
-        JSONB page_views "Page view counts"
-        JSONB traffic_sources "Traffic source data"
-        TIMESTAMPTZ updated_at "Default now(), auto-updated by trigger"
-    }
-
-    content_blocks {
-        UUID id PK "Default uuid_generate_v4()"
-        UUID site_id FK "FK to sites.id, Not Null"
-        TEXmT type "text|gallery|blog|contact|etc, Not Null"
-        INTEGER display_order "Display order, default 0, Not Null"
-        JSONB content "Block content"
-        BOOLEAN published "Published status, default false, Not Null"
-        TIMESTAMPTZ created_at "Default now()"
-        TIMESTAMPTZ updated_at "Default now(), auto-updated by trigger"
-    }
-
-    media_assets {
-        UUID id PK "Default uuid_generate_v4()"
-        UUID owner_id "Not Null"
-        TEXT owner_type "user|group, Not Null"
-        TEXT type "image|video|document, Not Null"
-        TEXT filename "Original filename"
-        TEXT storage_path UK "Path in storage, Not Null"
-        INTEGER size_bytes "File size"
-        TEXT url UK "Valid URL (app-level validation), Not Null"
-        JSONB metadata "Media metadata"
-        TIMESTAMPTZ uploaded_at "Default now()"
-        TIMESTAMPTZ updated_at "Default now(), auto-updated by trigger"
-    }
-
-    users ||--o| profiles: has
-    users ||--o{ user_search_preferences: configures
-    users ||--o{ swipes: initiates
-    users ||--o{ matches: participates
-    users ||--o{ messages: sends
-    users ||--o{ vlogs: creates
-    users ||--o{ vlog_likes: creates
-    users ||--o{ vlog_comments: writes
-    users ||--o{ vlog_shares: shares
-    users ||--o{ referrals: refers
-
-    profiles ||--o{ user_dance_styles: has
-    profiles ||--o{ user_awards: earns
-    profiles ||--o{ user_interests: has
-    profiles ||--o{ user_social_links: owns
-    profiles ||--o{ user_portfolio_items: has
-
-    dance_styles ||--o{ user_dance_styles: categorizes
-    interests ||--o{ user_interests: categorizes
-    social_platforms ||--o{ user_social_links: platforms
-
-    matches ||--|| chats: enables
-    chats ||--o{ messages: contains
-    vlogs ||--o{ vlog_likes: has
-    vlogs ||--o{ vlog_comments: has
-    vlogs ||--o{ vlog_shares: tracks
-    referrals ||--o{ commissions: generates
-    referrals ||--o{ referrals: branches
-    vlog_comments ||--o{ vlog_comments: "replies to"
+    match ||--|| chat : enables
+    chat ||--o{ message : contains
+    vlog ||--o{ vlog_like : has
+    vlog ||--o{ vlog_comment : has
+    vlog ||--o{ vlog_share : tracks
+    referral ||--o{ commission : generates
+    vlog_comment ||--o{ vlog_comment : replies_to
 ```
 
-## 2. Database Extensions, Trigger Functions, and RLS Helper Functions
+## 3. Database Configuration
 
-### Database Extensions
-*   **`uuid-ossp`**: Enabled. Used for `uuid_generate_v4()` to generate UUIDs for primary keys.
+### 3.1 Setup
+- **Endpoint**: `wss://idance.cloud.surrealdb.com`
+- **Namespace**: `idance`
+- **Database**: `dev` (development), `prod` (production)
+- **Access**:
+  - Users: `DEFINE ACCESS user ON DATABASE TYPE RECORD` with JWT (email/password, OAuth).
+  - Workers: `DEFINE ACCESS worker ON DATABASE TYPE JWT` for Cloudflare Workers.
+- **Dependencies**:
+  - `surrealdb.js` for React Native and Next.js.
+  - iDrive E2 for media storage, Cloudflare R2 for caching.
+- **CLI Tools**:
+  - Install SurrealDB CLI: `curl -sSf https://install.surrealdb.com | sh`
+  - Apply schema: `surreal import --conn wss://idance.cloud.surrealdb.com --ns idance --db dev migrations/0000_initial_schema.surql`
 
-### Trigger Functions
-These functions are used by triggers to automatically update timestamp columns.
+### 3.2 Authentication
+- **User Access**:
+  ```surrealql
+  DEFINE ACCESS user ON DATABASE TYPE RECORD
+    SIGNUP ( CREATE user SET email = $email, password = crypto::argon2::generate($password), oauth_providers = $oauth_providers )
+    SIGNIN ( SELECT * FROM user WHERE email = $email AND crypto::argon2::compare(password, $password) OR oauth_providers[$provider].id = $provider_id )
+    WITH JWT ALGORITHM HS256 DURATION 1h;
+  ```
+- **Worker Access**:
+  ```surrealql
+  DEFINE TOKEN worker_token ON SCOPE worker TYPE HS256 VALUE '<secret>';
+  DEFINE ACCESS worker ON DATABASE TYPE JWT WITH TOKEN worker_token;
+  ```
+- **NextAuth.js Integration**:
+  - Stores OAuth data in `user.oauth_providers` (Google, Facebook, Apple).
+  - Uses SurrealDB JWT for session validation in Next.js.
 
-*   **`public.handle_updated_at()`**
-    ```sql
-    CREATE OR REPLACE FUNCTION public.handle_updated_at()
-    RETURNS TRIGGER AS $$
-    BEGIN
-        NEW.updated_at = now();
-        RETURN NEW;
-    END;
-    $$ LANGUAGE plpgsql;
+### 3.3 Real-time Features
+- **Notifications**:
+  - `LIVE SELECT` on `notification` streams new records to Cloudflare Workers.
+  - Example:
+    ```surrealql
+    LIVE SELECT * FROM notification WHERE push_status = 'pending';
     ```
-    This trigger function is used to automatically set the `updated_at` column to the current timestamp whenever a row is updated in tables like `profiles`, `groups`, `user_search_preferences`, `vlogs`, `vlog_comments`, `sites`, `site_analytics`, `content_blocks`, and `media_assets`.
-
-*   **`public.handle_last_activity_update()`**
-    ```sql
-    CREATE OR REPLACE FUNCTION public.handle_last_activity_update()
-    RETURNS TRIGGER AS $$
-    BEGIN
-        NEW.last_activity = now();
-        RETURN NEW;
-    END;
-    $$ LANGUAGE plpgsql;
-    ```
-    This trigger function is used to automatically set the `last_activity` column to the current timestamp whenever a row is updated in the `chats` table.
-
-### RLS (Row Level Security) Helper Functions
-These SQL functions are used within RLS policies to determine access permissions. They are defined with `SECURITY DEFINER` to execute with the permissions of the function owner (typically a superuser), allowing them to query tables that the calling user might not have direct access to, but only for the purpose of the RLS check.
-
-*   **`is_match_member(match_id_to_check UUID, user_id_to_check UUID) RETURNS BOOLEAN`**
-    Checks if a given user is one of the two participants in a specified match.
-    ```sql
-    CREATE OR REPLACE FUNCTION is_match_member(match_id_to_check UUID, user_id_to_check UUID)
-    RETURNS BOOLEAN AS $$
-    BEGIN
-      RETURN EXISTS (
-        SELECT 1 FROM public.matches
-        WHERE id = match_id_to_check AND (user1_id = user_id_to_check OR user2_id = user_id_to_check)
-      );
-    END;
-    $$ LANGUAGE plpgsql SECURITY DEFINER;
-    ```
-
-*   **`is_chat_member(chat_id_to_check UUID, user_id_to_check UUID) RETURNS BOOLEAN`**
-    Checks if a given user is a member of a specified chat (by checking membership of the underlying match).
-    ```sql
-    CREATE OR REPLACE FUNCTION is_chat_member(chat_id_to_check UUID, user_id_to_check UUID)
-    RETURNS BOOLEAN AS $$
-    DECLARE
-      match_id_of_chat UUID;
-    BEGIN
-      SELECT match_id INTO match_id_of_chat FROM public.chats WHERE id = chat_id_to_check;
-      IF match_id_of_chat IS NULL THEN
-        RETURN FALSE;
-      END IF;
-      RETURN is_match_member(match_id_of_chat, user_id_to_check);
-    END;
-    $$ LANGUAGE plpgsql SECURITY DEFINER;
-    ```
-
-*   **`can_view_vlog(vlog_id_to_check UUID, user_id_to_check UUID) RETURNS BOOLEAN`**
-    Checks if a given user can view a specified vlog based on its visibility settings and ownership.
-    ```sql
-    CREATE OR REPLACE FUNCTION can_view_vlog(vlog_id_to_check UUID, user_id_to_check UUID)
-    RETURNS BOOLEAN AS $$
-    DECLARE
-      vlog_owner_id UUID;
-      vlog_visibility TEXT;
-    BEGIN
-      SELECT user_id, visibility INTO vlog_owner_id, vlog_visibility FROM public.vlogs WHERE id = vlog_id_to_check;
-      IF vlog_owner_id IS NULL THEN RETURN FALSE; END IF; -- Vlog doesn't exist
-      IF vlog_visibility = 'public' THEN RETURN TRUE; END IF;
-      IF user_id_to_check IS NULL THEN RETURN FALSE; END IF; -- Anonymous user cannot see non-public
-      IF vlog_owner_id = user_id_to_check THEN RETURN TRUE; END IF; -- Owner can see their own
-      IF vlog_visibility = 'followers' THEN RETURN TRUE; END IF; -- Authenticated users can see 'followers' vlogs (requires app-level logic for actual following)
-      RETURN FALSE;
-    END;
-    $$ LANGUAGE plpgsql SECURITY DEFINER;
-    ```
-
-*   **`is_group_admin_or_owner(group_id_to_check UUID, user_id_to_check UUID) RETURNS BOOLEAN`**
-    Checks if a given user is an 'admin' or 'owner' in a specified group.
-    ```sql
-    CREATE OR REPLACE FUNCTION is_group_admin_or_owner(group_id_to_check UUID, user_id_to_check UUID)
-    RETURNS BOOLEAN AS $$
-    BEGIN
-      RETURN EXISTS (
-        SELECT 1 FROM public.group_members
-        WHERE group_id = group_id_to_check
-          AND user_id = user_id_to_check
-          AND (role = 'admin' OR role = 'owner')
-      );
-    END;
-    $$ LANGUAGE plpgsql SECURITY DEFINER;
-    ```
-
-*   **`can_manage_site(site_id_to_check UUID, user_id_to_check UUID) RETURNS BOOLEAN`**
-    Checks if a given user can manage a specified site (either as a direct user owner or as an admin/owner of the group that owns the site).
-    ```sql
-    CREATE OR REPLACE FUNCTION can_manage_site(site_id_to_check UUID, user_id_to_check UUID)
-    RETURNS BOOLEAN AS $$
-    DECLARE
-      site_owner_id UUID;
-      s_owner_type TEXT;
-    BEGIN
-      SELECT owner_id, owner_type INTO site_owner_id, s_owner_type FROM public.sites WHERE id = site_id_to_check;
-      IF site_owner_id IS NULL THEN RETURN FALSE; END IF;
-      IF s_owner_type = 'user' THEN
-        RETURN site_owner_id = user_id_to_check;
-      ELSIF s_owner_type = 'group' THEN
-        RETURN is_group_admin_or_owner(site_owner_id, user_id_to_check); -- site_owner_id is group_id here
-      ELSE
-        RETURN FALSE;
-      END IF;
-    END;
-    $$ LANGUAGE plpgsql SECURITY DEFINER;
-    ```
-
-*   **`is_group_owner(group_id_to_check UUID, user_id_to_check UUID) RETURNS BOOLEAN`**
-    Checks if a given user is an 'owner' in a specified group.
-    ```sql
-    CREATE OR REPLACE FUNCTION is_group_owner(group_id_to_check UUID, user_id_to_check UUID)
-    RETURNS BOOLEAN AS $$
-    BEGIN
-      RETURN EXISTS (
-        SELECT 1 FROM public.group_members
-        WHERE group_id = group_id_to_check
-          AND user_id = user_id_to_check
-          AND role = 'owner'
-      );
-    END;
-    $$ LANGUAGE plpgsql SECURITY DEFINER;
-    ```
-
-*   **`is_sole_owner(p_group_id UUID, p_user_id UUID) RETURNS BOOLEAN`**
-    Checks if a given user is the *only* owner of a specified group.
-    ```sql
-    CREATE OR REPLACE FUNCTION is_sole_owner(p_group_id UUID, p_user_id UUID)
-    RETURNS BOOLEAN AS $$
-    DECLARE
-      v_is_owner BOOLEAN;
-      v_owner_count INT;
-    BEGIN
-      SELECT role = 'owner' INTO v_is_owner
-      FROM public.group_members
-      WHERE group_id = p_group_id AND user_id = p_user_id;
-
-      IF NOT FOUND OR v_is_owner IS NOT TRUE THEN
-        RETURN FALSE; 
-      END IF;
-
-      SELECT COUNT(*) INTO v_owner_count
-      FROM public.group_members
-      WHERE group_id = p_group_id AND role = 'owner';
-
-      RETURN v_owner_count = 1;
-    END;
-    $$ LANGUAGE plpgsql SECURITY DEFINER;
-    ```
-
-## 3. Table Schemas (Implemented)
-
-This section details the final implemented schemas for each table.
-RLS (Row Level Security) is enabled on all user-data tables listed below.
-
-### `users` (Provided by Supabase Auth)
-*   This table is managed by Supabase Auth.
-*   Key fields: `id` (UUID, PK), `email` (TEXT), `role` (TEXT), `created_at` (TIMESTAMPTZ), `updated_at` (TIMESTAMPTZ).
-
-### `profiles`
-*   `user_id` (UUID, PK, FK to `auth.users.id` ON DELETE CASCADE)
-*   `username` (TEXT, UNIQUE, NOT NULL, CHECK: `char_length(username) >= 3 AND char_length(username) <= 30 AND username ~ '^[a-z0-9]+(?:-[a-z0-9]+)*$'`)
-*   `first_name` (TEXT, NOT NULL)
-*   `last_name` (TEXT, NOT NULL)
-*   `date_of_birth` (DATE, NOT NULL)
-*   `gender` (TEXT, CHECK: `gender IN ('Male', 'Female', 'Non-binary', 'Other', 'Prefer not to say')`)
-*   `bio` (TEXT, NULLABLE, CHECK: `char_length(bio) <= 2000`)
-*   `looking_for_partners` (BOOLEAN, NOT NULL, Default: FALSE)
-*   `looking_for_jobs` (BOOLEAN, NOT NULL, Default: FALSE)
-*   `looking_for_dancers` (BOOLEAN, NOT NULL, Default: FALSE)
-*   `referrer_id` (UUID, NULLABLE, FK to `auth.users.id` ON DELETE SET NULL)
-*   `referral_code` (TEXT, UNIQUE, NULLABLE)
-*   `commission_tier` (TEXT, NULLABLE)
-*   `profile_status` (TEXT, NOT NULL, Default: 'pending_waitlist_approval')
-*   `profile_picture_url` (TEXT, NULLABLE) -- URL validation at app level
-*   `user_tier` (TEXT, NOT NULL, Default: 'basic')
-*   `stripe_customer_id` (TEXT, UNIQUE, NULLABLE)
-*   `location_city` (TEXT, NULLABLE)
-*   `location_state` (TEXT, NULLABLE)
-*   `location_country` (TEXT, NULLABLE)
-*   `latitude` (FLOAT8, NULLABLE)
-*   `longitude` (FLOAT8, NULLABLE)
-*   `last_active_at` (TIMESTAMPTZ, Default: `now()`)
-*   `created_at` (TIMESTAMPTZ, Default: `now()`)
-*   `updated_at` (TIMESTAMPTZ, Default: `now()`) -- Auto-updated by `handle_updated_at` trigger.
-*   **Trigger**: `on_profiles_updated` (BEFORE UPDATE, EXECUTE `public.handle_updated_at()`)
-
-### `roles`
-*   `id` (UUID, PK, Default: `uuid_generate_v4()`)
-*   `name` (TEXT, NOT NULL, CHECK: `name IN ('site_admin', 'group_admin', 'pro_user', 'free_user')`)
-*   `permissions` (JSONB, NOT NULL, Default: `'[]'::jsonb`)
-*   `created_at` (TIMESTAMPTZ, Default: `now()`)
-
-### `user_roles`
-*   `user_id` (UUID, PK, FK to `auth.users.id` ON DELETE CASCADE)
-*   `role_id` (UUID, PK, FK to `roles.id` ON DELETE CASCADE)
-*   `scope_id` (UUID, NULLABLE, FK to `groups.id` ON DELETE CASCADE)
-*   `granted_at` (TIMESTAMPTZ, Default: `now()`)
-
-### `dance_styles`
-*   `id` (SERIAL, PK)
-*   `name` (TEXT, UNIQUE, NOT NULL)
-*   `created_at` (TIMESTAMPTZ, Default: `now()`)
-
-### `user_dance_styles`
-*   `user_id` (UUID, PK, FK to `profiles.user_id` ON DELETE CASCADE)
-*   `style_id` (INTEGER, PK, FK to `dance_styles.id` ON DELETE CASCADE)
-*   `proficiency_level` (TEXT, NOT NULL)
-*   `created_at` (TIMESTAMPTZ, Default: `now()`)
-
-### `user_awards`
-*   `id` (UUID, PK, Default: `uuid_generate_v4()`)
-*   `user_id` (UUID, NOT NULL, FK to `profiles.user_id` ON DELETE CASCADE)
-*   `name` (TEXT, NOT NULL)
-*   `year` (INTEGER, NULLABLE)
-*   `description` (TEXT, NULLABLE)
-*   `created_at` (TIMESTAMPTZ, Default: `now()`)
-
-### `interests`
-*   `id` (SERIAL, PK)
-*   `name` (TEXT, UNIQUE, NOT NULL)
-*   `created_at` (TIMESTAMPTZ, Default: `now()`)
-
-### `user_interests`
-*   `user_id` (UUID, PK, FK to `profiles.user_id` ON DELETE CASCADE)
-*   `interest_id` (INTEGER, PK, FK to `interests.id` ON DELETE CASCADE)
-*   `created_at` (TIMESTAMPTZ, Default: `now()`)
-
-### `social_platforms`
-*   `id` (SERIAL, PK)
-*   `name` (TEXT, UNIQUE, NOT NULL)
-*   `created_at` (TIMESTAMPTZ, Default: `now()`)
-
-### `user_social_links`
-*   `id` (UUID, PK, Default: `uuid_generate_v4()`)
-*   `user_id` (UUID, NOT NULL, FK to `profiles.user_id` ON DELETE CASCADE)
-*   `platform_id` (INTEGER, NOT NULL, FK to `social_platforms.id` ON DELETE CASCADE)
-*   `url` (TEXT, NOT NULL) -- Basic check, app-level validation for URL format
-*   `created_at` (TIMESTAMPTZ, Default: `now()`)
-*   CONSTRAINT `unique_user_platform_link` UNIQUE (`user_id`, `platform_id`)
-
-### `user_portfolio_items`
-*   `id` (UUID, PK, Default: `uuid_generate_v4()`)
-*   `user_id` (UUID, NOT NULL, FK to `profiles.user_id` ON DELETE CASCADE)
-*   `item_type` (TEXT, NOT NULL)
-*   `url` (TEXT, NOT NULL) -- URL to the portfolio item. App-level validation for format.
-*   `caption` (TEXT, NULLABLE)
-*   `thumbnail_url` (TEXT, NULLABLE) -- URL to a thumbnail image. App-level validation.
-*   `display_order` (INTEGER, NOT NULL, Default: 0)
-*   `created_at` (TIMESTAMPTZ, Default: `now()`)
-
-### `user_search_preferences`
-*   `user_id` (UUID, PK, FK to `auth.users.id` ON DELETE CASCADE)
-*   `discovery_dance_styles` (JSONB, Default: `'[]'::jsonb`)
-*   `discovery_skill_levels` (JSONB, Default: `'[]'::jsonb`)
-*   `discovery_min_age` (INTEGER, CHECK: `discovery_min_age >= 18`)
-*   `discovery_max_age` (INTEGER, NULLABLE)
-*   `discovery_distance_miles` (INTEGER, NOT NULL, Default: 50)
-*   `discovery_gender_preference` (JSONB, Default: `'[]'::jsonb`)
-*   `notifications_enabled` (BOOLEAN, NOT NULL, Default: TRUE)
-*   `search_location_city` (TEXT, NULLABLE)
-*   `search_location_state` (TEXT, NULLABLE)
-*   `search_location_country` (TEXT, NULLABLE)
-*   `search_latitude` (FLOAT8, NULLABLE)
-*   `search_longitude` (FLOAT8, NULLABLE)
-*   `use_custom_location` (BOOLEAN, NOT NULL, Default: FALSE)
-*   `updated_at` (TIMESTAMPTZ, Default: `now()`) -- Auto-updated by `handle_updated_at` trigger.
-*   CONSTRAINT `check_max_age` CHECK (`discovery_max_age` IS NULL OR `discovery_min_age` IS NULL OR `discovery_max_age >= discovery_min_age`)
-*   **Trigger**: `on_user_search_preferences_updated` (BEFORE UPDATE, EXECUTE `public.handle_updated_at()`)
-
-### `groups`
-*   `id` (UUID, PK, Default: `uuid_generate_v4()`)
-*   `name` (TEXT, NOT NULL)
-*   `type` (TEXT, NOT NULL, CHECK: `type IN ('company', 'studio', 'team')`)
-*   `subdomain` (TEXT, UNIQUE, NOT NULL)
-*   `custom_domain` (TEXT, UNIQUE, NULLABLE)
-*   `settings` (JSONB, NOT NULL, Default: `'{}'::jsonb`)
-*   `created_at` (TIMESTAMPTZ, Default: `now()`)
-*   `updated_at` (TIMESTAMPTZ, Default: `now()`) -- Auto-updated by `handle_updated_at` trigger.
-*   **Trigger**: `on_groups_updated` (BEFORE UPDATE, EXECUTE `public.handle_updated_at()`)
-
-### `group_members`
-*   `group_id` (UUID, PK, FK to `groups.id` ON DELETE CASCADE)
-*   `user_id` (UUID, PK, FK to `auth.users.id` ON DELETE CASCADE)
-*   `role` (TEXT, NOT NULL, CHECK: `role IN ('owner', 'admin', 'member')`)
-*   `joined_at` (TIMESTAMPTZ, Default: `now()`)
-
-### `swipes`
-*   `swiper_user_id` (UUID, PK, FK to `auth.users.id` ON DELETE CASCADE)
-*   `swiped_user_id` (UUID, PK, FK to `auth.users.id` ON DELETE CASCADE)
-*   `swipe_type` (TEXT, NOT NULL, CHECK: `swipe_type IN ('like', 'dislike', 'superlike')`)
-*   `created_at` (TIMESTAMPTZ, Default: `now()`)
-*   CONSTRAINT `check_different_users` CHECK (`swiper_user_id <> swiped_user_id`)
-
-### `matches`
-*   `id` (UUID, PK, Default: `uuid_generate_v4()`)
-*   `user1_id` (UUID, NOT NULL, FK to `auth.users.id` ON DELETE CASCADE)
-*   `user2_id` (UUID, NOT NULL, FK to `auth.users.id` ON DELETE CASCADE)
-*   `matched_at` (TIMESTAMPTZ, Default: `now()`)
-*   CONSTRAINT `unique_match_pair` UNIQUE (`user1_id`, `user2_id`)
-*   CONSTRAINT `check_different_users_match` CHECK (`user1_id <> user2_id`)
-*   CONSTRAINT `check_user_order_match` CHECK (`user1_id < user2_id`)
-
-### `chats`
-*   `id` (UUID, PK, Default: `uuid_generate_v4()`)
-*   `match_id` (UUID, UNIQUE, NOT NULL, FK to `matches.id` ON DELETE CASCADE)
-*   `last_message_id` (UUID, NULLABLE, FK to `messages.id` ON DELETE SET NULL)
-*   `last_activity` (TIMESTAMPTZ, Default: `now()`) -- Auto-updated by `handle_last_activity_update` trigger.
-*   **Trigger**: `on_chats_last_activity_updated` (BEFORE UPDATE, EXECUTE `public.handle_last_activity_update()`)
-
-### `messages`
-*   `id` (UUID, PK, Default: `uuid_generate_v4()`)
-*   `chat_id` (UUID, NOT NULL, FK to `chats.id` ON DELETE CASCADE)
-*   `sender_id` (UUID, NOT NULL, FK to `auth.users.id` ON DELETE CASCADE)
-*   `content_type` (TEXT, NOT NULL, CHECK: `content_type IN ('text', 'image', 'video', 'audio')`)
-*   `content` (TEXT, NOT NULL)
-*   `media_url` (TEXT, NULLABLE) -- App-level validation for URL format
-*   `sent_at` (TIMESTAMPTZ, Default: `now()`)
-
-### `vlogs`
-*   `id` (UUID, PK, Default: `uuid_generate_v4()`)
-*   `user_id` (UUID, NOT NULL, FK to `auth.users.id` ON DELETE CASCADE)
-*   `post_type` (TEXT, NOT NULL, CHECK: `post_type IN ('text', 'image', 'video', 'story')`)
-*   `title` (TEXT, NULLABLE)
-*   `caption` (TEXT, NULLABLE)
-*   `media_items` (JSONB, Default: `'[]'::jsonb`)
-*   `engagement_counts` (JSONB, Default: `'{}'::jsonb`)
-*   `visibility` (TEXT, NOT NULL, Default: `'public'`, CHECK: `visibility IN ('public', 'followers', 'private')`)
-*   `created_at` (TIMESTAMPTZ, Default: `now()`)
-*   `updated_at` (TIMESTAMPTZ, Default: `now()`) -- Auto-updated by `handle_updated_at` trigger.
-*   **Trigger**: `on_vlogs_updated` (BEFORE UPDATE, EXECUTE `public.handle_updated_at()`)
-
-### `vlog_likes`
-*   `id` (UUID, PK, Default: `uuid_generate_v4()`)
-*   `vlog_id` (UUID, NOT NULL, FK to `vlogs.id` ON DELETE CASCADE)
-*   `user_id` (UUID, NOT NULL, FK to `auth.users.id` ON DELETE CASCADE)
-*   `created_at` (TIMESTAMPTZ, Default: `now()`)
-*   CONSTRAINT `unique_vlog_user_like` UNIQUE (`vlog_id`, `user_id`)
-
-### `vlog_comments`
-*   `id` (UUID, PK, Default: `uuid_generate_v4()`)
-*   `vlog_id` (UUID, NOT NULL, FK to `vlogs.id` ON DELETE CASCADE)
-*   `user_id` (UUID, NOT NULL, FK to `auth.users.id` ON DELETE CASCADE)
-*   `content` (TEXT, NOT NULL)
-*   `metadata` (JSONB, NULLABLE)
-*   `reply_to_id` (UUID, NULLABLE, FK to `vlog_comments.id` ON DELETE CASCADE)
-*   `created_at` (TIMESTAMPTZ, Default: `now()`)
-*   `updated_at` (TIMESTAMPTZ, Default: `now()`) -- Auto-updated by `handle_updated_at` trigger.
-*   **Trigger**: `on_vlog_comments_updated` (BEFORE UPDATE, EXECUTE `public.handle_updated_at()`)
-
-### `vlog_shares`
-*   `id` (UUID, PK, Default: `uuid_generate_v4()`)
-*   `vlog_id` (UUID, NOT NULL, FK to `vlogs.id` ON DELETE CASCADE)
-*   `user_id` (UUID, NOT NULL, FK to `auth.users.id` ON DELETE CASCADE)
-*   `share_type` (TEXT, NOT NULL)
-*   `created_at` (TIMESTAMPTZ, Default: `now()`)
-
-### `referrals`
-*   `id` (UUID, PK, Default: `uuid_generate_v4()`)
-*   `referrer_id` (UUID, NOT NULL, FK to `auth.users.id` ON DELETE SET NULL)
-*   `referred_id` (UUID, UNIQUE, NOT NULL, FK to `auth.users.id` ON DELETE CASCADE)
-*   `status` (TEXT, NOT NULL, Default: `'pending'`)
-*   `level` (INTEGER, NOT NULL, Default: 1)
-*   `parent_referral_id` (UUID, NULLABLE, FK to `referrals.id` ON DELETE SET NULL)
-*   `created_at` (TIMESTAMPTZ, Default: `now()`)
-*   CONSTRAINT `check_different_referrer_referred` CHECK (`referrer_id <> referred_id`)
-
-### `commissions`
-*   `id` (UUID, PK, Default: `uuid_generate_v4()`)
-*   `referral_id` (UUID, NOT NULL, FK to `referrals.id` ON DELETE CASCADE)
-*   `earner_id` (UUID, NOT NULL, FK to `auth.users.id` ON DELETE CASCADE)
-*   `payer_id` (UUID, NOT NULL, FK to `auth.users.id` ON DELETE CASCADE)
-*   `amount` (NUMERIC, NOT NULL, CHECK: `amount > 0`)
-*   `currency` (TEXT, NOT NULL, Default: `'USD'`)
-*   `type` (TEXT, NOT NULL)
-*   `status` (TEXT, NOT NULL, Default: `'pending'`)
-*   `created_at` (TIMESTAMPTZ, Default: `now()`)
-*   CONSTRAINT `check_different_earner_payer` CHECK (`earner_id <> payer_id`)
-
-### `sites`
-*   `id` (UUID, PK, Default: `uuid_generate_v4()`)
-*   `owner_id` (UUID, NOT NULL)
-*   `owner_type` (TEXT, NOT NULL, CHECK: `owner_type IN ('user', 'group')`)
-*   `theme` (TEXT, NULLABLE)
-*   `layout` (JSONB, NULLABLE)
-*   `settings` (JSONB, NULLABLE)
-*   `custom_domain` (TEXT, UNIQUE, NULLABLE)
-*   `site_title` (TEXT, NULLABLE)
-*   `site_description` (TEXT, NULLABLE)
-*   `use_app_profile` (BOOLEAN, Default: FALSE)
-*   `show_contact_form` (BOOLEAN, Default: FALSE)
-*   `contact_email` (TEXT, NULLABLE)
-*   `social_links` (JSONB, NULLABLE)
-*   `featured_content` (JSONB, NULLABLE)
-*   `custom_sections` (JSONB, NULLABLE)
-*   `created_at` (TIMESTAMPTZ, Default: `now()`)
-*   `updated_at` (TIMESTAMPTZ, Default: `now()`) -- Auto-updated by `handle_updated_at` trigger.
-*   **Trigger**: `on_sites_updated` (BEFORE UPDATE, EXECUTE `public.handle_updated_at()`)
-
-### `site_analytics`
-*   `site_id` (UUID, PK, FK to `sites.id` ON DELETE CASCADE)
-*   `date` (DATE, PK)
-*   `visits` (INTEGER, Default: 0)
-*   `unique_visitors` (INTEGER, Default: 0)
-*   `page_views` (JSONB, NULLABLE)
-*   `traffic_sources` (JSONB, NULLABLE)
-*   `updated_at` (TIMESTAMPTZ, Default: `now()`) -- Auto-updated by `handle_updated_at` trigger.
-*   **Trigger**: `on_site_analytics_updated` (BEFORE UPDATE, EXECUTE `public.handle_updated_at()`)
-
-### `content_blocks`
-*   `id` (UUID, PK, Default: `uuid_generate_v4()`)
-*   `site_id` (UUID, NOT NULL, FK to `sites.id` ON DELETE CASCADE)
-*   `type` (TEXT, NOT NULL)
-*   `"order"` (INTEGER, NOT NULL, Default: 0) -- Quoted as "order"
-*   `content` (JSONB, NULLABLE)
-*   `published` (BOOLEAN, NOT NULL, Default: FALSE)
-*   `created_at` (TIMESTAMPTZ, Default: `now()`)
-*   `updated_at` (TIMESTAMPTZ, Default: `now()`) -- Auto-updated by `handle_updated_at` trigger.
-*   **Trigger**: `on_content_blocks_updated` (BEFORE UPDATE, EXECUTE `public.handle_updated_at()`)
-
-### `media_assets`
-*   `id` (UUID, PK, Default: `uuid_generate_v4()`)
-*   `owner_id` (UUID, NOT NULL)
-*   `owner_type` (TEXT, NOT NULL, CHECK: `owner_type IN ('user', 'group')`)
-*   `type` (TEXT, NOT NULL, CHECK: `type IN ('image', 'video', 'document')`)
-*   `filename` (TEXT, NULLABLE)
-*   `storage_path` (TEXT, NOT NULL, UNIQUE)
-*   `size_bytes` (INTEGER, NULLABLE)
-*   `url` (TEXT, NOT NULL, UNIQUE)
-*   `metadata` (JSONB, NULLABLE)
-*   `uploaded_at` (TIMESTAMPTZ, Default: `now()`)
-*   `updated_at` (TIMESTAMPTZ, Default: `now()`) -- Auto-updated by `handle_updated_at` trigger.
-*   **Trigger**: `on_media_assets_updated` (BEFORE UPDATE, EXECUTE `public.handle_updated_at()`)
-
-## 4. Row Level Security (RLS) Policies (Implemented)
-
-All tables listed below have `ALTER TABLE public.<table> ENABLE ROW LEVEL SECURITY;` applied.
-
-### `profiles`
-```sql
-CREATE POLICY "Allow public read access to active profiles"
-ON public.profiles FOR SELECT
-USING (profile_status = 'active');
-
-CREATE POLICY "Allow user to read their own profile"
-ON public.profiles FOR SELECT
-USING (auth.uid() = user_id);
-
-CREATE POLICY "Allow user to update their own profile"
-ON public.profiles FOR UPDATE
-USING (auth.uid() = user_id)
-WITH CHECK (auth.uid() = user_id);
-
-CREATE POLICY "Allow authenticated users to create their profile"
-ON public.profiles FOR INSERT
-WITH CHECK (auth.uid() = user_id);
-
-CREATE POLICY "Allow user to delete their own profile"
-ON public.profiles FOR DELETE
-USING (auth.uid() = user_id);
-```
-
-### `user_search_preferences`
-```sql
-CREATE POLICY "Allow user to read their own search preferences"
-ON public.user_search_preferences FOR SELECT
-USING (auth.uid() = user_id);
-
-CREATE POLICY "Allow user to create their own search preferences"
-ON public.user_search_preferences FOR INSERT
-WITH CHECK (auth.uid() = user_id);
-
-CREATE POLICY "Allow user to update their own search preferences"
-ON public.user_search_preferences FOR UPDATE
-USING (auth.uid() = user_id)
-WITH CHECK (auth.uid() = user_id);
-
-CREATE POLICY "Allow user to delete their own search preferences"
-ON public.user_search_preferences FOR DELETE
-USING (auth.uid() = user_id);
-```
-
-### `dance_styles`
-```sql
-CREATE POLICY "Allow authenticated read access to dance styles"
-ON public.dance_styles FOR SELECT
-TO authenticated
-USING (true);
-```
-
-### `user_dance_styles`
-```sql
-CREATE POLICY "Allow users to read any user dance styles"
-ON public.user_dance_styles FOR SELECT
-TO authenticated
-USING (true);
-
-CREATE POLICY "Allow user to create their own dance style links"
-ON public.user_dance_styles FOR INSERT
-WITH CHECK (auth.uid() = user_id);
-
-CREATE POLICY "Allow user to delete their own dance style links"
-ON public.user_dance_styles FOR DELETE
-USING (auth.uid() = user_id);
-```
-
-### `interests`
-```sql
-CREATE POLICY "Allow authenticated read access to interests"
-ON public.interests FOR SELECT
-TO authenticated
-USING (true);
-```
-
-### `user_interests`
-```sql
-CREATE POLICY "Allow users to read any user interests"
-ON public.user_interests FOR SELECT
-TO authenticated
-USING (true);
-
-CREATE POLICY "Allow user to create their own interest links"
-ON public.user_interests FOR INSERT
-WITH CHECK (auth.uid() = user_id);
-
-CREATE POLICY "Allow user to delete their own interest links"
-ON public.user_interests FOR DELETE
-USING (auth.uid() = user_id);
-```
-
-### `social_platforms`
-```sql
-CREATE POLICY "Allow authenticated read access to social platforms"
-ON public.social_platforms FOR SELECT
-TO authenticated
-USING (true);
-```
-
-### `user_social_links`
-```sql
-CREATE POLICY "Allow users to read any user social links"
-ON public.user_social_links FOR SELECT
-TO authenticated
-USING (true);
-
-CREATE POLICY "Allow user to create their own social links"
-ON public.user_social_links FOR INSERT
-WITH CHECK (auth.uid() = user_id);
-
-CREATE POLICY "Allow user to update their own social links"
-ON public.user_social_links FOR UPDATE
-USING (auth.uid() = user_id)
-WITH CHECK (auth.uid() = user_id);
-
-CREATE POLICY "Allow user to delete their own social links"
-ON public.user_social_links FOR DELETE
-USING (auth.uid() = user_id);
-```
-
-### `user_awards`
-```sql
-CREATE POLICY "Allow users to read any user awards"
-ON public.user_awards FOR SELECT
-TO authenticated
-USING (true);
-
-CREATE POLICY "Allow user to create their own awards"
-ON public.user_awards FOR INSERT
-WITH CHECK (auth.uid() = user_id);
-
-CREATE POLICY "Allow user to update their own awards"
-ON public.user_awards FOR UPDATE
-USING (auth.uid() = user_id)
-WITH CHECK (auth.uid() = user_id);
-
-CREATE POLICY "Allow user to delete their own awards"
-ON public.user_awards FOR DELETE
-USING (auth.uid() = user_id);
-```
-
-### `user_portfolio_items`
-```sql
-CREATE POLICY "Allow users to read any user portfolio items"
-ON public.user_portfolio_items FOR SELECT
-TO authenticated
-USING (true);
-
-CREATE POLICY "Allow user to create their own portfolio items"
-ON public.user_portfolio_items FOR INSERT
-WITH CHECK (auth.uid() = user_id);
-
-CREATE POLICY "Allow user to update their own portfolio items"
-ON public.user_portfolio_items FOR UPDATE
-USING (auth.uid() = user_id)
-WITH CHECK (auth.uid() = user_id);
-
-CREATE POLICY "Allow user to delete their own portfolio items"
-ON public.user_portfolio_items FOR DELETE
-USING (auth.uid() = user_id);
-```
-
-### `swipes`
-```sql
-CREATE POLICY "Allow user to create their own swipes"
-ON public.swipes FOR INSERT
-WITH CHECK (auth.uid() = swiper_user_id);
-
-CREATE POLICY "Allow user to read their own initiated or received swipes"
-ON public.swipes FOR SELECT
-USING (auth.uid() = swiper_user_id OR auth.uid() = swiped_user_id);
-```
-
-### `matches`
-```sql
-CREATE POLICY "Allow involved users to read their matches"
-ON public.matches FOR SELECT
-USING (is_match_member(id, auth.uid()));
-```
-
-### `chats`
-```sql
-CREATE POLICY "Allow chat members to read their chats"
-ON public.chats FOR SELECT
-USING (is_chat_member(id, auth.uid()));
-```
-
-### `messages`
-```sql
-CREATE POLICY "Allow chat members to read messages in their chats"
-ON public.messages FOR SELECT
-USING (is_chat_member(chat_id, auth.uid()));
-
-CREATE POLICY "Allow chat member to insert messages into their chats"
-ON public.messages FOR INSERT
-WITH CHECK (auth.uid() = sender_id AND is_chat_member(chat_id, auth.uid()));
-
-CREATE POLICY "Allow sender to update their own messages if chat member"
-ON public.messages FOR UPDATE
-USING (auth.uid() = sender_id AND is_chat_member(chat_id, auth.uid()))
-WITH CHECK (auth.uid() = sender_id AND is_chat_member(chat_id, auth.uid()));
-
-CREATE POLICY "Allow sender to delete their own messages if chat member"
-ON public.messages FOR DELETE
-USING (auth.uid() = sender_id AND is_chat_member(chat_id, auth.uid()));
-```
-
-### `vlogs`
-```sql
-CREATE POLICY "Allow users to read accessible vlogs"
-ON public.vlogs FOR SELECT
-USING (can_view_vlog(id, auth.uid()));
-
-CREATE POLICY "Allow user to create their own vlogs"
-ON public.vlogs FOR INSERT
-WITH CHECK (auth.uid() = user_id);
-
-CREATE POLICY "Allow user to update their own vlogs"
-ON public.vlogs FOR UPDATE
-USING (auth.uid() = user_id)
-WITH CHECK (auth.uid() = user_id);
-
-CREATE POLICY "Allow user to delete their own vlogs"
-ON public.vlogs FOR DELETE
-USING (auth.uid() = user_id);
-```
-
-### `vlog_likes`
-```sql
-CREATE POLICY "Allow users to read likes on accessible vlogs"
-ON public.vlog_likes FOR SELECT
-USING (can_view_vlog(vlog_id, auth.uid()));
-
-CREATE POLICY "Allow user to create likes on accessible vlogs"
-ON public.vlog_likes FOR INSERT
-WITH CHECK (auth.uid() = user_id AND can_view_vlog(vlog_id, auth.uid()));
-
-CREATE POLICY "Allow user to delete their own likes"
-ON public.vlog_likes FOR DELETE
-USING (auth.uid() = user_id);
-```
-
-### `vlog_comments`
-```sql
-CREATE POLICY "Allow users to read comments on accessible vlogs"
-ON public.vlog_comments FOR SELECT
-USING (can_view_vlog(vlog_id, auth.uid()));
-
-CREATE POLICY "Allow user to create comments on accessible vlogs"
-ON public.vlog_comments FOR INSERT
-WITH CHECK (auth.uid() = user_id AND can_view_vlog(vlog_id, auth.uid()));
-
-CREATE POLICY "Allow user to update their own comments"
-ON public.vlog_comments FOR UPDATE
-USING (auth.uid() = user_id AND can_view_vlog(vlog_id, auth.uid()))
-WITH CHECK (auth.uid() = user_id);
-
-CREATE POLICY "Allow user to delete their own comments"
-ON public.vlog_comments FOR DELETE
-USING (auth.uid() = user_id);
-```
-
-### `vlog_shares`
-```sql
-CREATE POLICY "Allow users to read shares of accessible vlogs"
-ON public.vlog_shares FOR SELECT
-USING (can_view_vlog(vlog_id, auth.uid()));
-
-CREATE POLICY "Allow user to create shares on accessible vlogs"
-ON public.vlog_shares FOR INSERT
-WITH CHECK (auth.uid() = user_id AND can_view_vlog(vlog_id, auth.uid()));
-
-CREATE POLICY "Allow user to delete their own shares"
-ON public.vlog_shares FOR DELETE
-USING (auth.uid() = user_id);
-```
-
-### `referrals`
-```sql
-CREATE POLICY "Allow user to read their own referral records"
-ON public.referrals FOR SELECT
-USING (auth.uid() = referrer_id OR auth.uid() = referred_id);
-
-CREATE POLICY "Allow user to create referrals for others"
-ON public.referrals FOR INSERT
-WITH CHECK (auth.uid() = referrer_id AND auth.uid() <> referred_id);
-```
-
-### `commissions`
-```sql
-CREATE POLICY "Allow earner to read their own commissions"
-ON public.commissions FOR SELECT
-USING (auth.uid() = earner_id);
-```
-
-### `sites`
-```sql
-CREATE POLICY "Allow public read access to sites"
-ON public.sites FOR SELECT USING (true);
-
-CREATE POLICY "Allow site managers to update their sites"
-ON public.sites FOR UPDATE
-USING (can_manage_site(id, auth.uid()))
-WITH CHECK (can_manage_site(id, auth.uid()));
-
-CREATE POLICY "Allow site managers to delete their sites"
-ON public.sites FOR DELETE
-USING (can_manage_site(id, auth.uid()));
-
-CREATE POLICY "Allow users or group admins to create sites"
-ON public.sites FOR INSERT
-WITH CHECK (
-  (owner_type = 'user' AND owner_id = auth.uid()) OR
-  (owner_type = 'group' AND is_group_admin_or_owner(owner_id, auth.uid()))
-);
-```
-
-### `site_analytics`
-```sql
-CREATE POLICY "Allow site managers to read their site analytics"
-ON public.site_analytics FOR SELECT
-USING (can_manage_site(site_id, auth.uid()));
-```
-
-### `content_blocks`
-```sql
-CREATE POLICY "Allow public read access to published content blocks"
-ON public.content_blocks FOR SELECT
-USING (published = true);
-
-CREATE POLICY "Allow site managers to manage their content blocks"
-ON public.content_blocks FOR ALL
-USING (can_manage_site(site_id, auth.uid()))
-WITH CHECK (can_manage_site(site_id, auth.uid()));
-```
-
-### `media_assets`
-```sql
-CREATE POLICY "Allow public read access to media assets"
-ON public.media_assets FOR SELECT
-USING (true);
-
-CREATE POLICY "Allow authenticated users to upload media"
-ON public.media_assets FOR INSERT
-WITH CHECK (
-  (owner_type = 'user' AND owner_id = auth.uid()) OR
-  (owner_type = 'group' AND is_group_admin_or_owner(owner_id, auth.uid()))
-);
-
-CREATE POLICY "Allow owners to update their media asset metadata"
-ON public.media_assets FOR UPDATE
-USING (
-  (owner_type = 'user' AND owner_id = auth.uid()) OR
-  (owner_type = 'group' AND is_group_admin_or_owner(owner_id, auth.uid()))
-)
-WITH CHECK (
-  (owner_type = 'user' AND owner_id = auth.uid()) OR
-  (owner_type = 'group' AND is_group_admin_or_owner(owner_id, auth.uid()))
-);
-
-CREATE POLICY "Allow owners to delete their media assets"
-ON public.media_assets FOR DELETE
-USING (
-  (owner_type = 'user' AND owner_id = auth.uid()) OR
-  (owner_type = 'group' AND is_group_admin_or_owner(owner_id, auth.uid()))
-);
-```
-
-### `groups`
-```sql
-CREATE POLICY "Allow authenticated users to read groups"
-ON public.groups FOR SELECT TO authenticated USING (true);
-
-CREATE POLICY "Allow authenticated users to create groups"
-ON public.groups FOR INSERT TO authenticated WITH CHECK (true);
-
-CREATE POLICY "Allow group admins or owners to update their group"
-ON public.groups FOR UPDATE
-USING (is_group_admin_or_owner(id, auth.uid()))
-WITH CHECK (is_group_admin_or_owner(id, auth.uid()));
-
-CREATE POLICY "Allow group owners to delete their group"
-ON public.groups FOR DELETE
-USING (is_group_owner(id, auth.uid()));
-```
-
-### `group_members`
-```sql
-CREATE POLICY "Allow authenticated users to read group memberships"
-ON public.group_members FOR SELECT TO authenticated USING (true);
-
-CREATE POLICY "Allow group admins or owners to add members"
-ON public.group_members FOR INSERT
-WITH CHECK (is_group_admin_or_owner(group_id, auth.uid()));
-
-CREATE POLICY "Allow group admins or owners to update member roles"
-ON public.group_members FOR UPDATE
-USING (is_group_admin_or_owner(group_id, auth.uid())) -- group_id refers to OLD.group_id
-WITH CHECK (true); -- SIMPLIFIED: "Last owner" demotion check deferred to trigger or app-layer. USING clause gates permission.
-
-CREATE POLICY "Allow group admins/owners to remove members (not last owner)"
-ON public.group_members FOR DELETE
-USING (
-  is_group_admin_or_owner(group_id, auth.uid()) AND
-  user_id <> auth.uid() AND
-  NOT is_sole_owner(group_id, user_id)
-);
-
-CREATE POLICY "Allow members to leave a group (not last owner)"
-ON public.group_members FOR DELETE
-USING (
-  user_id = auth.uid() AND
-  NOT is_sole_owner(group_id, user_id)
-);
-```
-
-### `roles`
-```sql
-CREATE POLICY "Allow authenticated users to read roles"
-ON public.roles FOR SELECT TO authenticated USING (true);
-```
-
-### `user_roles`
-```sql
-CREATE POLICY "Allow users to read their own roles"
-ON public.user_roles FOR SELECT USING (auth.uid() = user_id);
-
-CREATE POLICY "Allow group admins/owners to manage user roles in their group"
-ON public.user_roles FOR ALL
-USING (scope_id IS NOT NULL AND is_group_admin_or_owner(scope_id, auth.uid()))
-WITH CHECK (scope_id IS NOT NULL AND is_group_admin_or_owner(scope_id, auth.uid()));
+- **Chats**:
+  - `LIVE SELECT` on `message` for real-time chat updates.
+- **Vlogs**:
+  - `LIVE SELECT` on `vlog_like`, `vlog_comment` for engagement updates.
+
+### 3.4 Geospatial Search
+- **Index**: MTREE on `profile.location` for distance-based queries.
+  ```surrealql
+  DEFINE INDEX profile_location ON profile FIELDS location MTREE DIMENSION 2;
+  ```
+- **Query Example**:
+  ```surrealql
+  SELECT * FROM profile WHERE location NEAR [40.7128, -74.0060] < 50mi;
+  ```
+
+### 3.5 Migrations
+- **Apply Schema**:
+  ```bash
+  surreal import --conn wss://idance.cloud.surrealdb.com --ns idance --db dev migrations/0000_initial_schema.surql
+  ```
+- **Backup**:
+  ```bash
+  surreal export --conn wss://idance.cloud.surrealdb.com --ns idance --db dev backup_$(date +%F).surql
+  ```
+- **Restore**:
+  ```bash
+  surreal import --conn wss://idance.cloud.surrealdb.com --ns idance --db dev backup_2025-05-24.surql
+  ```
+
+### 3.6 Costs
+- **SurrealDB**: Free tier (5GB storage, 100,000 queries/day), ~$0-$5/month for 100,000 MAUs.
+- **iDrive E2**: ~$0.005/GB/month (~$5/month for 1TB media).
+- **Cloudflare R2**: ~$0.015/GB/month (~$1.50/month for 100GB cached assets).
+
+## 4. Table Schemas
+
+Tables are defined using `DEFINE TABLE` and `DEFINE FIELD` in SurrealQL. Permissions use `PERMIT` clauses with `DEFINE FUNCTION` for complex access control. Cloudflare Workers handle workflows like swipe matching and referral commissions. See `migrations/0000_initial_schema.surql` for the executable schema.
+
+### 4.1 `user`
+- **Description**: Stores generic user authentication data, reusable for future `modelling_profile` and `acting_profile` tables.
+- **Schema**:
+  ```surrealql
+  DEFINE TABLE user SCHEMAFULL;
+  DEFINE FIELD email ON user TYPE string ASSERT $value != NONE AND string::is::email($value);
+  DEFINE FIELD password ON user TYPE string; -- Hashed with argon2
+  DEFINE FIELD oauth_providers ON user TYPE object DEFAULT {};
+  DEFINE FIELD created_at ON user TYPE datetime DEFAULT time::now();
+  DEFINE FIELD updated_at ON user TYPE datetime DEFAULT time::now() FLEXIBLE;
+  DEFINE INDEX user_email ON user FIELDS email UNIQUE;
+  ```
+- **Permissions**:
+  ```surrealql
+  DEFINE ACCESS user ON DATABASE
+    PERMIT SELECT WHERE id = $auth.id,
+    PERMIT CREATE WHERE id = $auth.id,
+    PERMIT UPDATE WHERE id = $auth.id,
+    PERMIT DELETE WHERE id = $auth.id;
+  ```
+
+### 4.2 `profile`
+- **Description**: Stores dancer-specific profile details, including physical attributes for partner and job matching.
+- **Schema**:
+  ```surrealql
+  DEFINE TABLE profile SCHEMAFULL;
+  DEFINE FIELD user ON profile TYPE record<user> ASSERT $value != NONE;
+  DEFINE FIELD username ON profile TYPE string ASSERT $value != NONE AND string::len($value) >= 3 AND string::len($value) <= 30 AND $value MATCHES '^[a-z0-9]+(?:-[a-z0-9]+)*$';
+  DEFINE FIELD first_name ON profile TYPE string ASSERT $value != NONE;
+  DEFINE FIELD last_name ON profile TYPE string ASSERT $value != NONE;
+  DEFINE FIELD date_of_birth ON profile TYPE datetime ASSERT $value != NONE;
+  DEFINE FIELD gender ON profile TYPE string ASSERT $value IN ['Male', 'Female', 'Non-binary', 'Other', 'Prefer not to say'];
+  DEFINE FIELD bio ON profile TYPE string ASSERT string::len($value) <= 2000;
+  DEFINE FIELD looking_for_partners ON profile TYPE bool DEFAULT false;
+  DEFINE FIELD looking_for_jobs ON profile TYPE bool DEFAULT false;
+  DEFINE FIELD looking_for_dancers ON profile TYPE bool DEFAULT false;
+  DEFINE FIELD referrer ON profile TYPE record<user>;
+  DEFINE FIELD referral_code ON profile TYPE string;
+  DEFINE FIELD commission_tier ON profile TYPE string;
+  DEFINE FIELD profile_status ON profile TYPE string DEFAULT 'pending_waitlist_approval';
+  DEFINE FIELD profile_picture_url ON profile TYPE string;
+  DEFINE FIELD user_tier ON profile TYPE string DEFAULT 'basic';
+  DEFINE FIELD stripe_customer_id ON profile TYPE string;
+  DEFINE FIELD location ON profile TYPE point;
+  DEFINE FIELD location_city ON profile TYPE string;
+  DEFINE FIELD location_state ON profile TYPE string;
+  DEFINE FIELD location_country ON profile TYPE string;
+  DEFINE FIELD last_active_at ON profile TYPE datetime DEFAULT time::now();
+  DEFINE FIELD weight ON profile TYPE float; -- kg or lbs, optional
+  DEFINE FIELD weight_unit ON profile TYPE string ASSERT $value IN ['kg', 'lbs', null];
+  DEFINE FIELD height ON profile TYPE float; -- cm or ft/in, optional
+  DEFINE FIELD height_unit ON profile TYPE string ASSERT $value IN ['cm', 'ft', null];
+  DEFINE FIELD hair_color ON profile TYPE string ASSERT $value IN ['Black', 'Brown', 'Blonde', 'Red', 'Gray', 'Other', null];
+  DEFINE FIELD eye_color ON profile TYPE string ASSERT $value IN ['Blue', 'Brown', 'Green', 'Hazel', 'Gray', 'Other', null];
+  DEFINE FIELD body_type ON profile TYPE string ASSERT $value IN ['Athletic', 'Slim', 'Average', 'Muscular', 'Curvy', 'Other', null];
+  DEFINE FIELD measurements ON profile TYPE object; -- e.g., { chest: 34, waist: 28, hips: 36 }, optional
+  DEFINE FIELD measurements_unit ON profile TYPE string ASSERT $value IN ['in', 'cm', null];
+  DEFINE FIELD ethnicity ON profile TYPE string ASSERT $value IN ['Asian', 'Black', 'Hispanic', 'White', 'Native American', 'Pacific Islander', 'Other', null];
+  DEFINE FIELD created_at ON profile TYPE datetime DEFAULT time::now();
+  DEFINE FIELD updated_at ON profile TYPE datetime DEFAULT time::now() FLEXIBLE;
+  DEFINE INDEX profile_username ON profile FIELDS username UNIQUE;
+  DEFINE INDEX profile_referral_code ON profile FIELDS referral_code UNIQUE;
+  DEFINE INDEX profile_location ON profile FIELDS location MTREE DIMENSION 2;
+  ```
+- **Permissions**:
+  ```surrealql
+  PERMIT SELECT WHERE fn::can_view_profile(id, $auth.id),
+  PERMIT CREATE WHERE user = $auth.id,
+  PERMIT UPDATE WHERE user = $auth.id,
+  PERMIT DELETE WHERE user = $auth.id;
+  ```
+
+### 4.3 `role`
+- **Description**: Defines user roles (e.g., site_admin).
+- **Schema**:
+  ```surrealql
+  DEFINE TABLE role SCHEMAFULL;
+  DEFINE FIELD name ON role TYPE string ASSERT $value IN ['site_admin', 'group_admin', 'pro_user', 'free_user'];
+  DEFINE FIELD permissions ON role TYPE array<string> DEFAULT [];
+  DEFINE FIELD created_at ON role TYPE datetime DEFAULT time::now();
+  ```
+- **Permissions**:
+  ```surrealql
+  PERMIT SELECT FOR authenticated;
+  ```
+
+### 4.4 `user_role`
+- **Description**: Assigns roles to users, optionally scoped to groups.
+- **Schema**:
+  ```surrealql
+  DEFINE TABLE user_role SCHEMAFULL;
+  DEFINE FIELD user ON user_role TYPE record<user> ASSERT $value != NONE;
+  DEFINE FIELD role ON user_role TYPE record<role> ASSERT $value != NONE;
+  DEFINE FIELD scope ON user_role TYPE record<group>;
+  DEFINE FIELD granted_at ON user_role TYPE datetime DEFAULT time::now();
+  ```
+- **Permissions**:
+  ```surrealql
+  PERMIT SELECT WHERE user = $auth.id OR fn::is_group_admin_or_owner(scope, $auth.id),
+  PERMIT ALL WHERE fn::is_group_admin_or_owner(scope, $auth.id);
+  ```
+
+### 4.5 `group`
+- **Description**: Represents dance companies, studios, or teams.
+- **Schema**:
+  ```surrealql
+  DEFINE TABLE group SCHEMAFULL;
+  DEFINE FIELD name ON group TYPE string ASSERT $value != NONE;
+  DEFINE FIELD type ON group TYPE string ASSERT $value IN ['company', 'studio', 'team'];
+  DEFINE FIELD subdomain ON group TYPE string ASSERT $value != NONE;
+  DEFINE FIELD custom_domain ON group TYPE string;
+  DEFINE FIELD settings ON group TYPE object DEFAULT {};
+  DEFINE FIELD created_at ON group TYPE datetime DEFAULT time::now();
+  DEFINE FIELD updated_at ON group TYPE datetime DEFAULT time::now() FLEXIBLE;
+  DEFINE INDEX group_subdomain ON group FIELDS subdomain UNIQUE;
+  DEFINE INDEX group_custom_domain ON group FIELDS custom_domain UNIQUE;
+  ```
+- **Permissions**:
+  ```surrealql
+  PERMIT SELECT FOR authenticated,
+  PERMIT CREATE FOR authenticated,
+  PERMIT UPDATE WHERE fn::is_group_admin_or_owner(id, $auth.id),
+  PERMIT DELETE WHERE fn::is_group_owner(id, $auth.id);
+  ```
+
+### 4.6 `group_member`
+- **Description**: Tracks group memberships.
+- **Schema**:
+  ```surrealql
+  DEFINE TABLE group_member SCHEMAFULL;
+  DEFINE FIELD group ON group_member TYPE record<group> ASSERT $value != NONE;
+  DEFINE FIELD user ON group_member TYPE record<user> ASSERT $value != NONE;
+  DEFINE FIELD role ON group_member TYPE string ASSERT $value IN ['owner', 'admin', 'member'];
+  DEFINE FIELD joined_at ON group_member TYPE datetime DEFAULT time::now();
+  ```
+- **Permissions**:
+  ```surrealql
+  PERMIT SELECT FOR authenticated,
+  PERMIT INSERT WHERE fn::is_group_admin_or_owner(group, $auth.id),
+  PERMIT UPDATE WHERE fn::is_group_admin_or_owner(group, $auth.id),
+  PERMIT DELETE WHERE fn::is_group_admin_or_owner(group, $auth.id) OR (user = $auth.id AND NOT fn::is_sole_owner(group, user));
+  ```
+
+### 4.7 `dance_style`
+- **Description**: Stores dance styles (e.g., ballet, hip-hop).
+- **Schema**:
+  ```surrealql
+  DEFINE TABLE dance_style SCHEMAFULL;
+  DEFINE FIELD name ON dance_style TYPE string ASSERT $value != NONE;
+  DEFINE FIELD created_at ON dance_style TYPE datetime DEFAULT time::now();
+  DEFINE INDEX dance_style_name ON dance_style FIELDS name UNIQUE;
+  ```
+- **Permissions**:
+  ```surrealql
+  PERMIT SELECT FOR authenticated;
+  ```
+
+### 4.8 `user_dance_style`
+- **Description**: Links users to dance styles with proficiency.
+- **Schema**:
+  ```surrealql
+  DEFINE TABLE user_dance_style SCHEMAFULL;
+  DEFINE FIELD user ON user_dance_style TYPE record<profile> ASSERT $value != NONE;
+  DEFINE FIELD style ON user_dance_style TYPE record<dance_style> ASSERT $value != NONE;
+  DEFINE FIELD proficiency_level ON user_dance_style TYPE string ASSERT $value != NONE;
+  DEFINE FIELD created_at ON user_dance_style TYPE datetime DEFAULT time::now();
+  ```
+- **Permissions**:
+  ```surrealql
+  PERMIT SELECT FOR authenticated,
+  PERMIT INSERT WHERE user.user = $auth.id,
+  PERMIT DELETE WHERE user.user = $auth.id;
+  ```
+
+### 4.9 `user_award`
+- **Description**: Stores user awards.
+- **Schema**:
+  ```surrealql
+  DEFINE TABLE user_award SCHEMAFULL;
+  DEFINE FIELD user ON user_award TYPE record<profile> ASSERT $value != NONE;
+  DEFINE FIELD name ON user_award TYPE string ASSERT $value != NONE;
+  DEFINE FIELD year ON user_award TYPE int;
+  DEFINE FIELD description ON user_award TYPE string;
+  DEFINE FIELD created_at ON user_award TYPE datetime DEFAULT time::now();
+  ```
+- **Permissions**:
+  ```surrealql
+  PERMIT SELECT FOR authenticated,
+  PERMIT INSERT WHERE user.user = $auth.id,
+  PERMIT UPDATE WHERE user.user = $auth.id,
+  PERMIT DELETE WHERE user.user = $auth.id;
+  ```
+
+### 4.10 `interest`
+- **Description**: Stores user interests.
+- **Schema**:
+  ```surrealql
+  DEFINE TABLE interest SCHEMAFULL;
+  DEFINE FIELD name ON interest TYPE string ASSERT $value != NONE;
+  DEFINE FIELD created_at ON interest TYPE datetime DEFAULT time::now();
+  DEFINE INDEX interest_name ON interest FIELDS name UNIQUE;
+  ```
+- **Permissions**:
+  ```surrealql
+  PERMIT SELECT FOR authenticated;
+  ```
+
+### 4.11 `user_interest`
+- **Description**: Links users to interests.
+- **Schema**:
+  ```surrealql
+  DEFINE TABLE user_interest SCHEMAFULL;
+  DEFINE FIELD user ON user_interest TYPE record<profile> ASSERT $value != NONE;
+  DEFINE FIELD interest ON user_interest TYPE record<interest> ASSERT $value != NONE;
+  DEFINE FIELD created_at ON user_interest TYPE datetime DEFAULT time::now();
+  ```
+- **Permissions**:
+  ```surrealql
+  PERMIT SELECT FOR authenticated,
+  PERMIT INSERT WHERE user.user = $auth.id,
+  PERMIT DELETE WHERE user.user = $auth.id;
+  ```
+
+### 4.12 `social_platform`
+- **Description**: Stores social media platforms.
+- **Schema**:
+  ```surrealql
+  DEFINE TABLE social_platform SCHEMAFULL;
+  DEFINE FIELD name ON social_platform TYPE string ASSERT $value != NONE;
+  DEFINE FIELD created_at ON social_platform TYPE datetime DEFAULT time::now();
+  DEFINE INDEX social_platform_name ON social_platform FIELDS name UNIQUE;
+  ```
+- **Permissions**:
+  ```surrealql
+  PERMIT SELECT FOR authenticated;
+  ```
+
+### 4.13 `user_social_link`
+- **Description**: Links users to social platforms.
+- **Schema**:
+  ```surrealql
+  DEFINE TABLE user_social_link SCHEMAFULL;
+  DEFINE FIELD user ON user_social_link TYPE record<profile> ASSERT $value != NONE;
+  DEFINE FIELD platform ON user_social_link TYPE record<social_platform> ASSERT $value != NONE;
+  DEFINE FIELD url ON user_social_link TYPE string ASSERT $value != NONE;
+  DEFINE FIELD created_at ON user_social_link TYPE datetime DEFAULT time::now();
+  DEFINE INDEX user_platform_unique ON user_social_link FIELDS user, platform UNIQUE;
+  ```
+- **Permissions**:
+  ```surrealql
+  PERMIT SELECT FOR authenticated,
+  PERMIT INSERT WHERE user.user = $auth.id,
+  PERMIT UPDATE WHERE user.user = $auth.id,
+  PERMIT DELETE WHERE user.user = $auth.id;
+  ```
+
+### 4.14 `user_portfolio_item`
+- **Description**: Stores user portfolio media.
+- **Schema**:
+  ```surrealql
+  DEFINE TABLE user_portfolio_item SCHEMAFULL;
+  DEFINE FIELD user ON user_portfolio_item TYPE record<profile> ASSERT $value != NONE;
+  DEFINE FIELD item_type ON user_portfolio_item TYPE string ASSERT $value != NONE;
+  DEFINE FIELD url ON user_portfolio_item TYPE string ASSERT $value != NONE;
+  DEFINE FIELD caption ON user_portfolio_item TYPE string;
+  DEFINE FIELD thumbnail_url ON user_portfolio_item TYPE string;
+  DEFINE FIELD display_order ON user_portfolio_item TYPE int DEFAULT 0;
+  DEFINE FIELD created_at ON user_portfolio_item TYPE datetime DEFAULT time::now();
+  ```
+- **Permissions**:
+  ```surrealql
+  PERMIT SELECT FOR authenticated,
+  PERMIT INSERT WHERE user.user = $auth.id,
+  PERMIT UPDATE WHERE user.user = $auth.id,
+  PERMIT DELETE WHERE user.user = $auth.id;
+  ```
+
+### 4.15 `user_search_preference`
+- **Description**: Stores user search preferences.
+- **Schema**:
+  ```surrealql
+  DEFINE TABLE user_search_preference SCHEMAFULL;
+  DEFINE FIELD user ON user_search_preference TYPE record<user> ASSERT $value != NONE;
+  DEFINE FIELD discovery_dance_styles ON user_search_preference TYPE array<string> DEFAULT [];
+  DEFINE FIELD discovery_skill_levels ON user_search_preference TYPE array<string> DEFAULT [];
+  DEFINE FIELD discovery_min_age ON user_search_preference TYPE int ASSERT $value >= 18;
+  DEFINE FIELD discovery_max_age ON user_search_preference TYPE int ASSERT $value >= discovery_min_age OR $value IS NONE;
+  DEFINE FIELD discovery_distance_miles ON user_search_preference TYPE int DEFAULT 50;
+  DEFINE FIELD discovery_gender_preference ON user_search_preference TYPE array<string> DEFAULT [];
+  DEFINE FIELD notifications_enabled ON user_search_preference TYPE bool DEFAULT true;
+  DEFINE FIELD search_location ON user_search_preference TYPE point;
+  DEFINE FIELD search_location_city ON user_search_preference TYPE string;
+  DEFINE FIELD search_location_state ON user_search_preference TYPE string;
+  DEFINE FIELD search_location_country ON user_search_preference TYPE string;
+  DEFINE FIELD use_custom_location ON user_search_preference TYPE bool DEFAULT false;
+  DEFINE FIELD updated_at ON user_search_preference TYPE datetime DEFAULT time::now() FLEXIBLE;
+  ```
+- **Permissions**:
+  ```surrealql
+  PERMIT SELECT WHERE user = $auth.id,
+  PERMIT INSERT WHERE user = $auth.id,
+  PERMIT UPDATE WHERE user = $auth.id,
+  PERMIT DELETE WHERE user = $auth.id;
+  ```
+
+### 4.16 `swipe`
+- **Description**: Tracks user swipes.
+- **Schema**:
+  ```surrealql
+  DEFINE TABLE swipe SCHEMAFULL;
+  DEFINE FIELD swiper_user ON swipe TYPE record<user> ASSERT $value != NONE AND $value != swiped_user;
+  DEFINE FIELD swiped_user ON swipe TYPE record<user> ASSERT $value != NONE;
+  DEFINE FIELD swipe_type ON swipe TYPE string ASSERT $value IN ['like', 'dislike', 'superlike'];
+  DEFINE FIELD created_at ON swipe TYPE datetime DEFAULT time::now();
+  ```
+- **Permissions**:
+  ```surrealql
+  PERMIT SELECT WHERE swiper_user = $auth.id OR swiped_user = $auth.id,
+  PERMIT INSERT WHERE swiper_user = $auth.id;
+  ```
+
+### 4.17 `match`
+- **Description**: Stores user matches.
+- **Schema**:
+  ```surrealql
+  DEFINE TABLE match SCHEMAFULL;
+  DEFINE FIELD user1 ON match TYPE record<user> ASSERT $value != NONE AND $value != user2;
+  DEFINE FIELD user2 ON match TYPE record<user> ASSERT $value != NONE;
+  DEFINE FIELD matched_at ON match TYPE datetime DEFAULT time::now();
+  DEFINE INDEX match_users ON match FIELDS user1, user2 UNIQUE;
+  ```
+- **Permissions**:
+  ```surrealql
+  PERMIT SELECT WHERE fn::is_match_member(id, $auth.id);
+  ```
+
+### 4.18 `chat`
+- **Description**: Manages chat sessions.
+- **Schema**:
+  ```surrealql
+  DEFINE TABLE chat SCHEMAFULL;
+  DEFINE FIELD match ON chat TYPE record<match> ASSERT $value != NONE;
+  DEFINE FIELD last_message ON chat TYPE record<message>;
+  DEFINE FIELD last_activity ON chat TYPE datetime DEFAULT time::now() FLEXIBLE;
+  DEFINE INDEX chat_match ON chat FIELDS match UNIQUE;
+  ```
+- **Permissions**:
+  ```surrealql
+  PERMIT SELECT WHERE fn::is_chat_member(id, $auth.id);
+  ```
+
+### 4.19 `message`
+- **Description**: Stores chat messages.
+- **Schema**:
+  ```surrealql
+  DEFINE TABLE message SCHEMAFULL;
+  DEFINE FIELD chat ON message TYPE record<chat> ASSERT $value != NONE;
+  DEFINE FIELD sender ON message TYPE record<user> ASSERT $value != NONE;
+  DEFINE FIELD content_type ON message TYPE string ASSERT $value IN ['text', 'image', 'video', 'audio'];
+  DEFINE FIELD content ON message TYPE string ASSERT $value != NONE;
+  DEFINE FIELD media_url ON message TYPE string;
+  DEFINE FIELD sent_at ON message TYPE datetime DEFAULT time::now();
+  ```
+- **Permissions**:
+  ```surrealql
+  PERMIT SELECT WHERE fn::is_chat_member(chat, $auth.id),
+  PERMIT INSERT WHERE sender = $auth.id AND fn::is_chat_member(chat, $auth.id),
+  PERMIT UPDATE WHERE sender = $auth.id AND fn::is_chat_member(chat, $auth.id),
+  PERMIT DELETE WHERE sender = $auth.id AND fn::is_chat_member(chat, $auth.id);
+  ```
+
+### 4.20 `vlog`
+- **Description**: Stores user vlogs.
+- **Schema**:
+  ```surrealql
+  DEFINE TABLE vlog SCHEMAFULL;
+  DEFINE FIELD user ON vlog TYPE record<user> ASSERT $value != NONE;
+  DEFINE FIELD post_type ON vlog TYPE string ASSERT $value IN ['text', 'image', 'video', 'story'];
+  DEFINE FIELD title ON vlog TYPE string;
+  DEFINE FIELD caption ON vlog TYPE string;
+  DEFINE FIELD media_items ON vlog TYPE array<object> DEFAULT [];
+  DEFINE FIELD engagement_counts ON vlog TYPE object DEFAULT {};
+  DEFINE FIELD visibility ON vlog TYPE string ASSERT $value IN ['public', 'followers', 'private'] DEFAULT 'public';
+  DEFINE FIELD created_at ON vlog TYPE datetime DEFAULT time::now();
+  DEFINE FIELD updated_at ON vlog TYPE datetime DEFAULT time::now() FLEXIBLE;
+  ```
+- **Permissions**:
+  ```surrealql
+  PERMIT SELECT WHERE fn::can_view_vlog(id, $auth.id),
+  PERMIT INSERT WHERE user = $auth.id,
+  PERMIT UPDATE WHERE user = $auth.id,
+  PERMIT DELETE WHERE user = $auth.id;
+  ```
+
+### 4.21 `vlog_like`
+- **Description**: Tracks vlog likes.
+- **Schema**:
+  ```surrealql
+  DEFINE TABLE vlog_like SCHEMAFULL;
+  DEFINE FIELD vlog ON vlog_like TYPE record<vlog> ASSERT $value != NONE;
+  DEFINE FIELD user ON vlog_like TYPE record<user> ASSERT $value != NONE;
+  DEFINE FIELD created_at ON vlog_like TYPE datetime DEFAULT time::now();
+  DEFINE INDEX vlog_like_unique ON vlog_like FIELDS vlog, user UNIQUE;
+  ```
+- **Permissions**:
+  ```surrealql
+  PERMIT SELECT WHERE fn::can_view_vlog(vlog, $auth.id),
+  PERMIT INSERT WHERE user = $auth.id AND fn::can_view_vlog(vlog, $auth.id),
+  PERMIT DELETE WHERE user = $auth.id;
+  ```
+
+### 4.22 `vlog_comment`
+- **Description**: Stores vlog comments.
+- **Schema**:
+  ```surrealql
+  DEFINE TABLE vlog_comment SCHEMAFULL;
+  DEFINE FIELD vlog ON vlog_comment TYPE record<vlog> ASSERT $value != NONE;
+  DEFINE FIELD user ON vlog_comment TYPE record<user> ASSERT $value != NONE;
+  DEFINE FIELD content ON vlog_comment TYPE string ASSERT $value != NONE;
+  DEFINE FIELD metadata ON vlog_comment TYPE object;
+  DEFINE FIELD reply_to ON vlog_comment TYPE record<vlog_comment>;
+  DEFINE FIELD created_at ON vlog_comment TYPE datetime DEFAULT time::now();
+  DEFINE FIELD updated_at ON vlog_comment TYPE datetime DEFAULT time::now() FLEXIBLE;
+  ```
+- **Permissions**:
+  ```surrealql
+  PERMIT SELECT WHERE fn::can_view_vlog(vlog, $auth.id),
+  PERMIT INSERT WHERE user = $auth.id AND fn::can_view_vlog(vlog, $auth.id),
+  PERMIT UPDATE WHERE user = $auth.id AND fn::can_view_vlog(vlog, $auth.id),
+  PERMIT DELETE WHERE user = $auth.id;
+  ```
+
+### 4.23 `vlog_share`
+- **Description**: Tracks vlog shares.
+- **Schema**:
+  ```surrealql
+  DEFINE TABLE vlog_share SCHEMAFULL;
+  DEFINE FIELD vlog ON vlog_share TYPE record<vlog> ASSERT $value != NONE;
+  DEFINE FIELD user ON vlog_share TYPE record<user> ASSERT $value != NONE;
+  DEFINE FIELD share_type ON vlog_share TYPE string ASSERT $value != NONE;
+  DEFINE FIELD created_at ON vlog_share TYPE datetime DEFAULT time::now();
+  ```
+- **Permissions**:
+  ```surrealql
+  PERMIT SELECT WHERE fn::can_view_vlog(vlog, $auth.id),
+  PERMIT INSERT WHERE user = $auth.id AND fn::can_view_vlog(vlog, $auth.id),
+  PERMIT DELETE WHERE user = $auth.id;
+  ```
+
+### 4.24 `referral`
+- **Description**: Manages referrals.
+- **Schema**:
+  ```surrealql
+  DEFINE TABLE referral SCHEMAFULL;
+  DEFINE FIELD referrer ON referral TYPE record<user> ASSERT $value != NONE AND $value != referred;
+  DEFINE FIELD referred ON referral TYPE record<user> ASSERT $value != NONE;
+  DEFINE FIELD status ON referral TYPE string DEFAULT 'pending';
+  DEFINE FIELD level ON referral TYPE int DEFAULT 1;
+  DEFINE FIELD parent_referral ON referral TYPE record<referral>;
+  DEFINE FIELD created_at ON referral TYPE datetime DEFAULT time::now();
+  DEFINE INDEX referral_referred ON referral FIELDS referred UNIQUE;
+  ```
+- **Permissions**:
+  ```surrealql
+  PERMIT SELECT WHERE referrer = $auth.id OR referred = $auth.id,
+  PERMIT INSERT WHERE referrer = $auth.id;
+  ```
+
+### 4.25 `commission`
+- **Description**: Tracks referral commissions.
+- **Schema**:
+  ```surrealql
+  DEFINE TABLE commission SCHEMAFULL;
+  DEFINE FIELD referral ON commission TYPE record<referral> ASSERT $value != NONE;
+  DEFINE FIELD earner ON commission TYPE record<user> ASSERT $value != NONE AND $value != payer;
+  DEFINE FIELD payer ON commission TYPE record<user> ASSERT $value != NONE;
+  DEFINE FIELD amount ON commission TYPE float ASSERT $value > 0;
+  DEFINE FIELD currency ON commission TYPE string DEFAULT 'USD';
+  DEFINE FIELD type ON commission TYPE string ASSERT $value != NONE;
+  DEFINE FIELD status ON commission TYPE string DEFAULT 'pending';
+  DEFINE FIELD created_at ON commission TYPE datetime DEFAULT time::now();
+  ```
+- **Permissions**:
+  ```surrealql
+  PERMIT SELECT WHERE earner = $auth.id;
+  ```
+
+### 4.26 `site`
+- **Description**: Stores user or group sites.
+- **Schema**:
+  ```surrealql
+  DEFINE TABLE site SCHEMAFULL;
+  DEFINE FIELD owner ON site TYPE record<user,group> ASSERT $value != NONE;
+  DEFINE FIELD owner_type ON site TYPE string ASSERT $value IN ['user', 'group'];
+  DEFINE FIELD theme ON site TYPE string;
+  DEFINE FIELD layout ON site TYPE object;
+  DEFINE FIELD settings ON site TYPE object;
+  DEFINE FIELD custom_domain ON site TYPE string;
+  DEFINE FIELD site_title ON site TYPE string;
+  DEFINE FIELD site_description ON site TYPE string;
+  DEFINE FIELD use_app_profile ON site TYPE bool DEFAULT false;
+  DEFINE FIELD show_contact_form ON site TYPE bool DEFAULT false;
+  DEFINE FIELD contact_email ON site TYPE string;
+  DEFINE FIELD social_links ON site TYPE object;
+  DEFINE FIELD featured_content ON site TYPE object;
+  DEFINE FIELD custom_sections ON site TYPE object;
+  DEFINE FIELD created_at ON site TYPE datetime DEFAULT time::now();
+  DEFINE FIELD updated_at ON site TYPE datetime DEFAULT time::now() FLEXIBLE;
+  DEFINE INDEX site_custom_domain ON site FIELDS custom_domain UNIQUE;
+  ```
+- **Permissions**:
+  ```surrealql
+  PERMIT SELECT,
+  PERMIT INSERT WHERE fn::can_manage_site(id, $auth.id),
+  PERMIT UPDATE WHERE fn::can_manage_site(id, $auth.id),
+  PERMIT DELETE WHERE fn::can_manage_site(id, $auth.id);
+  ```
+
+### 4.27 `site_analytic`
+- **Description**: Tracks site analytics.
+- **Schema**:
+  ```surrealql
+  DEFINE TABLE site_analytic SCHEMAFULL;
+  DEFINE FIELD site ON site_analytic TYPE record<site> ASSERT $value != NONE;
+  DEFINE FIELD date ON site_analytic TYPE datetime ASSERT $value != NONE;
+  DEFINE FIELD visits ON site_analytic TYPE int DEFAULT 0;
+  DEFINE FIELD unique_visitors ON site_analytic TYPE int DEFAULT 0;
+  DEFINE FIELD page_views ON site_analytic TYPE object;
+  DEFINE FIELD traffic_sources ON site_analytic TYPE object;
+  DEFINE FIELD updated_at ON site_analytic TYPE datetime DEFAULT time::now() FLEXIBLE;
+  ```
+- **Permissions**:
+  ```surrealql
+  PERMIT SELECT WHERE fn::can_manage_site(site, $auth.id);
+  ```
+
+### 4.28 `content_block`
+- **Description**: Stores site content blocks.
+- **Schema**:
+  ```surrealql
+  DEFINE TABLE content_block SCHEMAFULL;
+  DEFINE FIELD site ON content_block TYPE record<site> ASSERT $value != NONE;
+  DEFINE FIELD type ON content_block TYPE string ASSERT $value != NONE;
+  DEFINE FIELD display_order ON content_block TYPE int DEFAULT 0;
+  DEFINE FIELD content ON content_block TYPE object;
+  DEFINE FIELD published ON content_block TYPE bool DEFAULT false;
+  DEFINE FIELD created_at ON content_block TYPE datetime DEFAULT time::now();
+  DEFINE FIELD updated_at ON content_block TYPE datetime DEFAULT time::now() FLEXIBLE;
+  ```
+- **Permissions**:
+  ```surrealql
+  PERMIT SELECT WHERE published = true,
+  PERMIT ALL WHERE fn::can_manage_site(site, $auth.id);
+  ```
+
+### 4.29 `media_asset`
+- **Description**: Stores media files (links to iDrive E2/R2).
+- **Schema**:
+  ```surrealql
+  DEFINE TABLE media_asset SCHEMAFULL;
+  DEFINE FIELD owner ON media_asset TYPE record<user,group> ASSERT $value != NONE;
+  DEFINE FIELD owner_type ON media_asset TYPE string ASSERT $value IN ['user', 'group'];
+  DEFINE FIELD type ON media_asset TYPE string ASSERT $value IN ['image', 'video', 'document'];
+  DEFINE FIELD filename ON media_asset TYPE string;
+  DEFINE FIELD storage_path ON media_asset TYPE string ASSERT $value != NONE;
+  DEFINE FIELD size_bytes ON media_asset TYPE int;
+  DEFINE FIELD url ON media_asset TYPE string ASSERT $value != NONE;
+  DEFINE FIELD metadata ON media_asset TYPE object;
+  DEFINE FIELD uploaded_at ON media_asset TYPE datetime DEFAULT time::now();
+  DEFINE FIELD updated_at ON media_asset TYPE datetime DEFAULT time::now() FLEXIBLE;
+  DEFINE INDEX media_asset_storage_path ON media_asset FIELDS storage_path UNIQUE;
+  DEFINE INDEX media_asset_url ON media_asset FIELDS url UNIQUE;
+  ```
+- **Permissions**:
+  ```surrealql
+  PERMIT SELECT,
+  PERMIT INSERT WHERE fn::can_manage_media(id, $auth.id),
+  PERMIT UPDATE WHERE fn::can_manage_media(id, $auth.id),
+  PERMIT DELETE WHERE fn::can_manage_media(id, $auth.id);
+  ```
+
+### 4.30 `device`
+- **Description**: Stores user device tokens for notifications.
+- **Schema**:
+  ```surrealql
+  DEFINE TABLE device SCHEMAFULL;
+  DEFINE FIELD user ON device TYPE record<user> ASSERT $value != NONE;
+  DEFINE FIELD token ON device TYPE string ASSERT $value != NONE;
+  DEFINE FIELD platform ON device TYPE string ASSERT $value IN ['ios', 'android'];
+  DEFINE FIELD created_at ON device TYPE datetime DEFAULT time::now();
+  DEFINE FIELD updated_at ON device TYPE datetime DEFAULT time::now() FLEXIBLE;
+  DEFINE INDEX device_token ON device FIELDS token UNIQUE;
+  ```
+- **Permissions**:
+  ```surrealql
+  PERMIT SELECT WHERE user = $auth.id OR $access = 'worker',
+  PERMIT INSERT WHERE user = $auth.id,
+  PERMIT UPDATE WHERE user = $auth.id,
+  PERMIT DELETE WHERE user = $auth.id;
+  ```
+
+### 4.31 `notification`
+- **Description**: Stores push notifications.
+- **Schema**:
+  ```surrealql
+  DEFINE TABLE notification SCHEMAFULL;
+  DEFINE FIELD user ON notification TYPE record<user> ASSERT $value != NONE;
+  DEFINE FIELD type ON notification TYPE string ASSERT $value IN ['like', 'comment', 'match', 'message', 'follow'];
+  DEFINE FIELD data ON notification TYPE object;
+  DEFINE FIELD push_status ON notification TYPE string ASSERT $value IN ['pending', 'sent', 'failed'] DEFAULT 'pending';
+  DEFINE FIELD created_at ON notification TYPE datetime DEFAULT time::now();
+  ```
+- **Permissions**:
+  ```surrealql
+  PERMIT SELECT WHERE user = $auth.id OR $access = 'worker',
+  PERMIT INSERT WHERE user != NONE,
+  PERMIT UPDATE WHERE $access = 'worker';
+  ```
+
+## 5. Helper Functions
+
+SurrealDB functions (`DEFINE FUNCTION`) enforce complex access control, optimizing performance and security by centralizing permission logic.
+
+### 5.1 `is_match_member`
+- **Description**: Checks if a user is part of a match.
+  ```surrealql
+  DEFINE FUNCTION fn::is_match_member($match_id: record<match>, $user_id: record<user>) RETURNS bool {
+    RETURN (SELECT id FROM match WHERE id = $match_id AND (user1 = $user_id OR user2 = $user_id) LIMIT 1) IS NOT NONE;
+  };
+  ```
+
+### 5.2 `is_chat_member`
+- **Description**: Checks if a user is part of a chat.
+  ```surrealql
+  DEFINE FUNCTION fn::is_chat_member($chat_id: record<chat>, $user_id: record<user>) RETURNS bool {
+    LET $match_id = (SELECT match FROM chat WHERE id = $chat_id LIMIT 1);
+    RETURN $match_id IS NONE ? false : fn::is_match_member($match_id, $user_id);
+  };
+  ```
+
+### 5.3 `can_view_vlog`
+- **Description**: Checks if a user can view a vlog based on visibility.
+  ```surrealql
+  DEFINE FUNCTION fn::can_view_vlog($vlog_id: record<vlog>, $user_id: record<user>) RETURNS bool {
+    LET $vlog = (SELECT user, visibility FROM vlog WHERE id = $vlog_id LIMIT 1);
+    RETURN $vlog IS NONE ? false :
+           $vlog.visibility = 'public' ? true :
+           $user_id IS NONE ? false :
+           $vlog.user = $user_id ? true :
+           $vlog.visibility = 'followers' AND (SELECT id FROM follower WHERE follower = $user_id AND followed = $vlog.user LIMIT 1) IS NOT NONE;
+  };
+  ```
+- **Note**: Assumes a `follower` table for follow relationships. If not implemented, Workers can handle follow checks.
+
+### 5.4 `is_group_admin_or_owner`
+- **Description**: Checks if a user is a group admin or owner.
+  ```surrealql
+  DEFINE FUNCTION fn::is_group_admin_or_owner($group_id: record<group>, $user_id: record<user>) RETURNS bool {
+    RETURN (SELECT id FROM group_member WHERE group = $group_id AND user = $user_id AND role IN ['admin', 'owner'] LIMIT 1) IS NOT NONE;
+  };
+  ```
+
+### 5.5 `is_group_owner`
+- **Description**: Checks if a user is a group owner.
+  ```surrealql
+  DEFINE FUNCTION fn::is_group_owner($group_id: record<group>, $user_id: record<user>) RETURNS bool {
+    RETURN (SELECT id FROM group_member WHERE group = $group_id AND user = $user_id AND role = 'owner' LIMIT 1) IS NOT NONE;
+  };
+  ```
+
+### 5.6 `is_sole_owner`
+- **Description**: Checks if a user is the sole group owner.
+  ```surrealql
+  DEFINE FUNCTION fn::is_sole_owner($group_id: record<group>, $user_id: record<user>) RETURNS bool {
+    LET $is_owner = (SELECT role = 'owner' FROM group_member WHERE group = $group_id AND user = $user_id LIMIT 1);
+    RETURN $is_owner ? (SELECT count() FROM group_member WHERE group = $group_id AND role = 'owner' GROUP ALL) = 1 : false;
+  };
+  ```
+
+### 5.7 `can_manage_site`
+- **Description**: Checks if a user can manage a site.
+  ```surrealql
+  DEFINE FUNCTION fn::can_manage_site($site_id: record<site>, $user_id: record<user>) RETURNS bool {
+    LET $site = (SELECT owner, owner_type FROM site WHERE id = $site_id LIMIT 1);
+    RETURN $site IS NONE ? false :
+           $site.owner_type = 'user' ? $site.owner = $user_id :
+           fn::is_group_admin_or_owner($site.owner, $user_id);
+  };
+  ```
+
+### 5.8 `can_manage_media`
+- **Description**: Checks if a user can manage a media asset.
+  ```surrealql
+  DEFINE FUNCTION fn::can_manage_media($media_id: record<media_asset>, $user_id: record<user>) RETURNS bool {
+    LET $media = (SELECT owner, owner_type FROM media_asset WHERE id = $media_id LIMIT 1);
+    RETURN $media IS NONE ? false :
+           $media.owner_type = 'user' ? $media.owner = $user_id :
+           fn::is_group_admin_or_owner($media.owner, $user_id);
+  };
+  ```
+
+### 5.9 `can_view_profile`
+- **Description**: Checks if a user can view a profile, restricting sensitive fields.
+  ```surrealql
+  DEFINE FUNCTION fn::can_view_profile($profile_id: record<profile>, $user_id: record<user>) RETURNS bool {
+    LET $profile = (SELECT user, profile_status FROM profile WHERE id = $profile_id LIMIT 1);
+    RETURN $profile IS NONE ? false :
+           $profile.profile_status = 'active' ? true :
+           $user_id IS NONE ? false :
+           $profile.user = $user_id;
+  };
+  ```
+- **Note**: Sensitive fields (e.g., `weight`, `ethnicity`) are accessible only to recruiters or matched users via Cloudflare Worker logic.
+
+## 6. Notification System
+
+The `notification` and `device` tables integrate with Cloudflare Workers (`notify.js`, artifact ID `5ad4f3c9-d29c-4ffb-9110-c63306d87edc`) for APNs/FCM push notifications.
+
+- **Workflow**:
+  - React Native app registers device tokens using `NotificationService.js` (artifact ID `bdbc747b-887a-4654-9b90-c5a069711b89`), storing them in `device`.
+  - Events (e.g., likes, matches) create `notification` records with `push_status = 'pending'`.
+  - Cloudflare Worker subscribes to `LIVE SELECT * FROM notification WHERE push_status = 'pending'`.
+  - Worker sends APNs/FCM push notifications and updates `push_status` to `sent` or `failed`.
+- **Setup**:
+  - Apply schema (section 3.5).
+  - Configure APNs/FCM and deploy Worker (see `architecture.md`, artifact ID `e9df0d7a-34b0-4283-9fd3-600f79e39840`, section 3.4).
+- **Example Notification**:
+  ```surrealql
+  CREATE notification SET
+    user = user:test,
+    type = 'like',
+    data = { vlog = vlog:123 },
+    created_at = time::now();
+  ```
+
+## 7. Performance Considerations
+
+- **Indexes**: Unique and MTREE indexes ensure fast queries (e.g., `profile.username`, `profile.location`).
+- **Caching**: Cloudflare R2 caches `media_asset.url` for low-latency media access.
+- **Real-time**: Single WebSocket connection per Worker minimizes overhead.
+- **Scalability**: SurrealDB’s distributed architecture supports 100,000+ MAUs.
+- **Query Optimization**:
+  - Use `SELECT * FROM profile WHERE location NEAR ...` for geospatial searches.
+  - Leverage `LIVE SELECT` for real-time updates, avoiding polling.
+- **Functions**: Server-side execution reduces Worker round-trips.
+
+## 8. Security
+
+- **Access Control**: `DEFINE ACCESS` and functions ensure authorized data access.
+- **Field Validation**: `ASSERT` clauses enforce data integrity (e.g., email format, unique usernames).
+- **JWT Security**: Short-lived tokens (1h) with HS256 algorithm.
+- **Data Privacy**: Functions like `fn::can_view_profile` protect sensitive fields (e.g., `ethnicity`).
+- **Audit Logging**: `created_at` and `updated_at` track changes.
+
+## 9. Maintenance
+
+- **Monitoring**:
+  - Use SurrealDB’s `INFO FOR DB` to check query performance.
+  - Monitor Worker logs: `wrangler tail`.
+- **Updates**:
+  - Apply schema changes via `surreal import migrations/0000_initial_schema.surql`.
+  - Use `SCHEMALESS` for flexible fields during prototyping.
+- **Backups**:
+  - Schedule daily exports (section 3.5).
+  - Store backups in iDrive E2 for redundancy.
+
+## 10. Design Decisions
+
+This section explains the rationale for key architectural choices, optimizing for performance, security, maintainability, and dancer-specific functionality.
+
+### 10.1 Database Choice: SurrealDB
+- **Why**: SurrealDB’s document-relational model supports flexible schemas, real-time WebSocket queries (`LIVE SELECT`), and geospatial indexing (MTREE), ideal for iDance’s social, mobile-first, and location-based features.
+- **Performance**: Native indexing (e.g., MTREE for location) and WebSocket reduce latency vs. traditional polling.
+- **Scalability**: Distributed architecture handles 100,000+ MAUs.
+- **Cost**: Free tier (5GB, 100,000 queries/day) suits early growth, with predictable scaling costs (~$5/month for 100,000 MAUs).
+
+### 10.2 Access Control: SurrealDB Functions
+- **Why**: SurrealDB functions (`DEFINE FUNCTION`) centralize access control (e.g., vlog visibility, group admin checks) at the database level.
+  - **Performance**: Server-side execution minimizes round-trips (e.g., one query checks vlog visibility vs. multiple Worker queries).
+  - **Security**: Ensures consistent permission enforcement, preventing Worker misconfigurations.
+  - **Maintainability**: Reusable functions (e.g., `fn::is_group_admin_or_owner`) simplify schema updates.
+- **Alternative Considered**: Cloudflare Workers for all permission checks.
+  - **Trade-off**: Increases latency (additional queries) and risks inconsistent logic across Workers.
+  - **Decision**: Use SurrealDB functions for core permissions (e.g., `fn::can_view_vlog`), with Workers handling complex workflows (e.g., swipe matching).
+
+### 10.3 Notifications: SurrealDB + Cloudflare Workers
+- **Why**: SurrealDB’s `LIVE SELECT` streams notification events to Workers, which handle APNs/FCM delivery.
+  - **Performance**: WebSocket minimizes polling; Workers’ edge compute ensures low-latency push delivery.
+  - **Scalability**: Workers scale globally, supporting high notification volumes.
+
+### 10.4 Media Storage: iDrive E2 + Cloudflare R2
+- **Why**: iDrive E2 offers cost-effective storage ($0.005/GB/month); R2 provides edge caching ($0.015/GB/month).
+  - **Performance**: R2 reduces media load times for mobile users.
+  - **Cost**: Balances low storage costs with fast delivery.
+
+### 10.5 Geospatial Search: SurrealDB MTREE
+- **Why**: MTREE index on `profile.location` enables fast distance-based queries.
+  - **Performance**: Native indexing outperforms Worker-based geospatial calculations.
+
+### 10.6 Dancer-Specific Fields in `profile`
+- **Why**: Added `weight`, `height`, `hair_color`, `eye_color`, `body_type`, `measurements`, and `ethnicity` to `profile` to enhance dancer partner and job matching, especially for cheerleaders transitioning from college.
+  - **Relevance**:
+    - **Weight/Height**: Ensures physical compatibility for partnered dances (e.g., lifts, cheerleading stunts) and job requirements (e.g., cheerleading squads).
+    - **Hair/Eye Color**: Supports casting for roles requiring specific aesthetics (e.g., dance productions, team uniformity).
+    - **Body Type**: Aligns with partner matching (e.g., group performance aesthetics) and job preferences (e.g., ‘Athletic’ for cheerleading).
+    - **Measurements**: Critical for costume-based roles (e.g., cheerleading uniforms) and visual symmetry in partnered dances.
+    - **Ethnicity**: Aids casting for roles seeking diverse representation (e.g., productions, cheerleading teams) and partner matching for aesthetic alignment.
+  - **Privacy**: Fields are optional and restricted by `fn::can_view_profile` to authorized users (e.g., recruiters, matched partners).
+  - **Reusability**: Non-dancer fields (e.g., `email`, `password`) remain in `user` for future `modelling_profile` and `acting_profile` tables.
+  - **UX**: Optional fields with clear UI explanations (e.g., “Ethnicity helps match you with diverse roles”) avoid discomfort for casual users.
+  - **Reasoning**: These fields align with industry needs (e.g., NFL cheerleader auditions) and iDance’s goal to connect dancers, especially cheerleaders, with partners and jobs.
+
+### 10.7 Table Structure for Reusability
+- **Why**: Separated generic fields (`user`) from dancer-specific fields (`profile`) to support future `modelling_profile` and `acting_profile` tables.
+  - **user**: Holds authentication and universal fields (e.g., `email`, `password`, `oauth_providers`).
+  - **profile**: Contains dancer-specific fields (e.g., `height`, `ethnicity`).
+  - **Reasoning**: Enables `modelling_profile` and `acting_profile` to reference `user` for common data, reducing duplication and simplifying schema extensions.
+
+This schema optimizes iDance’s mobile-first, real-time, and scalable architecture, with SurrealDB handling dancer-specific data and access control, and Cloudflare Workers managing notifications and workflows.

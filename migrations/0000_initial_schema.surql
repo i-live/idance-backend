@@ -62,92 +62,92 @@ DEFINE INDEX user_email ON user FIELDS email UNIQUE;
 DEFINE INDEX user_stripe_customer_id ON user FIELDS stripe_customer_id UNIQUE WHERE stripe_customer_id != NONE;
 
 -- Dance Profile
--- Stores dance-specific user data (location, preferences, portfolio)
-DEFINE TABLE dance_profile SCHEMAFULL
+-- Stores physical user data (location, preferences, portfolio)
+DEFINE TABLE profile SCHEMAFULL
     PERMISSIONS
         FOR select WHERE profile_status = 'active' FIELDS user_id, location, bio, social_links, awards, portfolio_items, looking_for, search_preferences
         FOR select WHERE user_id = $auth.id FULL
-        FOR create WHERE user_id = $auth.id AND (SELECT count() FROM dance_profile WHERE user_id = $auth.id) = 0 FULL
+        FOR create WHERE user_id = $auth.id AND (SELECT count() FROM profile WHERE user_id = $auth.id) = 0 FULL
         FOR update WHERE user_id = $auth.id OMIT profile_status, bio_embedding, vlog_embedding
         FOR update WHERE $auth.roles CONTAINS 'site_admin' FULL;
 
-DEFINE FIELD user_id ON dance_profile TYPE record<user>;
-DEFINE FIELD profile_type ON dance_profile TYPE string DEFAULT 'dancer';
-DEFINE FIELD profile_type ON dance_profile ASSERT $value IN ['dancer', 'actor', 'model'];
-DEFINE FIELD date_of_birth ON dance_profile TYPE datetime;
-DEFINE FIELD date_of_birth ON dance_profile ASSERT $value != NONE;
-DEFINE FIELD gender ON dance_profile TYPE option<string>;
-DEFINE FIELD gender ON dance_profile ASSERT $value == NONE OR $value IN ['Male', 'Female', 'Non-binary', 'Other', 'Prefer not to say'];
-DEFINE FIELD bio ON dance_profile TYPE option<string>;
-DEFINE FIELD bio ON dance_profile ASSERT $value == NONE OR string::len($value) <= 2000;
-DEFINE FIELD bio_embedding ON dance_profile TYPE array<float>;
-DEFINE FIELD bio_embedding ON dance_profile ASSERT array::len($value) = 1536;
-DEFINE FIELD vlog_embedding ON dance_profile TYPE option<array<float>>;
-DEFINE FIELD vlog_embedding ON dance_profile ASSERT $value == NONE OR (array::len($value) = 768 AND user_tier IN ['pro', 'vip']);
-DEFINE FIELD looking_for ON dance_profile TYPE array<string> DEFAULT [];
-DEFINE FIELD looking_for.* ON dance_profile ASSERT $value IN ['partners', 'jobs', 'dancers', 'events'];
-DEFINE FIELD profile_status ON dance_profile TYPE string DEFAULT 'active';
-DEFINE FIELD profile_status ON dance_profile ASSERT $value IN ['active', 'suspended', 'deleted'];
+DEFINE FIELD user_id ON profile TYPE record<user>;
+DEFINE FIELD profile_type ON profile TYPE string DEFAULT 'dancer';
+DEFINE FIELD profile_type ON profile ASSERT $value IN ['dancer', 'actor', 'model'];
+DEFINE FIELD date_of_birth ON profile TYPE datetime;
+DEFINE FIELD date_of_birth ON profile ASSERT $value != NONE;
+DEFINE FIELD gender ON profile TYPE option<string>;
+DEFINE FIELD gender ON profile ASSERT $value == NONE OR $value IN ['Male', 'Female', 'Non-binary', 'Other', 'Prefer not to say'];
+DEFINE FIELD bio ON profile TYPE option<string>;
+DEFINE FIELD bio ON profile ASSERT $value == NONE OR string::len($value) <= 2000;
+DEFINE FIELD bio_embedding ON profile TYPE array<float>;
+DEFINE FIELD bio_embedding ON profile ASSERT array::len($value) = 1536;
+DEFINE FIELD vlog_embedding ON profile TYPE option<array<float>>;
+DEFINE FIELD vlog_embedding ON profile ASSERT $value == NONE OR (array::len($value) = 768 AND user_tier IN ['pro', 'vip']);
+DEFINE FIELD looking_for ON profile TYPE array<string> DEFAULT [];
+DEFINE FIELD looking_for.* ON profile ASSERT $value IN ['partners', 'jobs', 'dancers', 'events'];
+DEFINE FIELD profile_status ON profile TYPE string DEFAULT 'active';
+DEFINE FIELD profile_status ON profile ASSERT $value IN ['active', 'suspended', 'deleted'];
 
 -- Location fields
-DEFINE FIELD location ON dance_profile TYPE object;
-DEFINE FIELD location.country ON dance_profile TYPE option<record<country>>;
-DEFINE FIELD location.state ON dance_profile TYPE option<record<state>>;
-DEFINE FIELD location.county ON dance_profile TYPE option<record<county>>;
-DEFINE FIELD location.city ON dance_profile TYPE option<record<city>>;
-DEFINE FIELD location.zipcode ON dance_profile TYPE option<string>;
-DEFINE FIELD location.zipcode ON dance_profile ASSERT $value == NONE OR $value MATCHES /^[0-9A-Z\- ]{3,10}$/;
-DEFINE FIELD location.street ON dance_profile TYPE option<string>;
-DEFINE FIELD location.point ON dance_profile TYPE option<geometry<point>>;
-DEFINE FIELD location.custom_city ON dance_profile TYPE option<string>;
-DEFINE FIELD location.custom_city ON dance_profile ASSERT $value == NONE OR user_tier IN ['pro', 'vip'];
+DEFINE FIELD location ON profile TYPE object;
+DEFINE FIELD location.country ON profile TYPE option<record<country>>;
+DEFINE FIELD location.state ON profile TYPE option<record<state>>;
+DEFINE FIELD location.county ON profile TYPE option<record<county>>;
+DEFINE FIELD location.city ON profile TYPE option<record<city>>;
+DEFINE FIELD location.zipcode ON profile TYPE option<string>;
+DEFINE FIELD location.zipcode ON profile ASSERT $value == NONE OR $value MATCHES /^[0-9A-Z\- ]{3,10}$/;
+DEFINE FIELD location.street ON profile TYPE option<string>;
+DEFINE FIELD location.point ON profile TYPE option<geometry<point>>;
+DEFINE FIELD location.custom_city ON profile TYPE option<string>;
+DEFINE FIELD location.custom_city ON profile ASSERT $value == NONE OR user_tier IN ['pro', 'vip'];
 
 -- Search preferences
-DEFINE FIELD search_preferences ON dance_profile TYPE array<object> DEFAULT [];
-DEFINE FIELD search_preferences.*.name ON dance_profile TYPE string;
-DEFINE FIELD search_preferences.*.name ON dance_profile ASSERT $value != NONE AND string::len($value) <= 50;
-DEFINE FIELD search_preferences.*.search_area ON dance_profile TYPE object;
-DEFINE FIELD search_preferences.*.search_area.point ON dance_profile TYPE geometry<point>;
-DEFINE FIELD search_preferences.*.search_area.distance ON dance_profile TYPE float;
-DEFINE FIELD search_preferences.*.search_area.distance ON dance_profile ASSERT $value > 0;
-DEFINE FIELD search_preferences.*.active ON dance_profile TYPE bool DEFAULT true;
-DEFINE FIELD search_preferences ON dance_profile ASSERT $value == [] OR user_tier IN ['pro', 'vip'];
+DEFINE FIELD search_preferences ON profile TYPE array<object> DEFAULT [];
+DEFINE FIELD search_preferences.*.name ON profile TYPE string;
+DEFINE FIELD search_preferences.*.name ON profile ASSERT $value != NONE AND string::len($value) <= 50;
+DEFINE FIELD search_preferences.*.search_area ON profile TYPE object;
+DEFINE FIELD search_preferences.*.search_area.point ON profile TYPE geometry<point>;
+DEFINE FIELD search_preferences.*.search_area.distance ON profile TYPE float;
+DEFINE FIELD search_preferences.*.search_area.distance ON profile ASSERT $value > 0;
+DEFINE FIELD search_preferences.*.active ON profile TYPE bool DEFAULT true;
+DEFINE FIELD search_preferences ON profile ASSERT $value == [] OR user_tier IN ['pro', 'vip'];
 
 -- Timestamps
-DEFINE FIELD created_at ON dance_profile TYPE datetime DEFAULT time::now();
-DEFINE FIELD updated_at ON dance_profile TYPE datetime DEFAULT time::now();
+DEFINE FIELD created_at ON profile TYPE datetime DEFAULT time::now();
+DEFINE FIELD updated_at ON profile TYPE datetime DEFAULT time::now();
 
 -- Indexes
-DEFINE INDEX dance_profile_user_id ON dance_profile FIELDS user_id UNIQUE;
-DEFINE INDEX dance_profile_location_city ON dance_profile FIELDS location.city;
-DEFINE INDEX dance_profile_location_country ON dance_profile FIELDS location.country;
-DEFINE INDEX dance_profile_location_state ON dance_profile FIELDS location.state;
-DEFINE INDEX dance_profile_location_point ON dance_profile FIELDS location.point MTREE;
-DEFINE INDEX idx_bio_embedding ON dance_profile FIELDS bio_embedding HNSW DIMENSION 1536 DIST COSINE TYPE F32;
-DEFINE INDEX idx_vlog_embedding ON dance_profile FIELDS vlog_embedding HNSW DIMENSION 768 DIST COSINE TYPE F32;
+DEFINE INDEX profile_user_id ON profile FIELDS user_id UNIQUE;
+DEFINE INDEX profile_location_city ON profile FIELDS location.city;
+DEFINE INDEX profile_location_country ON profile FIELDS location.country;
+DEFINE INDEX profile_location_state ON profile FIELDS location.state;
+DEFINE INDEX profile_location_point ON profile FIELDS location.point MTREE;
+DEFINE INDEX idx_bio_embedding ON profile FIELDS bio_embedding HNSW DIMENSION 1536 DIST COSINE TYPE F32;
+DEFINE INDEX idx_vlog_embedding ON profile FIELDS vlog_embedding HNSW DIMENSION 768 DIST COSINE TYPE F32;
 
 -- Social links
-DEFINE FIELD social_links ON dance_profile TYPE array<object> DEFAULT [];
-DEFINE FIELD social_links.*.platform ON dance_profile TYPE record<social_platform>;
-DEFINE FIELD social_links.*.url ON dance_profile TYPE string;
-DEFINE FIELD social_links.*.url ON dance_profile ASSERT string::is::url($value);
+DEFINE FIELD social_links ON profile TYPE array<object> DEFAULT [];
+DEFINE FIELD social_links.*.platform ON profile TYPE record<social_platform>;
+DEFINE FIELD social_links.*.url ON profile TYPE string;
+DEFINE FIELD social_links.*.url ON profile ASSERT string::is::url($value);
 
 -- Awards
-DEFINE FIELD awards ON dance_profile TYPE array<object> DEFAULT [];
-DEFINE FIELD awards.*.name ON dance_profile TYPE string;
-DEFINE FIELD awards.*.year ON dance_profile TYPE option<int>;
-DEFINE FIELD awards.*.description ON dance_profile TYPE option<string>;
+DEFINE FIELD awards ON profile TYPE array<object> DEFAULT [];
+DEFINE FIELD awards.*.name ON profile TYPE string;
+DEFINE FIELD awards.*.year ON profile TYPE option<int>;
+DEFINE FIELD awards.*.description ON profile TYPE option<string>;
 
 -- Portfolio items
-DEFINE FIELD portfolio_items ON dance_profile TYPE array<object> DEFAULT [];
-DEFINE FIELD portfolio_items.*.item_type ON dance_profile TYPE string;
-DEFINE FIELD portfolio_items.*.item_type ON dance_profile ASSERT $value IN ['video', 'image', 'project_link'];
-DEFINE FIELD portfolio_items.*.url ON dance_profile TYPE string;
-DEFINE FIELD portfolio_items.*.url ON dance_profile ASSERT string::is::url($value);
-DEFINE FIELD portfolio_items.*.caption ON dance_profile TYPE option<string>;
-DEFINE FIELD portfolio_items.*.thumbnail_url ON dance_profile TYPE option<string>;
-DEFINE FIELD portfolio_items.*.thumbnail_url ON dance_profile ASSERT $value == NONE OR string::is::url($value);
-DEFINE FIELD portfolio_items.*.display_order ON dance_profile TYPE int DEFAULT 0;
+DEFINE FIELD portfolio_items ON profile TYPE array<object> DEFAULT [];
+DEFINE FIELD portfolio_items.*.item_type ON profile TYPE string;
+DEFINE FIELD portfolio_items.*.item_type ON profile ASSERT $value IN ['video', 'image', 'project_link'];
+DEFINE FIELD portfolio_items.*.url ON profile TYPE string;
+DEFINE FIELD portfolio_items.*.url ON profile ASSERT string::is::url($value);
+DEFINE FIELD portfolio_items.*.caption ON profile TYPE option<string>;
+DEFINE FIELD portfolio_items.*.thumbnail_url ON profile TYPE option<string>;
+DEFINE FIELD portfolio_items.*.thumbnail_url ON profile ASSERT $value == NONE OR string::is::url($value);
+DEFINE FIELD portfolio_items.*.display_order ON profile TYPE int DEFAULT 0;
 
 -- Device
 -- Stores device tokens for push notifications
@@ -168,7 +168,7 @@ DEFINE INDEX device_user_token ON device FIELDS user, token UNIQUE;
 ---- Lookup Tables ----
 
 -- Countries (ISO 3166-1)
--- Referenced by dance_profile.location.country
+-- Referenced by profile.location.country
 DEFINE TABLE country SCHEMAFULL
     PERMISSIONS
         FOR select FULL
@@ -183,7 +183,7 @@ DEFINE FIELD created_at ON country TYPE datetime DEFAULT time::now();
 DEFINE INDEX country_code ON country FIELDS code UNIQUE;
 
 -- States (or prefectures, provinces)
--- Referenced by dance_profile.location.state
+-- Referenced by profile.location.state
 DEFINE TABLE state SCHEMAFULL
     PERMISSIONS
         FOR select FULL
@@ -197,7 +197,7 @@ DEFINE FIELD created_at ON state TYPE datetime DEFAULT time::now();
 DEFINE INDEX state_name_country ON state FIELDS name, country UNIQUE;
 
 -- Counties
--- Referenced by dance_profile.location.county
+-- Referenced by profile.location.county
 DEFINE TABLE county SCHEMAFULL
     PERMISSIONS
         FOR select FULL
@@ -212,7 +212,7 @@ DEFINE FIELD created_at ON county TYPE datetime DEFAULT time::now();
 DEFINE INDEX county_name_state ON county FIELDS name, state UNIQUE;
 
 -- Cities
--- Referenced by dance_profile.location.city
+-- Referenced by profile.location.city
 DEFINE TABLE city SCHEMAFULL
     PERMISSIONS
         FOR select FULL
@@ -255,7 +255,7 @@ DEFINE FIELD created_at ON interest TYPE datetime DEFAULT time::now();
 DEFINE INDEX interest_name ON interest FIELDS name UNIQUE;
 
 -- Social Platforms
--- Referenced by dance_profile.social_links
+-- Referenced by profile.social_links
 DEFINE TABLE social_platform SCHEMAFULL
     PERMISSIONS
         FOR select FULL
@@ -663,5 +663,60 @@ DEFINE EVENT update_vlog_embedding ON TABLE vlog WHEN $event IN ["CREATE", "UPDA
     LET $vlogs = (SELECT caption FROM vlog WHERE user = $user_id);
     LET $text = array::join(array::flatten($vlogs.caption), ' ');
     LET $embedding = <future>fn::generate_embedding($text);
-    UPDATE dance_profile SET vlog_embedding = $embedding WHERE user_id = $user_id AND user_tier IN ['pro', 'vip'];
+    UPDATE profile SET vlog_embedding = $embedding WHERE user_id = $user_id AND user_tier IN ['pro', 'vip'];
 );
+
+
+-- Helper Functions
+DEFINE FUNCTION fn::is_match_member($match_id: record<match>, $user_id: record<user>) RETURNS bool {
+  RETURN (SELECT id FROM match WHERE id = $match_id AND (user1 = $user_id OR user2 = $user_id) LIMIT 1) IS NOT NONE;
+};
+
+DEFINE FUNCTION fn::is_chat_member($chat_id: record<chat>, $user_id: record<user>) RETURNS bool {
+  LET $match_id = (SELECT match FROM chat WHERE id = $chat_id LIMIT 1);
+  RETURN $match_id IS NONE ? false : fn::is_match_member($match_id, $user_id);
+};
+
+DEFINE FUNCTION fn::can_view_vlog($vlog_id: record<vlog>, $user_id: record<user>) RETURNS bool {
+  LET $vlog = (SELECT user, visibility FROM vlog WHERE id = $vlog_id LIMIT 1);
+  RETURN $vlog IS NONE ? false :
+         $vlog.visibility = 'public' ? true :
+         $user_id IS NONE ? false :
+         $vlog.user = $user_id ? true :
+         $vlog.visibility = 'followers' AND (SELECT id FROM follower WHERE follower = $user_id AND followed = $vlog.user LIMIT 1) IS NOT NONE;
+};
+
+DEFINE FUNCTION fn::is_group_admin_or_owner($group_id: record<group>, $user_id: record<user>) RETURNS bool {
+  RETURN (SELECT id FROM group_member WHERE group = $group_id AND user = $user_id AND role IN ['admin', 'owner'] LIMIT 1) IS NOT NONE;
+};
+
+DEFINE FUNCTION fn::is_group_owner($group_id: record<group>, $user_id: record<user>) RETURNS bool {
+  RETURN (SELECT id FROM group_member WHERE group = $group_id AND user = $user_id AND role = 'owner' LIMIT 1) IS NOT NONE;
+};
+
+DEFINE FUNCTION fn::is_sole_owner($group_id: record<group>, $user_id: record<user>) RETURNS bool {
+  LET $is_owner = (SELECT role = 'owner' FROM group_member WHERE group = $group_id AND user = $user_id LIMIT 1);
+  RETURN $is_owner ? (SELECT count() FROM group_member WHERE group = $group_id AND role = 'owner' GROUP ALL) = 1 : false;
+};
+
+DEFINE FUNCTION fn::can_manage_site($site_id: record<site>, $user_id: record<user>) RETURNS bool {
+  LET $site = (SELECT owner, owner_type FROM site WHERE id = $site_id LIMIT 1);
+  RETURN $site IS NONE ? false :
+         $site.owner_type = 'user' ? $site.owner = $user_id :
+         fn::is_group_admin_or_owner($site.owner, $user_id);
+};
+
+DEFINE FUNCTION fn::can_manage_media($media_id: record<media_asset>, $user_id: record<user>) RETURNS bool {
+  LET $media = (SELECT owner, owner_type FROM media_asset WHERE id = $media_id LIMIT 1);
+  RETURN $media IS NONE ? false :
+         $media.owner_type = 'user' ? $media.owner = $user_id :
+         fn::is_group_admin_or_owner($media.owner, $user_id);
+};
+
+DEFINE FUNCTION fn::can_view_profile($profile_id: record<profile>, $user_id: record<user>) RETURNS bool {
+  LET $profile = (SELECT user, profile_status FROM profile WHERE id = $profile_id LIMIT 1);
+  RETURN $profile IS NONE ? false :
+         $profile.profile_status = 'active' ? true :
+         $user_id IS NONE ? false :
+         $profile.user = $user_id;
+};
