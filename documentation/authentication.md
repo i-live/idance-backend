@@ -10,6 +10,32 @@ The authentication system supports dual authentication methods:
 
 The system uses JWT tokens for session management and provides separate access controls for users and backend workers.
 
+## Database Scope
+
+**Important**: The authentication access definitions are scoped to individual databases, not across all databases in the SurrealDB instance.
+
+```sql
+DEFINE ACCESS user ON DATABASE TYPE RECORD
+DEFINE ACCESS worker ON DATABASE TYPE JWT
+```
+
+This means:
+- Each database (`dev`, `prod`, `test`) has its own authentication configuration
+- Users authenticated in the `dev` database cannot access `prod` database without re-authentication
+- Access tokens are database-specific
+- You must define the same access rules in each database environment
+
+### Multi-Environment Setup
+
+The schema defines three databases:
+```sql
+DEFINE DATABASE dev;    -- Development environment
+DEFINE DATABASE prod;   -- Production environment
+DEFINE DATABASE test;   -- Testing environment
+```
+
+Each database requires its own access definitions to be applied separately.
+
 ## SurrealDB Schema
 
 ### User Authentication Access
@@ -351,4 +377,36 @@ await db.use('namespace', 'database')
 await db.authenticate(workerJWT)
 ```
 
-This authentication system provides a robust, secure foundation for user management with support for both traditional and modern OAuth-based authentication methods.
+## Cross-Database Authentication Considerations
+
+### Database Isolation
+- **No Cross-Database Access**: Authentication tokens are scoped to the specific database where they were issued
+- **Environment Separation**: Users in `dev` database are completely separate from `prod` database users
+- **Migration Requirements**: User data must be explicitly migrated between databases if needed
+
+### Production Deployment Strategy
+1. **Development**: Use `dev` database for local development and testing
+2. **Staging**: Use `test` database for integration testing
+3. **Production**: Use `prod` database for live application
+
+### Connection Examples
+
+```javascript
+// Development environment
+await db.connect('ws://localhost:8000/rpc')
+await db.use('idance', 'dev')
+await db.signin({ /* user credentials */ })
+
+// Production environment
+await db.connect('wss://your-surrealdb-instance.com/rpc')
+await db.use('idance', 'prod')
+await db.signin({ /* user credentials */ })
+```
+
+### Best Practices for Multi-Database Setup
+1. **Consistent Schema**: Apply the same access definitions to all databases
+2. **Environment Variables**: Use different connection strings per environment
+3. **Data Synchronization**: Implement proper data migration strategies if needed
+4. **Testing**: Test authentication in each database environment separately
+
+This authentication system provides a robust, secure foundation for user management with support for both traditional and modern OAuth-based authentication methods, with proper database isolation for different environments.
