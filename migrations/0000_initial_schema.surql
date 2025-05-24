@@ -20,7 +20,9 @@
 -- Defines session management for user authentication
 DEFINE SCOPE idance SESSION 7d;
 
--- User
+-- ########################################################
+-- User Table
+-- ########################################################
 -- Stores general user data, authentication credentials, and OAuth providers
 DEFINE TABLE user SCHEMAFULL
     PERMISSIONS
@@ -61,35 +63,68 @@ DEFINE INDEX user_username ON user FIELDS username UNIQUE;
 DEFINE INDEX user_email ON user FIELDS email UNIQUE;
 DEFINE INDEX user_stripe_customer_id ON user FIELDS stripe_customer_id UNIQUE WHERE stripe_customer_id != NONE;
 
--- Dance Profile
--- Stores physical user data (location, preferences, portfolio)
+-- ########################################################
+-- Profile Table
+-- ########################################################
+-- Stores comprehensive user profile information including physical attributes,
+-- location data, preferences, and portfolio items
 DEFINE TABLE profile SCHEMAFULL
     PERMISSIONS
-        FOR select WHERE profile_status = 'active' FIELDS user_id, location, bio, social_links, awards, portfolio_items, looking_for, search_preferences
+        -- Public view (active profiles only)
+        FOR select WHERE profile_status = 'active' 
+        FIELDS user_id, profile_type,
+               location, bio, 
+               social_links, awards, portfolio_items,
+               looking_for, search_preferences,
+               body_type, height, height_unit  -- Added safe physical attributes
+        
+        -- Full access to own profile
         FOR select WHERE user_id = $auth.id FULL
-        FOR create WHERE user_id = $auth.id AND (SELECT count() FROM profile WHERE user_id = $auth.id) = 0 FULL
-        FOR update WHERE user_id = $auth.id OMIT profile_status, bio_embedding, vlog_embedding
+        
+        -- One profile per user
+        FOR create WHERE user_id = $auth.id 
+        AND (SELECT count() FROM profile WHERE user_id = $auth.id) = 0 
+        FULL
+        
+        -- Update own profile (restricted fields)
+        FOR update WHERE user_id = $auth.id 
+        OMIT profile_status, bio_embedding, vlog_embedding,
+             measurements, measurements_unit,  -- Added sensitive measurements
+             weight, weight_unit              -- Added sensitive physical attributes
+        
+        -- Admin full access
         FOR update WHERE $auth.roles CONTAINS 'site_admin' FULL;
 
+------------------------------------------
+-- Core Profile Fields
+------------------------------------------
 DEFINE FIELD user_id ON profile TYPE record<user>;
 DEFINE FIELD profile_type ON profile TYPE string DEFAULT 'dancer';
 DEFINE FIELD profile_type ON profile ASSERT $value IN ['dancer', 'actor', 'model'];
+DEFINE FIELD profile_status ON profile TYPE string DEFAULT 'active';
+DEFINE FIELD profile_status ON profile ASSERT $value IN ['active', 'suspended', 'deleted'];
+
+------------------------------------------
+-- Basic Information
+------------------------------------------
 DEFINE FIELD date_of_birth ON profile TYPE datetime;
 DEFINE FIELD date_of_birth ON profile ASSERT $value != NONE;
 DEFINE FIELD gender ON profile TYPE option<string>;
 DEFINE FIELD gender ON profile ASSERT $value == NONE OR $value IN ['Male', 'Female', 'Non-binary', 'Other', 'Prefer not to say'];
+
+------------------------------------------
+-- Bio and Embeddings
+------------------------------------------
 DEFINE FIELD bio ON profile TYPE option<string>;
 DEFINE FIELD bio ON profile ASSERT $value == NONE OR string::len($value) <= 2000;
 DEFINE FIELD bio_embedding ON profile TYPE array<float>;
 DEFINE FIELD bio_embedding ON profile ASSERT array::len($value) = 1536;
 DEFINE FIELD vlog_embedding ON profile TYPE option<array<float>>;
 DEFINE FIELD vlog_embedding ON profile ASSERT $value == NONE OR (array::len($value) = 768 AND user_tier IN ['pro', 'vip']);
-DEFINE FIELD looking_for ON profile TYPE array<string> DEFAULT [];
-DEFINE FIELD looking_for.* ON profile ASSERT $value IN ['partners', 'jobs', 'dancers', 'events'];
-DEFINE FIELD profile_status ON profile TYPE string DEFAULT 'active';
-DEFINE FIELD profile_status ON profile ASSERT $value IN ['active', 'suspended', 'deleted'];
 
--- Physical attributes
+------------------------------------------
+-- Physical Attributes
+------------------------------------------
 DEFINE FIELD ethnicity ON profile TYPE option<string>;
 DEFINE FIELD ethnicity ON profile ASSERT $value == NONE OR $value IN ['Asian', 'Black', 'Hispanic', 'White', 'Native American', 'Pacific Islander', 'Other'];
 
@@ -110,6 +145,9 @@ DEFINE FIELD weight_unit ON profile ASSERT $value == NONE OR $value IN ['kg', 'l
 DEFINE FIELD body_type ON profile TYPE option<string>;
 DEFINE FIELD body_type ON profile ASSERT $value == NONE OR $value IN ['Athletic', 'Slim', 'Average', 'Muscular', 'Curvy', 'Other'];
 
+------------------------------------------
+-- Measurements
+------------------------------------------
 DEFINE FIELD measurements ON profile TYPE option<object>;
 DEFINE FIELD measurements.bust ON profile TYPE option<float>;
 DEFINE FIELD measurements.waist ON profile TYPE option<float>;
@@ -117,15 +155,18 @@ DEFINE FIELD measurements.hips ON profile TYPE option<float>;
 DEFINE FIELD measurements_unit ON profile TYPE option<string>;
 DEFINE FIELD measurements_unit ON profile ASSERT $value == NONE OR $value IN ['in', 'cm'];
 
--- Add validation to ensure measurements are present if measurements_unit is set
+-- Cross-field validation for measurements
 DEFINE FIELD measurements ON profile ASSERT $value == NONE OR measurements_unit != NONE;
 
--- Add index for common physical attribute queries
-DEFINE INDEX profile_physical_attrs ON profile 
-    FIELDS height, weight, body_type 
-    WHERE profile_status = 'active';
+------------------------------------------
+-- Preferences and Interests
+------------------------------------------
+DEFINE FIELD looking_for ON profile TYPE array<string> DEFAULT [];
+DEFINE FIELD looking_for.* ON profile ASSERT $value IN ['partners', 'jobs', 'dancers', 'events'];
 
--- Location fields
+------------------------------------------
+-- Location Information
+------------------------------------------
 DEFINE FIELD location ON profile TYPE object;
 DEFINE FIELD location.country ON profile TYPE option<record<country>>;
 DEFINE FIELD location.state ON profile TYPE option<record<state>>;
@@ -149,43 +190,75 @@ DEFINE FIELD search_preferences.*.search_area.distance ON profile ASSERT $value 
 DEFINE FIELD search_preferences.*.active ON profile TYPE bool DEFAULT true;
 DEFINE FIELD search_preferences ON profile ASSERT $value == [] OR user_tier IN ['pro', 'vip'];
 
--- Timestamps
-DEFINE FIELD created_at ON profile TYPE datetime DEFAULT time::now();
-DEFINE FIELD updated_at ON profile TYPE datetime DEFAULT time::now();
-
--- Indexes
-DEFINE INDEX profile_user_id ON profile FIELDS user_id UNIQUE;
-DEFINE INDEX profile_location_city ON profile FIELDS location.city;
-DEFINE INDEX profile_location_country ON profile FIELDS location.country;
-DEFINE INDEX profile_location_state ON profile FIELDS location.state;
-DEFINE INDEX profile_location_point ON profile FIELDS location.point MTREE;
-DEFINE INDEX idx_bio_embedding ON profile FIELDS bio_embedding HNSW DIMENSION 1536 DIST COSINE TYPE F32;
-DEFINE INDEX idx_vlog_embedding ON profile FIELDS vlog_embedding HNSW DIMENSION 768 DIST COSINE TYPE F32;
-
--- Social links
-DEFINE FIELD social_links ON profile TYPE array<object> DEFAULT [];
+------------------------------------------
+-- Portfolio and Achievements
+------------------------------------------
+DEFINE FIELD social_links ON profile TYPE array<object>;
 DEFINE FIELD social_links.*.platform ON profile TYPE record<social_platform>;
 DEFINE FIELD social_links.*.url ON profile TYPE string;
 DEFINE FIELD social_links.*.url ON profile ASSERT string::is::url($value);
 
--- Awards
-DEFINE FIELD awards ON profile TYPE array<object> DEFAULT [];
-DEFINE FIELD awards.*.name ON profile TYPE string;
+DEFINE FIELD awards ON profile TYPE array<object>;
+DEFINE FIELD awards.*.title ON profile TYPE string;
+DEFINE FIELD awards.*.organization ON profile TYPE option<string>;
 DEFINE FIELD awards.*.year ON profile TYPE option<int>;
 DEFINE FIELD awards.*.description ON profile TYPE option<string>;
 
--- Portfolio items
-DEFINE FIELD portfolio_items ON profile TYPE array<object> DEFAULT [];
-DEFINE FIELD portfolio_items.*.item_type ON profile TYPE string;
-DEFINE FIELD portfolio_items.*.item_type ON profile ASSERT $value IN ['video', 'image', 'project_link'];
+DEFINE FIELD portfolio_items ON profile TYPE array<object>;
+DEFINE FIELD portfolio_items.*.type ON profile TYPE string;
+DEFINE FIELD portfolio_items.*.type ON profile ASSERT $value IN ['video', 'image', 'document'];
+DEFINE FIELD portfolio_items.*.title ON profile TYPE string;
 DEFINE FIELD portfolio_items.*.url ON profile TYPE string;
 DEFINE FIELD portfolio_items.*.url ON profile ASSERT string::is::url($value);
-DEFINE FIELD portfolio_items.*.caption ON profile TYPE option<string>;
-DEFINE FIELD portfolio_items.*.thumbnail_url ON profile TYPE option<string>;
-DEFINE FIELD portfolio_items.*.thumbnail_url ON profile ASSERT $value == NONE OR string::is::url($value);
-DEFINE FIELD portfolio_items.*.display_order ON profile TYPE int DEFAULT 0;
+DEFINE FIELD portfolio_items.*.description ON profile TYPE option<string>;
+DEFINE FIELD portfolio_items.*.order ON profile TYPE int DEFAULT 0;
 
--- Device
+-- Add index for portfolio items search
+DEFINE INDEX profile_portfolio ON profile FIELDS portfolio_items.*.type, portfolio_items.*.title;
+
+------------------------------------------
+-- Timestamps
+------------------------------------------
+DEFINE FIELD created_at ON profile TYPE datetime DEFAULT time::now();
+DEFINE FIELD updated_at ON profile TYPE datetime DEFAULT time::now();
+
+------------------------------------------
+-- Indexes
+------------------------------------------
+DEFINE INDEX profile_user_id ON profile FIELDS user_id UNIQUE;
+DEFINE INDEX profile_location_point ON profile FIELDS location.point MTREE;
+DEFINE INDEX profile_physical_attrs ON profile FIELDS height, weight, body_type WHERE profile_status = 'active';
+DEFINE INDEX idx_bio_embedding ON profile FIELDS bio_embedding HNSW DIMENSION 1536 DIST COSINE TYPE F32;
+DEFINE INDEX idx_vlog_embedding ON profile FIELDS vlog_embedding HNSW DIMENSION 768 DIST COSINE TYPE F32;
+
+-- For profile listing and filtering
+DEFINE INDEX profile_status_type ON profile 
+    FIELDS profile_status, profile_type 
+    WHERE profile_status = 'active';
+
+-- For age-based queries
+DEFINE INDEX profile_date_of_birth ON profile 
+    FIELDS date_of_birth 
+    WHERE profile_status = 'active';
+
+-- For searching by location hierarchy
+DEFINE INDEX profile_location_hierarchy ON profile 
+    FIELDS location.country, location.state, location.city 
+    WHERE profile_status = 'active';
+
+-- For search preferences matching
+DEFINE INDEX profile_looking_for ON profile 
+    FIELDS looking_for.* 
+    WHERE profile_status = 'active';
+
+-- For portfolio search
+DEFINE INDEX profile_portfolio_type ON profile 
+    FIELDS portfolio_items.*.type 
+    WHERE profile_status = 'active';
+
+-- ########################################################
+-- Device Table
+-- ########################################################
 -- Stores device tokens for push notifications
 DEFINE TABLE device SCHEMAFULL
     PERMISSIONS
