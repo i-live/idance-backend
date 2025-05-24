@@ -89,6 +89,42 @@ DEFINE FIELD looking_for.* ON profile ASSERT $value IN ['partners', 'jobs', 'dan
 DEFINE FIELD profile_status ON profile TYPE string DEFAULT 'active';
 DEFINE FIELD profile_status ON profile ASSERT $value IN ['active', 'suspended', 'deleted'];
 
+-- Physical attributes
+DEFINE FIELD ethnicity ON profile TYPE option<string>;
+DEFINE FIELD ethnicity ON profile ASSERT $value == NONE OR $value IN ['Asian', 'Black', 'Hispanic', 'White', 'Native American', 'Pacific Islander', 'Other'];
+
+DEFINE FIELD hair_color ON profile TYPE option<string>;
+DEFINE FIELD hair_color ON profile ASSERT $value == NONE OR $value IN ['Black', 'Brown', 'Blonde', 'Red', 'Gray', 'Other'];
+
+DEFINE FIELD eye_color ON profile TYPE option<string>;
+DEFINE FIELD eye_color ON profile ASSERT $value == NONE OR $value IN ['Blue', 'Brown', 'Green', 'Hazel', 'Gray', 'Other'];
+
+DEFINE FIELD height ON profile TYPE option<float>;
+DEFINE FIELD height_unit ON profile TYPE option<string>;
+DEFINE FIELD height_unit ON profile ASSERT $value == NONE OR $value IN ['cm', 'ft'];
+
+DEFINE FIELD weight ON profile TYPE option<float>;
+DEFINE FIELD weight_unit ON profile TYPE option<string>;
+DEFINE FIELD weight_unit ON profile ASSERT $value == NONE OR $value IN ['kg', 'lbs'];
+
+DEFINE FIELD body_type ON profile TYPE option<string>;
+DEFINE FIELD body_type ON profile ASSERT $value == NONE OR $value IN ['Athletic', 'Slim', 'Average', 'Muscular', 'Curvy', 'Other'];
+
+DEFINE FIELD measurements ON profile TYPE option<object>;
+DEFINE FIELD measurements.bust ON profile TYPE option<float>;
+DEFINE FIELD measurements.waist ON profile TYPE option<float>;
+DEFINE FIELD measurements.hips ON profile TYPE option<float>;
+DEFINE FIELD measurements_unit ON profile TYPE option<string>;
+DEFINE FIELD measurements_unit ON profile ASSERT $value == NONE OR $value IN ['in', 'cm'];
+
+-- Add validation to ensure measurements are present if measurements_unit is set
+DEFINE FIELD measurements ON profile ASSERT $value == NONE OR measurements_unit != NONE;
+
+-- Add index for common physical attribute queries
+DEFINE INDEX profile_physical_attrs ON profile 
+    FIELDS height, weight, body_type 
+    WHERE profile_status = 'active';
+
 -- Location fields
 DEFINE FIELD location ON profile TYPE object;
 DEFINE FIELD location.country ON profile TYPE option<record<country>>;
