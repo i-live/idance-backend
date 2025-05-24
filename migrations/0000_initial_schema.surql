@@ -16,9 +16,33 @@
 
 ---- Authentication and Users ----
 
--- Authentication Scope
--- Defines session management for user authentication
-DEFINE SCOPE idance SESSION 7d;
+-- User Authentication Access
+-- JWT-based authentication with OAuth2 support for NextAuth.js integration
+DEFINE ACCESS user ON DATABASE TYPE RECORD
+    SIGNUP ( CREATE user SET
+        email = $email,
+        password = crypto::argon2::generate($password),
+        oauth_providers = $oauth_providers,
+        username = $username,
+        first_name = $first_name,
+        last_name = $last_name,
+        user_status = 'pending_waitlist_approval',
+        user_tier = 'basic',
+        created_at = time::now(),
+        updated_at = time::now()
+    )
+    SIGNIN ( SELECT * FROM user WHERE
+        (email = $email AND password != NONE AND crypto::argon2::compare(password, $password)) OR
+        (oauth_providers[?provider = $provider].id = $provider_id)
+    )
+    WITH JWT ALGORITHM HS256 DURATION 1h;
+
+-- Worker Authentication Access
+-- For Cloudflare Workers to access the database
+DEFINE ACCESS worker ON DATABASE TYPE JWT
+    WITH ISSUER KEY '<jwt-secret>'
+    WITH ALGORITHM HS256
+    DURATION 24h;
 
 -- ########################################################
 -- User Table
@@ -28,9 +52,9 @@ DEFINE TABLE user SCHEMAFULL
     PERMISSIONS
         FOR select WHERE id = $auth.id FULL
         FOR select WHERE user_status = 'active' FIELDS id, username, first_name, last_name, profile_picture_url
-        FOR create WHERE id = $auth.id AND (SELECT count() FROM user WHERE id = $auth.id) = 0 FULL
+        FOR create WHERE $access = 'user' FULL
         FOR update WHERE id = $auth.id OMIT email, password, oauth_providers, user_status, user_tier, stripe_customer_id
-        FOR update WHERE $auth.roles CONTAINS 'site_admin' FULL;
+        FOR update WHERE $access = 'worker' FULL;
 
 DEFINE FIELD id ON user TYPE record<user>;
 DEFINE FIELD username ON user TYPE string;
@@ -71,9 +95,9 @@ DEFINE INDEX user_stripe_customer_id ON user FIELDS stripe_customer_id UNIQUE WH
 DEFINE TABLE profile SCHEMAFULL
     PERMISSIONS
         -- Public view (active profiles only)
-        FOR select WHERE profile_status = 'active' 
+        FOR select WHERE profile_status = 'active'
         FIELDS user_id, profile_type,
-               location, bio, 
+               location, bio,
                social_links, awards, portfolio_items,
                looking_for, search_preferences,
                body_type, height, height_unit  -- Added safe physical attributes
@@ -82,18 +106,18 @@ DEFINE TABLE profile SCHEMAFULL
         FOR select WHERE user_id = $auth.id FULL
         
         -- One profile per user
-        FOR create WHERE user_id = $auth.id 
-        AND (SELECT count() FROM profile WHERE user_id = $auth.id) = 0 
+        FOR create WHERE user_id = $auth.id
+        AND (SELECT count() FROM profile WHERE user_id = $auth.id) = 0
         FULL
         
         -- Update own profile (restricted fields)
-        FOR update WHERE user_id = $auth.id 
+        FOR update WHERE user_id = $auth.id
         OMIT profile_status, bio_embedding, vlog_embedding,
              measurements, measurements_unit,  -- Added sensitive measurements
              weight, weight_unit              -- Added sensitive physical attributes
         
-        -- Admin full access
-        FOR update WHERE $auth.roles CONTAINS 'site_admin' FULL;
+        -- Worker full access
+        FOR update WHERE $access = 'worker' FULL;
 
 ------------------------------------------
 -- Core Profile Fields
@@ -262,7 +286,8 @@ DEFINE INDEX profile_portfolio_type ON profile
 -- Stores device tokens for push notifications
 DEFINE TABLE device SCHEMAFULL
     PERMISSIONS
-        FOR select, create, update, delete WHERE user = $auth.id;
+        FOR select, create, update, delete WHERE user = $auth.id
+        FOR select WHERE $access = 'worker';
 
 DEFINE FIELD user ON device TYPE record<user>;
 DEFINE FIELD token ON device TYPE string;
@@ -281,7 +306,7 @@ DEFINE INDEX device_user_token ON device FIELDS user, token UNIQUE;
 DEFINE TABLE country SCHEMAFULL
     PERMISSIONS
         FOR select FULL
-        FOR create, update, delete WHERE $auth.roles CONTAINS 'site_admin';
+        FOR create, update, delete WHERE $access = 'worker';
 
 DEFINE FIELD code ON country TYPE string;
 DEFINE FIELD code ON country ASSERT $value MATCHES /^[A-Z]{2}$/;
@@ -296,7 +321,7 @@ DEFINE INDEX country_code ON country FIELDS code UNIQUE;
 DEFINE TABLE state SCHEMAFULL
     PERMISSIONS
         FOR select FULL
-        FOR create, update, delete WHERE $auth.roles CONTAINS 'site_admin';
+        FOR create, update, delete WHERE $access = 'worker';
 
 DEFINE FIELD name ON state TYPE string;
 DEFINE FIELD name ON state ASSERT $value != NONE;
@@ -310,7 +335,7 @@ DEFINE INDEX state_name_country ON state FIELDS name, country UNIQUE;
 DEFINE TABLE county SCHEMAFULL
     PERMISSIONS
         FOR select FULL
-        FOR create, update, delete WHERE $auth.roles CONTAINS 'site_admin';
+        FOR create, update, delete WHERE $access = 'worker';
 
 DEFINE FIELD name ON county TYPE string;
 DEFINE FIELD name ON county ASSERT $value != NONE;
@@ -325,7 +350,7 @@ DEFINE INDEX county_name_state ON county FIELDS name, state UNIQUE;
 DEFINE TABLE city SCHEMAFULL
     PERMISSIONS
         FOR select FULL
-        FOR create, update, delete WHERE $auth.roles CONTAINS 'site_admin';
+        FOR create, update, delete WHERE $access = 'worker';
 
 DEFINE FIELD name ON city TYPE string;
 DEFINE FIELD name ON city ASSERT $value != NONE;
@@ -342,7 +367,7 @@ DEFINE INDEX city_name_state ON city FIELDS name, state UNIQUE;
 DEFINE TABLE dance_style SCHEMAFULL
     PERMISSIONS
         FOR select FULL
-        FOR create, update, delete WHERE $auth.roles CONTAINS 'site_admin';
+        FOR create, update, delete WHERE $access = 'worker';
 
 DEFINE FIELD name ON dance_style TYPE string;
 DEFINE FIELD name ON dance_style ASSERT $value != NONE;
@@ -355,7 +380,7 @@ DEFINE INDEX dance_style_name ON dance_style FIELDS name UNIQUE;
 DEFINE TABLE interest SCHEMAFULL
     PERMISSIONS
         FOR select FULL
-        FOR create, update, delete WHERE $auth.roles CONTAINS 'site_admin';
+        FOR create, update, delete WHERE $access = 'worker';
 
 DEFINE FIELD name ON interest TYPE string;
 DEFINE FIELD name ON interest ASSERT $value != NONE;
@@ -368,7 +393,7 @@ DEFINE INDEX interest_name ON interest FIELDS name UNIQUE;
 DEFINE TABLE social_platform SCHEMAFULL
     PERMISSIONS
         FOR select FULL
-        FOR create, update, delete WHERE $auth.roles CONTAINS 'site_admin';
+        FOR create, update, delete WHERE $access = 'worker';
 
 DEFINE FIELD name ON social_platform TYPE string;
 DEFINE FIELD name ON social_platform ASSERT $value != NONE;
@@ -479,7 +504,7 @@ DEFINE INDEX swipe_swiper ON swipe FIELDS swiper;
 DEFINE TABLE match SCHEMAFULL
     PERMISSIONS
         FOR select WHERE user1 = $auth.id OR user2 = $auth.id
-        FOR create WHERE $auth.roles CONTAINS 'site_admin';
+        FOR create WHERE $access = 'worker';
 
 DEFINE FIELD user1 ON match TYPE record<user>;
 DEFINE FIELD user2 ON match TYPE record<user>;
@@ -492,7 +517,7 @@ DEFINE INDEX match_unique ON match FIELDS user1, user2 UNIQUE;
 DEFINE TABLE chat SCHEMAFULL
     PERMISSIONS
         FOR select WHERE $auth.id IN participants
-        FOR create WHERE $auth.roles CONTAINS 'site_admin'
+        FOR create WHERE $access = 'worker'
         FOR update WHERE $auth.id IN participants;
 
 DEFINE FIELD match ON chat TYPE record<match>;
@@ -526,8 +551,8 @@ DEFINE INDEX message_chat ON message FIELDS chat, sent_at;
 DEFINE TABLE notification SCHEMAFULL
     PERMISSIONS
         FOR select WHERE user = $auth.id
-        FOR create WHERE $auth.roles CONTAINS 'site_admin'
-        FOR update WHERE user = $auth.id;
+        FOR create WHERE $access = 'worker'
+        FOR update WHERE user = $auth.id OR $access = 'worker';
 
 DEFINE FIELD user ON notification TYPE record<user>;
 DEFINE FIELD type ON notification TYPE string;

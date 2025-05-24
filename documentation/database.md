@@ -80,21 +80,38 @@ erDiagram
   - Apply schema: `surreal import --conn wss://idance.cloud.surrealdb.com --ns idance --db dev migrations/0000_initial_schema.surql`
 
 ### 3.2 Authentication
-- **User Access**:
+- **User Access** (Recommended for mobile + NextAuth.js):
   ```surrealql
   DEFINE ACCESS user ON DATABASE TYPE RECORD
-    SIGNUP ( CREATE user SET email = $email, password = crypto::argon2::generate($password), oauth_providers = $oauth_providers )
-    SIGNIN ( SELECT * FROM user WHERE email = $email AND crypto::argon2::compare(password, $password) OR oauth_providers[$provider].id = $provider_id )
+    SIGNUP ( CREATE user SET
+      email = $email,
+      password = crypto::argon2::generate($password),
+      oauth_providers = $oauth_providers,
+      username = $username,
+      first_name = $first_name,
+      last_name = $last_name
+    )
+    SIGNIN ( SELECT * FROM user WHERE
+      (email = $email AND crypto::argon2::compare(password, $password)) OR
+      (oauth_providers[?provider = $provider].id = $provider_id)
+    )
     WITH JWT ALGORITHM HS256 DURATION 1h;
   ```
 - **Worker Access**:
   ```surrealql
-  DEFINE TOKEN worker_token ON SCOPE worker TYPE HS256 VALUE '<secret>';
-  DEFINE ACCESS worker ON DATABASE TYPE JWT WITH TOKEN worker_token;
+  DEFINE ACCESS worker ON DATABASE TYPE JWT
+    WITH ISSUER KEY '<jwt-secret>'
+    WITH ALGORITHM HS256
+    DURATION 24h;
+  ```
+- **Current Schema Implementation** (for reference):
+  ```surrealql
+  DEFINE SCOPE idance SESSION 7d;
   ```
 - **NextAuth.js Integration**:
-  - Stores OAuth data in `user.oauth_providers` (Google, Facebook, Apple).
-  - Uses SurrealDB JWT for session validation in Next.js.
+  - Stores OAuth data in `user.oauth_providers` array (Google, Facebook, Apple).
+  - Uses SurrealDB JWT for stateless session validation in Next.js.
+  - Better scalability for mobile apps and Cloudflare Workers.
 
 ### 3.3 Real-time Features
 - **Notifications**:
@@ -142,78 +159,255 @@ erDiagram
 Tables are defined using `DEFINE TABLE` and `DEFINE FIELD` in SurrealQL. Permissions use `PERMIT` clauses with `DEFINE FUNCTION` for complex access control. Cloudflare Workers handle workflows like swipe matching and referral commissions. See `migrations/0000_initial_schema.surql` for the executable schema.
 
 ### 4.1 `user`
-- **Description**: Stores generic user authentication data, reusable for future `modelling_profile` and `acting_profile` tables.
+- **Description**: Stores user authentication data and basic profile information, reusable for future `modelling_profile` and `acting_profile` tables.
 - **Schema**:
   ```surrealql
   DEFINE TABLE user SCHEMAFULL;
-  DEFINE FIELD email ON user TYPE string ASSERT $value != NONE AND string::is::email($value);
-  DEFINE FIELD password ON user TYPE string; -- Hashed with argon2
-  DEFINE FIELD oauth_providers ON user TYPE object DEFAULT {};
+  DEFINE FIELD id ON user TYPE record<user>;
+  DEFINE FIELD username ON user TYPE string ASSERT $value != NONE AND $value MATCHES /^[a-z0-9]+(?:-[a-z0-9]+)*$/ AND string::len($value) >= 3 AND string::len($value) <= 30;
+  DEFINE FIELD first_name ON user TYPE string ASSERT $value != NONE;
+  DEFINE FIELD last_name ON user TYPE string ASSERT $value != NONE;
+  DEFINE FIELD email ON user TYPE string ASSERT $value MATCHES /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+  DEFINE FIELD password ON user TYPE option<string>; -- Hashed with argon2, optional for OAuth-only users
+  DEFINE FIELD oauth_providers ON user TYPE array<object> DEFAULT [];
+  DEFINE FIELD oauth_providers.*.provider ON user TYPE string ASSERT $value IN ['google', 'facebook', 'apple'];
+  DEFINE FIELD oauth_providers.*.id ON user TYPE string;
+  DEFINE FIELD phone_number ON user TYPE string ASSERT $value IS NULL OR $value MATCHES /^\+?[1-9]\d{1,14}$/;
+  DEFINE FIELD user_status ON user TYPE string DEFAULT 'pending_waitlist_approval' ASSERT $value IN ['pending_waitlist_approval', 'active', 'suspended', 'deleted'];
+  DEFINE FIELD user_tier ON user TYPE string DEFAULT 'basic' ASSERT $value IN ['basic', 'pro', 'vip'];
+  DEFINE FIELD stripe_customer_id ON user TYPE option<string>;
+  DEFINE FIELD profile_picture_url ON user TYPE option<string> ASSERT $value == NONE OR string::is::url($value);
+  DEFINE FIELD last_active_at ON user TYPE datetime DEFAULT time::now();
   DEFINE FIELD created_at ON user TYPE datetime DEFAULT time::now();
-  DEFINE FIELD updated_at ON user TYPE datetime DEFAULT time::now() FLEXIBLE;
+  DEFINE FIELD updated_at ON user TYPE datetime DEFAULT time::now();
+  
+  DEFINE INDEX user_username ON user FIELDS username UNIQUE;
   DEFINE INDEX user_email ON user FIELDS email UNIQUE;
+  DEFINE INDEX user_stripe_customer_id ON user FIELDS stripe_customer_id UNIQUE WHERE stripe_customer_id != NONE;
   ```
 - **Permissions**:
   ```surrealql
-  DEFINE ACCESS user ON DATABASE
-    PERMIT SELECT WHERE id = $auth.id,
-    PERMIT CREATE WHERE id = $auth.id,
-    PERMIT UPDATE WHERE id = $auth.id,
-    PERMIT DELETE WHERE id = $auth.id;
+  PERMISSIONS
+    FOR select WHERE id = $auth.id FULL
+    FOR select WHERE user_status = 'active' FIELDS id, username, first_name, last_name, profile_picture_url
+    FOR create WHERE $access = 'user' FULL
+    FOR update WHERE id = $auth.id OMIT email, password, oauth_providers, user_status, user_tier, stripe_customer_id
+    FOR update WHERE $access = 'worker' FULL;
   ```
 
 ### 4.2 `profile`
-- **Description**: Stores dancer-specific profile details, including physical attributes for partner and job matching.
+- **Description**: Stores comprehensive dancer-specific profile information including physical attributes, location data, preferences, and portfolio items for partner and job matching.
 - **Schema**:
   ```surrealql
   DEFINE TABLE profile SCHEMAFULL;
-  DEFINE FIELD user ON profile TYPE record<user> ASSERT $value != NONE;
-  DEFINE FIELD username ON profile TYPE string ASSERT $value != NONE AND string::len($value) >= 3 AND string::len($value) <= 30 AND $value MATCHES '^[a-z0-9]+(?:-[a-z0-9]+)*$';
-  DEFINE FIELD first_name ON profile TYPE string ASSERT $value != NONE;
-  DEFINE FIELD last_name ON profile TYPE string ASSERT $value != NONE;
+  
+  -- Core Profile Fields
+  DEFINE FIELD user_id ON profile TYPE record<user>;
+  DEFINE FIELD profile_type ON profile TYPE string DEFAULT 'dancer' ASSERT $value IN ['dancer', 'actor', 'model'];
+  DEFINE FIELD profile_status ON profile TYPE string DEFAULT 'active' ASSERT $value IN ['active', 'suspended', 'deleted'];
+  
+  -- Basic Information
   DEFINE FIELD date_of_birth ON profile TYPE datetime ASSERT $value != NONE;
-  DEFINE FIELD gender ON profile TYPE string ASSERT $value IN ['Male', 'Female', 'Non-binary', 'Other', 'Prefer not to say'];
-  DEFINE FIELD bio ON profile TYPE string ASSERT string::len($value) <= 2000;
-  DEFINE FIELD looking_for_partners ON profile TYPE bool DEFAULT false;
-  DEFINE FIELD looking_for_jobs ON profile TYPE bool DEFAULT false;
-  DEFINE FIELD looking_for_dancers ON profile TYPE bool DEFAULT false;
-  DEFINE FIELD referrer ON profile TYPE record<user>;
-  DEFINE FIELD referral_code ON profile TYPE string;
-  DEFINE FIELD commission_tier ON profile TYPE string;
-  DEFINE FIELD profile_status ON profile TYPE string DEFAULT 'pending_waitlist_approval';
-  DEFINE FIELD profile_picture_url ON profile TYPE string;
-  DEFINE FIELD user_tier ON profile TYPE string DEFAULT 'basic';
-  DEFINE FIELD stripe_customer_id ON profile TYPE string;
-  DEFINE FIELD location ON profile TYPE point;
-  DEFINE FIELD location_city ON profile TYPE string;
-  DEFINE FIELD location_state ON profile TYPE string;
-  DEFINE FIELD location_country ON profile TYPE string;
-  DEFINE FIELD last_active_at ON profile TYPE datetime DEFAULT time::now();
-  DEFINE FIELD weight ON profile TYPE float; -- kg or lbs, optional
-  DEFINE FIELD weight_unit ON profile TYPE string ASSERT $value IN ['kg', 'lbs', null];
-  DEFINE FIELD height ON profile TYPE float; -- cm or ft/in, optional
-  DEFINE FIELD height_unit ON profile TYPE string ASSERT $value IN ['cm', 'ft', null];
-  DEFINE FIELD hair_color ON profile TYPE string ASSERT $value IN ['Black', 'Brown', 'Blonde', 'Red', 'Gray', 'Other', null];
-  DEFINE FIELD eye_color ON profile TYPE string ASSERT $value IN ['Blue', 'Brown', 'Green', 'Hazel', 'Gray', 'Other', null];
-  DEFINE FIELD body_type ON profile TYPE string ASSERT $value IN ['Athletic', 'Slim', 'Average', 'Muscular', 'Curvy', 'Other', null];
-  DEFINE FIELD measurements ON profile TYPE object; -- e.g., { chest: 34, waist: 28, hips: 36 }, optional
-  DEFINE FIELD measurements_unit ON profile TYPE string ASSERT $value IN ['in', 'cm', null];
-  DEFINE FIELD ethnicity ON profile TYPE string ASSERT $value IN ['Asian', 'Black', 'Hispanic', 'White', 'Native American', 'Pacific Islander', 'Other', null];
+  DEFINE FIELD gender ON profile TYPE option<string> ASSERT $value == NONE OR $value IN ['Male', 'Female', 'Non-binary', 'Other', 'Prefer not to say'];
+  
+  -- Bio and Embeddings
+  DEFINE FIELD bio ON profile TYPE option<string> ASSERT $value == NONE OR string::len($value) <= 2000;
+  DEFINE FIELD bio_embedding ON profile TYPE array<float> ASSERT array::len($value) = 1536;
+  DEFINE FIELD vlog_embedding ON profile TYPE option<array<float>> ASSERT $value == NONE OR (array::len($value) = 768 AND user_tier IN ['pro', 'vip']);
+  
+  -- Physical Attributes
+  DEFINE FIELD ethnicity ON profile TYPE option<string> ASSERT $value == NONE OR $value IN ['Asian', 'Black', 'Hispanic', 'White', 'Native American', 'Pacific Islander', 'Other'];
+  DEFINE FIELD hair_color ON profile TYPE option<string> ASSERT $value == NONE OR $value IN ['Black', 'Brown', 'Blonde', 'Red', 'Gray', 'Other'];
+  DEFINE FIELD eye_color ON profile TYPE option<string> ASSERT $value == NONE OR $value IN ['Blue', 'Brown', 'Green', 'Hazel', 'Gray', 'Other'];
+  DEFINE FIELD height ON profile TYPE option<float>;
+  DEFINE FIELD height_unit ON profile TYPE option<string> ASSERT $value == NONE OR $value IN ['cm', 'ft'];
+  DEFINE FIELD weight ON profile TYPE option<float>;
+  DEFINE FIELD weight_unit ON profile TYPE option<string> ASSERT $value == NONE OR $value IN ['kg', 'lbs'];
+  DEFINE FIELD body_type ON profile TYPE option<string> ASSERT $value == NONE OR $value IN ['Athletic', 'Slim', 'Average', 'Muscular', 'Curvy', 'Other'];
+  
+  -- Measurements (sensitive data)
+  DEFINE FIELD measurements ON profile TYPE option<object>;
+  DEFINE FIELD measurements.bust ON profile TYPE option<float>;
+  DEFINE FIELD measurements.waist ON profile TYPE option<float>;
+  DEFINE FIELD measurements.hips ON profile TYPE option<float>;
+  DEFINE FIELD measurements_unit ON profile TYPE option<string> ASSERT $value == NONE OR $value IN ['in', 'cm'];
+  DEFINE FIELD measurements ON profile ASSERT $value == NONE OR measurements_unit != NONE;
+  
+  -- Preferences and Interests
+  DEFINE FIELD looking_for ON profile TYPE array<string> DEFAULT [] ASSERT $value.* IN ['partners', 'jobs', 'dancers', 'events'];
+  
+  -- Location Information (hierarchical)
+  DEFINE FIELD location ON profile TYPE object;
+  DEFINE FIELD location.country ON profile TYPE option<record<country>>;
+  DEFINE FIELD location.state ON profile TYPE option<record<state>>;
+  DEFINE FIELD location.county ON profile TYPE option<record<county>>;
+  DEFINE FIELD location.city ON profile TYPE option<record<city>>;
+  DEFINE FIELD location.zipcode ON profile TYPE option<string> ASSERT $value == NONE OR $value MATCHES /^[0-9A-Z\- ]{3,10}$/;
+  DEFINE FIELD location.street ON profile TYPE option<string>;
+  DEFINE FIELD location.point ON profile TYPE option<geometry<point>>;
+  DEFINE FIELD location.custom_city ON profile TYPE option<string> ASSERT $value == NONE OR user_tier IN ['pro', 'vip'];
+  
+  -- Search preferences (pro/vip feature)
+  DEFINE FIELD search_preferences ON profile TYPE array<object> DEFAULT [] ASSERT $value == [] OR user_tier IN ['pro', 'vip'];
+  DEFINE FIELD search_preferences.*.name ON profile TYPE string ASSERT $value != NONE AND string::len($value) <= 50;
+  DEFINE FIELD search_preferences.*.search_area ON profile TYPE object;
+  DEFINE FIELD search_preferences.*.search_area.point ON profile TYPE geometry<point>;
+  DEFINE FIELD search_preferences.*.search_area.distance ON profile TYPE float ASSERT $value > 0;
+  DEFINE FIELD search_preferences.*.active ON profile TYPE bool DEFAULT true;
+  
+  -- Portfolio and Achievements (embedded objects)
+  DEFINE FIELD social_links ON profile TYPE array<object>;
+  DEFINE FIELD social_links.*.platform ON profile TYPE record<social_platform>;
+  DEFINE FIELD social_links.*.url ON profile TYPE string ASSERT string::is::url($value);
+  
+  DEFINE FIELD awards ON profile TYPE array<object>;
+  DEFINE FIELD awards.*.title ON profile TYPE string;
+  DEFINE FIELD awards.*.organization ON profile TYPE option<string>;
+  DEFINE FIELD awards.*.year ON profile TYPE option<int>;
+  DEFINE FIELD awards.*.description ON profile TYPE option<string>;
+  
+  DEFINE FIELD portfolio_items ON profile TYPE array<object>;
+  DEFINE FIELD portfolio_items.*.type ON profile TYPE string ASSERT $value IN ['video', 'image', 'document'];
+  DEFINE FIELD portfolio_items.*.title ON profile TYPE string;
+  DEFINE FIELD portfolio_items.*.url ON profile TYPE string ASSERT string::is::url($value);
+  DEFINE FIELD portfolio_items.*.description ON profile TYPE option<string>;
+  DEFINE FIELD portfolio_items.*.order ON profile TYPE int DEFAULT 0;
+  
+  -- Timestamps
   DEFINE FIELD created_at ON profile TYPE datetime DEFAULT time::now();
-  DEFINE FIELD updated_at ON profile TYPE datetime DEFAULT time::now() FLEXIBLE;
-  DEFINE INDEX profile_username ON profile FIELDS username UNIQUE;
-  DEFINE INDEX profile_referral_code ON profile FIELDS referral_code UNIQUE;
-  DEFINE INDEX profile_location ON profile FIELDS location MTREE DIMENSION 2;
+  DEFINE FIELD updated_at ON profile TYPE datetime DEFAULT time::now();
+  
+  -- Indexes
+  DEFINE INDEX profile_user_id ON profile FIELDS user_id UNIQUE;
+  DEFINE INDEX profile_location_point ON profile FIELDS location.point MTREE;
+  DEFINE INDEX profile_physical_attrs ON profile FIELDS height, weight, body_type WHERE profile_status = 'active';
+  DEFINE INDEX idx_bio_embedding ON profile FIELDS bio_embedding HNSW DIMENSION 1536 DIST COSINE TYPE F32;
+  DEFINE INDEX idx_vlog_embedding ON profile FIELDS vlog_embedding HNSW DIMENSION 768 DIST COSINE TYPE F32;
+  DEFINE INDEX profile_status_type ON profile FIELDS profile_status, profile_type WHERE profile_status = 'active';
+  DEFINE INDEX profile_date_of_birth ON profile FIELDS date_of_birth WHERE profile_status = 'active';
+  DEFINE INDEX profile_location_hierarchy ON profile FIELDS location.country, location.state, location.city WHERE profile_status = 'active';
+  DEFINE INDEX profile_looking_for ON profile FIELDS looking_for.* WHERE profile_status = 'active';
+  DEFINE INDEX profile_portfolio_type ON profile FIELDS portfolio_items.*.type WHERE profile_status = 'active';
   ```
 - **Permissions**:
   ```surrealql
-  PERMIT SELECT WHERE fn::can_view_profile(id, $auth.id),
-  PERMIT CREATE WHERE user = $auth.id,
-  PERMIT UPDATE WHERE user = $auth.id,
-  PERMIT DELETE WHERE user = $auth.id;
+  PERMISSIONS
+    -- Public view (active profiles only, safe fields)
+    FOR select WHERE profile_status = 'active'
+    FIELDS user_id, profile_type, location, bio, social_links, awards, portfolio_items,
+           looking_for, search_preferences, body_type, height, height_unit
+    
+    -- Full access to own profile
+    FOR select WHERE user_id = $auth.id FULL
+    
+    -- One profile per user
+    FOR create WHERE user_id = $auth.id AND (SELECT count() FROM profile WHERE user_id = $auth.id) = 0 FULL
+    
+    -- Update own profile (restricted sensitive fields)
+    FOR update WHERE user_id = $auth.id
+    OMIT profile_status, bio_embedding, vlog_embedding, measurements, measurements_unit, weight, weight_unit
+    
+    -- Worker full access
+    FOR update WHERE $access = 'worker' FULL;
   ```
 
-### 4.3 `role`
+### 4.3 `device`
+- **Description**: Stores device tokens for push notifications (iOS, Android, Web).
+- **Schema**:
+  ```surrealql
+  DEFINE TABLE device SCHEMAFULL;
+  DEFINE FIELD user ON device TYPE record<user>;
+  DEFINE FIELD token ON device TYPE string ASSERT $value != NONE AND string::len($value) > 0;
+  DEFINE FIELD platform ON device TYPE string ASSERT $value IN ['ios', 'android', 'web'];
+  DEFINE FIELD created_at ON device TYPE datetime DEFAULT time::now();
+  DEFINE FIELD updated_at ON device TYPE datetime DEFAULT time::now();
+  
+  DEFINE INDEX device_user_token ON device FIELDS user, token UNIQUE;
+  ```
+- **Permissions**:
+  ```surrealql
+  PERMISSIONS
+    FOR select, create, update, delete WHERE user = $auth.id
+    FOR select WHERE $access = 'worker';
+  ```
+
+### 4.4 `country`
+- **Description**: Stores country data (ISO 3166-1) for location hierarchy.
+- **Schema**:
+  ```surrealql
+  DEFINE TABLE country SCHEMAFULL;
+  DEFINE FIELD code ON country TYPE string ASSERT $value MATCHES /^[A-Z]{2}$/;
+  DEFINE FIELD name ON country TYPE string ASSERT $value != NONE;
+  DEFINE FIELD created_at ON country TYPE datetime DEFAULT time::now();
+  
+  DEFINE INDEX country_code ON country FIELDS code UNIQUE;
+  ```
+- **Permissions**:
+  ```surrealql
+  PERMISSIONS
+    FOR select FULL
+    FOR create, update, delete WHERE $access = 'worker';
+  ```
+
+### 4.5 `state`
+- **Description**: Stores state/province data for location hierarchy.
+- **Schema**:
+  ```surrealql
+  DEFINE TABLE state SCHEMAFULL;
+  DEFINE FIELD name ON state TYPE string ASSERT $value != NONE;
+  DEFINE FIELD country ON state TYPE record<country>;
+  DEFINE FIELD created_at ON state TYPE datetime DEFAULT time::now();
+  
+  DEFINE INDEX state_name_country ON state FIELDS name, country UNIQUE;
+  ```
+- **Permissions**:
+  ```surrealql
+  PERMISSIONS
+    FOR select FULL
+    FOR create, update, delete WHERE $access = 'worker';
+  ```
+
+### 4.6 `county`
+- **Description**: Stores county data for location hierarchy.
+- **Schema**:
+  ```surrealql
+  DEFINE TABLE county SCHEMAFULL;
+  DEFINE FIELD name ON county TYPE string ASSERT $value != NONE;
+  DEFINE FIELD state ON county TYPE record<state>;
+  DEFINE FIELD country ON county TYPE record<country>;
+  DEFINE FIELD created_at ON county TYPE datetime DEFAULT time::now();
+  
+  DEFINE INDEX county_name_state ON county FIELDS name, state UNIQUE;
+  ```
+- **Permissions**:
+  ```surrealql
+  PERMISSIONS
+    FOR select FULL
+    FOR create, update, delete WHERE $access = 'worker';
+  ```
+
+### 4.7 `city`
+- **Description**: Stores city data for location hierarchy.
+- **Schema**:
+  ```surrealql
+  DEFINE TABLE city SCHEMAFULL;
+  DEFINE FIELD name ON city TYPE string ASSERT $value != NONE;
+  DEFINE FIELD country ON city TYPE record<country>;
+  DEFINE FIELD state ON city TYPE option<record<state>>;
+  DEFINE FIELD county ON city TYPE option<record<county>>;
+  DEFINE FIELD location_point ON city TYPE geometry<point>;
+  DEFINE FIELD created_at ON city TYPE datetime DEFAULT time::now();
+  
+  DEFINE INDEX city_name_state ON city FIELDS name, state UNIQUE;
+  ```
+- **Permissions**:
+  ```surrealql
+  PERMISSIONS
+    FOR select FULL
+    FOR create, update, delete WHERE $access = 'worker';
+  ```
+
+### 4.8 `role`
 - **Description**: Defines user roles (e.g., site_admin).
 - **Schema**:
   ```surrealql
@@ -299,20 +493,23 @@ Tables are defined using `DEFINE TABLE` and `DEFINE FIELD` in SurrealQL. Permiss
   ```
 
 ### 4.8 `user_dance_style`
-- **Description**: Links users to dance styles with proficiency.
+- **Description**: Graph edge linking users to dance styles with proficiency levels.
 - **Schema**:
   ```surrealql
   DEFINE TABLE user_dance_style SCHEMAFULL;
-  DEFINE FIELD user ON user_dance_style TYPE record<profile> ASSERT $value != NONE;
-  DEFINE FIELD style ON user_dance_style TYPE record<dance_style> ASSERT $value != NONE;
-  DEFINE FIELD proficiency_level ON user_dance_style TYPE string ASSERT $value != NONE;
+  DEFINE FIELD in ON user_dance_style TYPE record<user>;
+  DEFINE FIELD out ON user_dance_style TYPE record<dance_style>;
+  DEFINE FIELD proficiency_level ON user_dance_style TYPE string ASSERT $value IN ['Beginner', 'Intermediate', 'Advanced', 'Professional'];
   DEFINE FIELD created_at ON user_dance_style TYPE datetime DEFAULT time::now();
+  
+  DEFINE INDEX user_dance_style_unique ON user_dance_style FIELDS in, out UNIQUE;
+  DEFINE INDEX user_dance_style_out ON user_dance_style FIELDS out;
   ```
 - **Permissions**:
   ```surrealql
-  PERMIT SELECT FOR authenticated,
-  PERMIT INSERT WHERE user.user = $auth.id,
-  PERMIT DELETE WHERE user.user = $auth.id;
+  PERMISSIONS
+    FOR select FULL
+    FOR create, update, delete WHERE in = $auth.id;
   ```
 
 ### 4.9 `user_award`
