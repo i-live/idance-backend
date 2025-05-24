@@ -14,6 +14,25 @@
 -- Supports 100,000+ MAUs, Cloudflare Workers, NextAuth.js integration
 -- Structured for clarity: Authentication → Users → Lookup → Social → Vlogs → Groups/Sites → Events
 
+---- Namespace and Database Setup ----
+
+-- Define the namespace
+DEFINE NAMESPACE idance;
+
+-- Use the namespace
+USE NAMESPACE idance;
+
+-- Define databases for different environments
+DEFINE DATABASE dev;
+DEFINE DATABASE prod;
+DEFINE DATABASE test;
+
+-- Note: The specific database to use should be selected when connecting
+-- Example: USE DATABASE dev; (for development environment)
+-- Example: USE DATABASE prod; (for production environment)
+-- Example: USE DATABASE test; (for testing environment)
+use database dev;
+
 ---- Authentication and Users ----
 
 -- User Authentication Access
