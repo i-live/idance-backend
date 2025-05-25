@@ -11,9 +11,9 @@
 -- Stores chat sessions for matches
 DEFINE TABLE chat SCHEMAFULL
     PERMISSIONS
-        FOR select WHERE array::any(participants) = $auth.id OR $access = 'backend_worker'
+        FOR select WHERE $auth.id IN participants OR $access = 'backend_worker'
         FOR create WHERE $access = 'backend_worker'
-        FOR update WHERE array::any(participants) = $auth.id OR $access = 'backend_worker'
+        FOR update WHERE $auth.id IN participants OR $access = 'backend_worker'
         FOR delete WHERE $access = 'backend_worker';
 
 DEFINE FIELD match ON chat TYPE option<record<match>>;
@@ -31,7 +31,7 @@ DEFINE INDEX chat_last_activity ON chat FIELDS last_activity;
 -- Individual messages within chats
 DEFINE TABLE message SCHEMAFULL
     PERMISSIONS
-        FOR select WHERE array::any(chat.participants) = $auth.id OR $access = 'backend_worker'
+        FOR select WHERE $auth.id IN chat.participants OR $access = 'backend_worker'
         FOR create WHERE sender = $auth.id OR $access = 'backend_worker'
         FOR update WHERE sender = $auth.id OR $access = 'backend_worker'
         FOR delete WHERE sender = $auth.id OR $access = 'backend_worker';

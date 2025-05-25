@@ -12,13 +12,16 @@
 DEFINE EVENT new_message ON TABLE message WHEN $event = "CREATE" THEN (
     LET $chat_id = $after.chat;
     UPDATE chat SET last_message = $after.id, last_activity = time::now() WHERE id = $chat_id;
-    CREATE notification SET
-        user = array::first(array::remove($after.chat.participants, $after.sender)),
-        type = 'message',
-        title = 'New Message',
-        body = 'You have a new message from ' + $after.sender.first_name,
-        data = { chat: $after.chat, sender: $after.sender },
-        created_at = time::now();
+    LET $recipient = SELECT VALUE id FROM $after.chat.participants WHERE id != $after.sender LIMIT 1;
+    IF $recipient {
+        CREATE notification SET
+            user = $recipient[0],
+            type = 'message',
+            title = 'New Message',
+            body = 'You have a new message from ' + $after.sender.first_name,
+            data = { chat: $after.chat, sender: $after.sender },
+            created_at = time::now();
+    };
 );
 
 -- New Match Event
@@ -78,15 +81,16 @@ DEFINE EVENT remove_vlog_like ON TABLE vlog_like WHEN $event = "DELETE" THEN (
 -- Updates comment count and notifies content author
 DEFINE EVENT new_comment ON TABLE comments WHEN $event = "CREATE" THEN (
     IF $after.target_type = 'vlog' {
-        UPDATE vlog SET comments_count = comments_count + 1 WHERE id = $after.target_id;
-        LET $vlog = SELECT * FROM vlog WHERE id = $after.target_id;
+        LET $vlog_id = type::thing('vlog', $after.target_id);
+        UPDATE vlog SET comments_count = comments_count + 1 WHERE id = $vlog_id;
+        LET $vlog = SELECT * FROM vlog WHERE id = $vlog_id;
         IF $vlog AND $vlog[0].author != $after.author {
             CREATE notification SET
                 user = $vlog[0].author,
                 type = 'comment',
                 title = 'New Comment',
                 body = $after.author.first_name + ' commented on your vlog',
-                data = { vlog: $after.target_id, commenter: $after.author },
+                data = { vlog: $vlog_id, commenter: $after.author },
                 created_at = time::now();
         };
     };

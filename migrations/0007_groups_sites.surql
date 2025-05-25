@@ -12,7 +12,7 @@
 DEFINE TABLE group SCHEMAFULL
     PERMISSIONS
         FOR select WHERE is_public = true OR id IN (SELECT group FROM group_member WHERE user = $auth.id) OR $access = 'backend_worker'
-        FOR create WHERE $auth.id != NONE OR $access = 'backend_worker'
+        FOR create WHERE $auth != NONE OR $access = 'backend_worker'
         FOR update WHERE id IN (SELECT group FROM group_member WHERE user = $auth.id AND role IN ['owner', 'admin']) OR $access = 'backend_worker'
         FOR delete WHERE id IN (SELECT group FROM group_member WHERE user = $auth.id AND role = 'owner') OR $access = 'backend_worker';
 
