@@ -59,46 +59,153 @@ All platforms use the same backend API endpoints for authentication:
 
 ## SurrealDB Schema
 
-### User Authentication Access (JWT-based for NextAuth.js)
+> **📋 Important**: Before using these schemas, you need to generate JWT secrets. See the [JWT Secrets Management Guide](./jwt-secrets-guide.md) for detailed instructions on generating and managing JWT secrets securely.
+
+### User Authentication Access (SurrealDB v2.0 RECORD-based)
 
 ```sql
--- User Authentication Access (JWT-based for NextAuth.js compatibility)
-DEFINE ACCESS user ON DATABASE TYPE JWT
-    WITH ISSUER KEY 'your-jwt-secret-key'
-    WITH ALGORITHM HS256
-    WITH DURATION 1h;
+-- User Authentication Access (SurrealDB v2.0 RECORD-based with enhanced features)
+-- Supports both traditional email/password and OAuth authentication
+DEFINE ACCESS user ON DATABASE TYPE RECORD
+    WITH JWT ALGORITHM HS256 KEY 'your-jwt-secret-key'
+    
+    -- Signup logic for new users (email/password)
+    SIGNUP (
+        CREATE user SET
+            email = $email,
+            password = IF $password != NONE THEN crypto::argon2::generate($password) ELSE NONE END,
+            oauth_providers = IF $oauth_providers != NONE THEN $oauth_providers ELSE [] END,
+            username = $username,
+            first_name = $first_name,
+            last_name = $last_name,
+            user_status = 'pending_waitlist_approval',
+            user_tier = 'basic',
+            created_at = time::now(),
+            updated_at = time::now()
+    )
+    
+    -- Signin logic for existing users (email/password)
+    SIGNIN (
+        SELECT * FROM user WHERE
+            email = $email AND password != NONE AND crypto::argon2::compare(password, $password)
+    )
+    
+    -- Enhanced authentication with user status validation
+    AUTHENTICATE {
+        IF $auth.id {
+            -- Verify user is still active and update last_active_at
+            LET $user = SELECT * FROM user WHERE id = $auth.id;
+            IF $user AND $user[0].user_status = 'active' {
+                UPDATE user SET last_active_at = time::now() WHERE id = $auth.id;
+                RETURN $auth.id;
+            } ELSE IF $user AND $user[0].user_status != 'active' {
+                THROW "User account is " + $user[0].user_status;
+            } ELSE {
+                THROW "User not found";
+            };
+        } ELSE IF $token.email {
+            -- For JWT tokens with email claims (NextAuth.js integration)
+            LET $user = SELECT * FROM user WHERE email = $token.email AND user_status = 'active';
+            IF $user {
+                UPDATE user SET last_active_at = time::now() WHERE email = $token.email;
+                RETURN $user[0];
+            } ELSE {
+                THROW "User not found or inactive";
+            };
+        };
+    }
+    
+    -- Set token and session durations
+    DURATION FOR TOKEN 1h, FOR SESSION 12h
+;
 
--- User signup function (called by your backend)
-DEFINE FUNCTION fn::signup($email: string, $password: string, $oauth_providers: array, $username: string, $first_name: string, $last_name: string) {
-    CREATE user SET
-        email = $email,
-        password = IF $password != NONE THEN crypto::argon2::generate($password) ELSE NONE END,
-        oauth_providers = $oauth_providers,
-        username = $username,
-        first_name = $first_name,
-        last_name = $last_name,
-        user_status = 'pending_waitlist_approval',
-        user_tier = 'basic',
-        created_at = time::now(),
-        updated_at = time::now()
-};
-
--- User signin function (called by your backend)
-DEFINE FUNCTION fn::signin($email: string, $password: string, $provider: string, $provider_id: string) {
-    SELECT * FROM user WHERE
-        (email = $email AND password != NONE AND crypto::argon2::compare(password, $password)) OR
-        (oauth_providers[?provider = $provider].id = $provider_id)
-};
+-- OAuth Authentication Access (separate access method for OAuth flows)
+DEFINE ACCESS oauth ON DATABASE TYPE RECORD
+    WITH JWT ALGORITHM HS256 KEY 'your-jwt-secret-key'
+    
+    -- OAuth signup - creates user if doesn't exist, links if exists
+    SIGNUP (
+        LET $existing = SELECT * FROM user WHERE oauth_providers[?provider = $provider].id = $provider_id;
+        IF $existing {
+            RETURN $existing[0];
+        } ELSE {
+            CREATE user SET
+                email = $email,
+                oauth_providers = [{
+                    provider: $provider,
+                    id: $provider_id,
+                    email: $email,
+                    name: $name,
+                    picture: $picture
+                }],
+                username = $email,
+                first_name = $first_name,
+                last_name = $last_name,
+                user_status = 'pending_waitlist_approval',
+                user_tier = 'basic',
+                created_at = time::now(),
+                updated_at = time::now()
+        };
+    )
+    
+    -- OAuth signin
+    SIGNIN (
+        SELECT * FROM user WHERE oauth_providers[?provider = $provider].id = $provider_id
+    )
+    
+    AUTHENTICATE {
+        IF $auth.id {
+            LET $user = SELECT * FROM user WHERE id = $auth.id;
+            IF $user AND $user[0].user_status = 'active' {
+                UPDATE user SET last_active_at = time::now() WHERE id = $auth.id;
+                RETURN $auth.id;
+            } ELSE {
+                THROW "OAuth user account is not active";
+            };
+        };
+    }
+    
+    DURATION FOR TOKEN 1h, FOR SESSION 12h
+;
 ```
 
 ### Worker Authentication Access
 
 ```sql
+-- Worker Authentication Access (Updated for v2.0)
 DEFINE ACCESS worker ON DATABASE TYPE JWT
-    WITH ISSUER KEY '<jwt-secret>'
-    WITH ALGORITHM HS256
-    WITH DURATION 24h;
+    WITH ALGORITHM HS256 KEY '<jwt-secret>'
+    DURATION FOR TOKEN 24h
+;
 ```
+## SurrealDB v2.0 Enhancements
+
+### Key Improvements in Our Updated Implementation
+
+1. **RECORD-based Access**: Migrated from JWT-only to RECORD-based access for better integration with SurrealDB's native authentication system.
+
+2. **Built-in SIGNUP/SIGNIN**: Authentication logic is now embedded directly in the access definitions rather than using separate functions.
+
+3. **Enhanced AUTHENTICATE Clause**: Added real-time user status validation and automatic session tracking.
+
+4. **Separate OAuth Access**: Dedicated OAuth access method for cleaner separation of authentication flows.
+
+5. **Improved Security**: 
+   - Real-time user status checking
+   - Automatic last_active_at updates
+   - Better error handling with descriptive messages
+   - Enhanced permission structure
+
+### Migration Benefits
+
+- **Better Performance**: Native SurrealDB authentication is faster than custom functions
+- **Enhanced Security**: Real-time validation prevents access with stale tokens
+- **Cleaner Architecture**: Separation of concerns between email/password and OAuth flows
+- **Future-Proof**: Aligned with SurrealDB v2.0 best practices and patterns
+
+### Backward Compatibility
+
+The legacy functions (`fn::signup` and `fn::signin`) are maintained for backward compatibility during the transition period. These can be removed once all client applications are updated to use the new access methods.
 
 ## Authentication Methods
 
