@@ -28,14 +28,20 @@ docker run --rm -p 8000:8000 surrealdb/surrealdb:latest start --user root --pass
 surreal start --user root --pass root memory
 ```
 
-### 3. Run Database Migration
+### 3. Run Database Migrations
 
 ```bash
-# Use the automated migration script
+# Run all migrations in sequence (recommended)
 ./scripts/run-migration.sh
 
-# Or manually with environment substitution
-envsubst < migrations/0000_initial_schema.surql | surreal sql --conn ws://localhost:8000 --user root --pass root --ns idance --db dev
+# Run specific migration for testing
+./scripts/run-migration.sh --migration 0003
+
+# Skip validation for development
+./scripts/run-migration.sh --skip-validation
+
+# Get help
+./scripts/run-migration.sh --help
 ```
 
 ## 📁 Project Structure
