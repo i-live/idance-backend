@@ -11,8 +11,8 @@
 -- Links users to dance styles with proficiency
 DEFINE TABLE user_dance_style SCHEMAFULL
     PERMISSIONS
-        FOR select WHERE user = $auth.id OR $access = 'worker'
-        FOR create, update, delete WHERE user = $auth.id OR $access = 'worker';
+        FOR select WHERE user = $auth.id OR $access = 'backend_worker'
+        FOR create, update, delete WHERE user = $auth.id OR $access = 'backend_worker';
 
 DEFINE FIELD user ON user_dance_style TYPE record<user>;
 DEFINE FIELD dance_style ON user_dance_style TYPE record<dance_style>;
@@ -27,8 +27,8 @@ DEFINE INDEX user_dance_style_user ON user_dance_style FIELDS user;
 -- Links users to interests
 DEFINE TABLE user_interest SCHEMAFULL
     PERMISSIONS
-        FOR select WHERE user = $auth.id OR $access = 'worker'
-        FOR create, update, delete WHERE user = $auth.id OR $access = 'worker';
+        FOR select WHERE user = $auth.id OR $access = 'backend_worker'
+        FOR create, update, delete WHERE user = $auth.id OR $access = 'backend_worker';
 
 DEFINE FIELD user ON user_interest TYPE record<user>;
 DEFINE FIELD interest ON user_interest TYPE record<interest>;
@@ -46,9 +46,9 @@ DEFINE INDEX user_interest_user ON user_interest FIELDS user;
 -- Represents user follow relationships
 DEFINE TABLE follow SCHEMAFULL
     PERMISSIONS
-        FOR select WHERE follower = $auth.id OR following = $auth.id OR $access = 'worker'
-        FOR create, delete WHERE follower = $auth.id OR $access = 'worker'
-        FOR update WHERE $access = 'worker';
+        FOR select WHERE follower = $auth.id OR following = $auth.id OR $access = 'backend_worker'
+        FOR create, delete WHERE follower = $auth.id OR $access = 'backend_worker'
+        FOR update WHERE $access = 'backend_worker';
 
 DEFINE FIELD follower ON follow TYPE record<user>;
 DEFINE FIELD following ON follow TYPE record<user>;
@@ -62,9 +62,9 @@ DEFINE INDEX follow_following ON follow FIELDS following;
 -- Tracks user referrals
 DEFINE TABLE referred SCHEMAFULL
     PERMISSIONS
-        FOR select WHERE referrer = $auth.id OR referred_user = $auth.id OR $access = 'worker'
-        FOR create WHERE $access IN ['user', 'oauth', 'worker']
-        FOR update, delete WHERE $access = 'worker';
+        FOR select WHERE referrer = $auth.id OR referred_user = $auth.id OR $access = 'backend_worker'
+        FOR create WHERE $access IN ['username_password', 'oauth', 'backend_worker']
+        FOR update, delete WHERE $access = 'backend_worker';
 
 DEFINE FIELD referrer ON referred TYPE record<user>;
 DEFINE FIELD referred_user ON referred TYPE record<user>;
@@ -84,9 +84,9 @@ DEFINE INDEX referred_code ON referred FIELDS referral_code;
 -- Records user swipes (like, dislike, superlike)
 DEFINE TABLE swipe SCHEMAFULL
     PERMISSIONS
-        FOR select WHERE swiper = $auth.id OR $access = 'worker'
-        FOR create WHERE swiper = $auth.id OR $access = 'worker'
-        FOR update, delete WHERE $access = 'worker';
+        FOR select WHERE swiper = $auth.id OR $access = 'backend_worker'
+        FOR create WHERE swiper = $auth.id OR $access = 'backend_worker'
+        FOR update, delete WHERE $access = 'backend_worker';
 
 DEFINE FIELD swiper ON swipe TYPE record<user>;
 DEFINE FIELD swiped ON swipe TYPE record<user>;
@@ -101,9 +101,9 @@ DEFINE INDEX swipe_swiped ON swipe FIELDS swiped;
 -- Represents mutual likes
 DEFINE TABLE match SCHEMAFULL
     PERMISSIONS
-        FOR select WHERE user1 = $auth.id OR user2 = $auth.id OR $access = 'worker'
-        FOR create WHERE $access = 'worker'
-        FOR update, delete WHERE $access = 'worker';
+        FOR select WHERE user1 = $auth.id OR user2 = $auth.id OR $access = 'backend_worker'
+        FOR create WHERE $access = 'backend_worker'
+        FOR update, delete WHERE $access = 'backend_worker';
 
 DEFINE FIELD user1 ON match TYPE record<user>;
 DEFINE FIELD user2 ON match TYPE record<user>;

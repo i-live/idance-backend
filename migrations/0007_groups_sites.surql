@@ -11,10 +11,10 @@
 -- Represents dance companies, studios, or teams
 DEFINE TABLE group SCHEMAFULL
     PERMISSIONS
-        FOR select WHERE is_public = true OR id IN (SELECT group FROM group_member WHERE user = $auth.id) OR $access = 'worker'
-        FOR create WHERE $auth.id != NONE OR $access = 'worker'
-        FOR update WHERE id IN (SELECT group FROM group_member WHERE user = $auth.id AND role IN ['owner', 'admin']) OR $access = 'worker'
-        FOR delete WHERE id IN (SELECT group FROM group_member WHERE user = $auth.id AND role = 'owner') OR $access = 'worker';
+        FOR select WHERE is_public = true OR id IN (SELECT group FROM group_member WHERE user = $auth.id) OR $access = 'backend_worker'
+        FOR create WHERE $auth.id != NONE OR $access = 'backend_worker'
+        FOR update WHERE id IN (SELECT group FROM group_member WHERE user = $auth.id AND role IN ['owner', 'admin']) OR $access = 'backend_worker'
+        FOR delete WHERE id IN (SELECT group FROM group_member WHERE user = $auth.id AND role = 'owner') OR $access = 'backend_worker';
 
 DEFINE FIELD name ON group TYPE string;
 DEFINE FIELD description ON group TYPE option<string>;
@@ -45,10 +45,10 @@ DEFINE INDEX group_public ON group FIELDS is_public, created_at;
 -- Tracks group membership and roles
 DEFINE TABLE group_member SCHEMAFULL
     PERMISSIONS
-        FOR select WHERE user = $auth.id OR group IN (SELECT group FROM group_member WHERE user = $auth.id AND role IN ['owner', 'admin']) OR $access = 'worker'
-        FOR create WHERE $access = 'worker' OR group IN (SELECT group FROM group_member WHERE user = $auth.id AND role IN ['owner', 'admin'])
-        FOR update WHERE group IN (SELECT group FROM group_member WHERE user = $auth.id AND role IN ['owner', 'admin']) OR $access = 'worker'
-        FOR delete WHERE user = $auth.id OR group IN (SELECT group FROM group_member WHERE user = $auth.id AND role IN ['owner', 'admin']) OR $access = 'worker';
+        FOR select WHERE user = $auth.id OR group IN (SELECT group FROM group_member WHERE user = $auth.id AND role IN ['owner', 'admin']) OR $access = 'backend_worker'
+        FOR create WHERE $access = 'backend_worker' OR group IN (SELECT group FROM group_member WHERE user = $auth.id AND role IN ['owner', 'admin'])
+        FOR update WHERE group IN (SELECT group FROM group_member WHERE user = $auth.id AND role IN ['owner', 'admin']) OR $access = 'backend_worker'
+        FOR delete WHERE user = $auth.id OR group IN (SELECT group FROM group_member WHERE user = $auth.id AND role IN ['owner', 'admin']) OR $access = 'backend_worker';
 
 DEFINE FIELD user ON group_member TYPE record<user>;
 DEFINE FIELD group ON group_member TYPE record<group>;
@@ -68,10 +68,10 @@ DEFINE INDEX group_member_user ON group_member FIELDS user;
 -- Custom websites for users or groups
 DEFINE TABLE site SCHEMAFULL
     PERMISSIONS
-        FOR select WHERE is_public = true OR owner = $auth.id OR owner_group IN (SELECT group FROM group_member WHERE user = $auth.id AND role IN ['owner', 'admin']) OR $access = 'worker'
-        FOR create WHERE owner = $auth.id OR $access = 'worker'
-        FOR update WHERE owner = $auth.id OR owner_group IN (SELECT group FROM group_member WHERE user = $auth.id AND role IN ['owner', 'admin']) OR $access = 'worker'
-        FOR delete WHERE owner = $auth.id OR owner_group IN (SELECT group FROM group_member WHERE user = $auth.id AND role IN ['owner', 'admin']) OR $access = 'worker';
+        FOR select WHERE is_public = true OR owner = $auth.id OR owner_group IN (SELECT group FROM group_member WHERE user = $auth.id AND role IN ['owner', 'admin']) OR $access = 'backend_worker'
+        FOR create WHERE owner = $auth.id OR $access = 'backend_worker'
+        FOR update WHERE owner = $auth.id OR owner_group IN (SELECT group FROM group_member WHERE user = $auth.id AND role IN ['owner', 'admin']) OR $access = 'backend_worker'
+        FOR delete WHERE owner = $auth.id OR owner_group IN (SELECT group FROM group_member WHERE user = $auth.id AND role IN ['owner', 'admin']) OR $access = 'backend_worker';
 
 DEFINE FIELD owner ON site TYPE option<record<user>>;
 DEFINE FIELD owner_group ON site TYPE option<record<group>>;
@@ -98,8 +98,8 @@ DEFINE INDEX site_domain ON site FIELDS custom_domain UNIQUE;
 -- Modular content for sites
 DEFINE TABLE content_block SCHEMAFULL
     PERMISSIONS
-        FOR select WHERE site.is_public = true OR site.owner = $auth.id OR site.owner_group IN (SELECT group FROM group_member WHERE user = $auth.id AND role IN ['owner', 'admin']) OR $access = 'worker'
-        FOR create, update, delete WHERE site.owner = $auth.id OR site.owner_group IN (SELECT group FROM group_member WHERE user = $auth.id AND role IN ['owner', 'admin']) OR $access = 'worker';
+        FOR select WHERE site.is_public = true OR site.owner = $auth.id OR site.owner_group IN (SELECT group FROM group_member WHERE user = $auth.id AND role IN ['owner', 'admin']) OR $access = 'backend_worker'
+        FOR create, update, delete WHERE site.owner = $auth.id OR site.owner_group IN (SELECT group FROM group_member WHERE user = $auth.id AND role IN ['owner', 'admin']) OR $access = 'backend_worker';
 
 DEFINE FIELD site ON content_block TYPE record<site>;
 DEFINE FIELD block_type ON content_block TYPE string ASSERT $value IN ['text', 'image', 'video', 'gallery', 'contact', 'calendar', 'social'];

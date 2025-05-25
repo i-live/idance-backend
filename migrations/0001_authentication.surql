@@ -7,21 +7,36 @@
 -- Authentication Access Methods
 -- ########################################################
 
--- User Authentication Access (SurrealDB v2.0 RECORD-based with JWT support)
--- Supports both traditional email/password and OAuth authentication with NextAuth.js integration
-DEFINE ACCESS user ON DATABASE TYPE RECORD
+-- Username/Password Authentication Access (SurrealDB v2.0 RECORD-based with JWT support)
+-- Handles traditional email/password authentication with NextAuth.js integration
+DEFINE ACCESS username_password ON DATABASE TYPE RECORD
     SIGNUP (
-        CREATE user SET
-            email = $email,
-            password = $password AND crypto::argon2::generate($password),
-            oauth_providers = $oauth_providers OR [],
-            username = $username,
-            first_name = $first_name,
-            last_name = $last_name,
-            user_status = 'pending_waitlist_approval',
-            user_tier = 'basic',
-            created_at = time::now(),
-            updated_at = time::now()
+        -- Check if user with same email already exists
+        LET $existing = SELECT * FROM user WHERE email = $email;
+        IF $existing {
+            -- Add password to existing user (likely OAuth-only user adding email/password)
+            UPDATE user SET
+                password = $password AND crypto::argon2::generate($password),
+                username = $username OR username,
+                first_name = $first_name OR first_name,
+                last_name = $last_name OR last_name,
+                updated_at = time::now()
+            WHERE email = $email;
+            RETURN $existing[0];
+        } ELSE {
+            -- Create new user with email/password
+            CREATE user SET
+                email = $email,
+                password = $password AND crypto::argon2::generate($password),
+                oauth_providers = [],
+                username = $username OR string::split($email, '@')[0],
+                first_name = $first_name OR '',
+                last_name = $last_name OR '',
+                user_status = 'pending_waitlist_approval',
+                user_tier = 'basic',
+                created_at = time::now(),
+                updated_at = time::now()
+        };
     )
     SIGNIN (
         SELECT * FROM user WHERE
@@ -57,26 +72,43 @@ DEFINE ACCESS user ON DATABASE TYPE RECORD
 -- OAuth Authentication Access (separate access method for OAuth flows)
 DEFINE ACCESS oauth ON DATABASE TYPE RECORD
     SIGNUP (
-        LET $existing = SELECT * FROM user WHERE oauth_providers[?provider = $provider].id = $provider_id;
-        IF $existing {
-            RETURN $existing[0];
+        -- First check if OAuth provider account already exists
+        LET $existing_oauth = SELECT * FROM user WHERE oauth_providers[?provider = $provider].id = $provider_id;
+        IF $existing_oauth {
+            RETURN $existing_oauth[0];
         } ELSE {
-            CREATE user SET
-                email = $email,
-                oauth_providers = [{
+            -- Check if user with same email already exists (prevent duplicates)
+            LET $existing_email = SELECT * FROM user WHERE email = $email;
+            IF $existing_email {
+                -- Link OAuth provider to existing user
+                UPDATE user SET oauth_providers += [{
                     provider: $provider,
                     id: $provider_id,
                     email: $email,
                     name: $name,
-                    picture: $picture
-                }],
-                username = $username OR $email,
-                first_name = $first_name,
-                last_name = $last_name,
-                user_status = 'pending_waitlist_approval',
-                user_tier = 'basic',
-                created_at = time::now(),
-                updated_at = time::now()
+                    picture: $picture,
+                    linked_at: time::now()
+                }] WHERE email = $email;
+                RETURN $existing_email[0];
+            } ELSE {
+                -- Create new user with OAuth data
+                CREATE user SET
+                    email = $email,
+                    oauth_providers = [{
+                        provider: $provider,
+                        id: $provider_id,
+                        email: $email,
+                        name: $name,
+                        picture: $picture
+                    }],
+                    username = $username OR string::split($email, '@')[0],
+                    first_name = $first_name OR string::split($name OR '', ' ')[0] OR '',
+                    last_name = $last_name OR string::split($name OR '', ' ')[1] OR '',
+                    user_status = 'pending_waitlist_approval',
+                    user_tier = 'basic',
+                    created_at = time::now(),
+                    updated_at = time::now()
+            };
         };
     )
     SIGNIN (
@@ -97,9 +129,9 @@ DEFINE ACCESS oauth ON DATABASE TYPE RECORD
     DURATION FOR TOKEN 1h, FOR SESSION 12h
 ;
 
--- Worker Authentication Access (for Cloudflare Workers - system level)
+-- Backend Worker Authentication Access (for Cloudflare Workers - system level)
 -- This one correctly uses TYPE JWT since workers need system-level access
-DEFINE ACCESS worker ON DATABASE TYPE JWT
+DEFINE ACCESS backend_worker ON DATABASE TYPE JWT
     ALGORITHM HS256 KEY '${SURREALDB_WORKER_JWT_SECRET}'
     DURATION FOR TOKEN 24h
 ;

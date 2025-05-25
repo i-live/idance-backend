@@ -11,10 +11,10 @@
 -- Stores chat sessions for matches
 DEFINE TABLE chat SCHEMAFULL
     PERMISSIONS
-        FOR select WHERE array::any(participants) = $auth.id OR $access = 'worker'
-        FOR create WHERE $access = 'worker'
-        FOR update WHERE array::any(participants) = $auth.id OR $access = 'worker'
-        FOR delete WHERE $access = 'worker';
+        FOR select WHERE array::any(participants) = $auth.id OR $access = 'backend_worker'
+        FOR create WHERE $access = 'backend_worker'
+        FOR update WHERE array::any(participants) = $auth.id OR $access = 'backend_worker'
+        FOR delete WHERE $access = 'backend_worker';
 
 DEFINE FIELD match ON chat TYPE option<record<match>>;
 DEFINE FIELD participants ON chat TYPE array<record<user>>;
@@ -31,10 +31,10 @@ DEFINE INDEX chat_last_activity ON chat FIELDS last_activity;
 -- Individual messages within chats
 DEFINE TABLE message SCHEMAFULL
     PERMISSIONS
-        FOR select WHERE array::any(chat.participants) = $auth.id OR $access = 'worker'
-        FOR create WHERE sender = $auth.id OR $access = 'worker'
-        FOR update WHERE sender = $auth.id OR $access = 'worker'
-        FOR delete WHERE sender = $auth.id OR $access = 'worker';
+        FOR select WHERE array::any(chat.participants) = $auth.id OR $access = 'backend_worker'
+        FOR create WHERE sender = $auth.id OR $access = 'backend_worker'
+        FOR update WHERE sender = $auth.id OR $access = 'backend_worker'
+        FOR delete WHERE sender = $auth.id OR $access = 'backend_worker';
 
 DEFINE FIELD chat ON message TYPE record<chat>;
 DEFINE FIELD sender ON message TYPE record<user>;
@@ -55,9 +55,9 @@ DEFINE INDEX message_created_at ON message FIELDS created_at;
 DEFINE TABLE comments SCHEMAFULL
     PERMISSIONS
         FOR select FULL
-        FOR create WHERE author = $auth.id OR $access = 'worker'
-        FOR update WHERE author = $auth.id OR $access = 'worker'
-        FOR delete WHERE author = $auth.id OR $access = 'worker';
+        FOR create WHERE author = $auth.id OR $access = 'backend_worker'
+        FOR update WHERE author = $auth.id OR $access = 'backend_worker'
+        FOR delete WHERE author = $auth.id OR $access = 'backend_worker';
 
 DEFINE FIELD author ON comments TYPE record<user>;
 DEFINE FIELD content ON comments TYPE string;
@@ -82,10 +82,10 @@ DEFINE INDEX comments_created_at ON comments FIELDS created_at;
 -- Tracks events for in-app (WebSocket via LIVE SELECT) and push (Cloudflare Worker + APNs/FCM)
 DEFINE TABLE notification SCHEMAFULL
     PERMISSIONS
-        FOR select WHERE user = $auth.id OR $access = 'worker'
-        FOR create WHERE $access = 'worker'
-        FOR update WHERE user = $auth.id OR $access = 'worker'
-        FOR delete WHERE user = $auth.id OR $access = 'worker';
+        FOR select WHERE user = $auth.id OR $access = 'backend_worker'
+        FOR create WHERE $access = 'backend_worker'
+        FOR update WHERE user = $auth.id OR $access = 'backend_worker'
+        FOR delete WHERE user = $auth.id OR $access = 'backend_worker';
 
 DEFINE FIELD user ON notification TYPE record<user>;
 DEFINE FIELD type ON notification TYPE string ASSERT $value IN ['message', 'match', 'like', 'comment', 'follow', 'system'];

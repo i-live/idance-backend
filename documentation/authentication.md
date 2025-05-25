@@ -14,11 +14,12 @@ The authentication system supports:
 ## 🏗️ Architecture
 
 ### **Single Access Method Design**
-Unlike traditional systems with separate OAuth and password flows, iDance uses a **unified `user` access method** that intelligently handles both authentication types based on the provided parameters.
+Unlike traditional systems with separate OAuth and password flows, iDance uses **unified access methods** that intelligently handle different authentication types based on the provided parameters.
 
 ### **Access Methods**
-1. **`user`** - Unified authentication for all user types (email/password + OAuth)
-2. **`worker`** - JWT-based access for Cloudflare Workers
+1. **`username_password`** - Email/password authentication for users
+2. **`oauth`** - OAuth authentication (Google, Facebook, Apple) for users  
+3. **`backend_worker`** - JWT-based access for Cloudflare Workers
 
 ## 📋 Authentication Flows
 
@@ -26,7 +27,7 @@ Unlike traditional systems with separate OAuth and password flows, iDance uses a
 ```javascript
 // Client-side signup
 const result = await db.signup({
-    access: 'user',
+    access: 'username_password',
     email: 'user@example.com',
     password: 'securepassword',
     username: 'username',
@@ -39,7 +40,7 @@ const result = await db.signup({
 ```javascript
 // Client-side signin
 const result = await db.signin({
-    access: 'user',
+    access: 'username_password',
     email: 'user@example.com',
     password: 'securepassword'
 });
@@ -49,7 +50,7 @@ const result = await db.signin({
 ```javascript
 // OAuth signup (Google, Facebook, Apple)
 const result = await db.signup({
-    access: 'user',
+    access: 'oauth',
     provider: 'google',
     provider_id: 'google_user_id',
     email: 'user@gmail.com',
@@ -65,7 +66,7 @@ const result = await db.signup({
 ```javascript
 // OAuth signin
 const result = await db.signin({
-    access: 'user',
+    access: 'oauth',
     provider: 'google',
     provider_id: 'google_user_id'
 });
@@ -159,7 +160,7 @@ export default NextAuth({
         
         // Use the unified 'user' access method for OAuth signup/signin
         const result = await db.signup({
-          access: 'user',
+          access: 'oauth',
           provider: account.provider,
           provider_id: account.providerAccountId,
           email: user.email,
@@ -301,7 +302,7 @@ await db.connect('wss://your-surrealdb-endpoint');
 
 // Use the unified 'user' access method for all authentication
 const token = await db.signin({
-    access: 'user',
+    access: 'oauth',
     // ... authentication parameters
 });
 ```
@@ -327,7 +328,7 @@ await db.authenticate(workerToken);
 - **Enhanced error handling**: Better error messages and status validation
 
 ### **Breaking Changes**
-- **OAuth access method removed**: Use `user` access method with OAuth parameters
+- **Separate access methods**: Use `username_password` for email/password and `oauth` for OAuth authentication
 - **Legacy functions removed**: Use access methods instead of custom functions
 
 ### **Migration Steps**

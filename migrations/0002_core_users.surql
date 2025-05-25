@@ -17,13 +17,13 @@ DEFINE TABLE user SCHEMAFULL
             FIELDS id, username, first_name, last_name, profile_picture_url
         
         -- Only allow creation through access methods
-        FOR create WHERE $access IN ['user', 'oauth'] FULL
+        FOR create WHERE $access IN ['username_password', 'oauth'] FULL
         
-        -- Users can update their own record, workers can update any
-        FOR update WHERE id = $auth.id OR $access = 'worker' FULL
+        -- Users can update their own record, backend workers can update any
+        FOR update WHERE id = $auth.id OR $access = 'backend_worker' FULL
         
         -- Soft delete only (set deleted_at instead of actual deletion)
-        FOR delete WHERE (id = $auth.id OR $access = 'worker') AND deleted_at = NONE
+        FOR delete WHERE (id = $auth.id OR $access = 'backend_worker') AND deleted_at = NONE
             SET deleted_at = time::now();
 
 -- User table fields
@@ -63,11 +63,11 @@ DEFINE TABLE profile SCHEMAFULL
             FIELDS user, age, height, weight, body_type, ethnicity, hair_color, eye_color, 
                    location, bio, portfolio, social_links, search_preferences
         
-        -- Users can create/update their own profile, workers can manage any
-        FOR create, update WHERE user = $auth.id OR $access = 'worker' FULL
+        -- Users can create/update their own profile, backend workers can manage any
+        FOR create, update WHERE user = $auth.id OR $access = 'backend_worker' FULL
         
         -- Soft delete only
-        FOR delete WHERE (user = $auth.id OR $access = 'worker') AND deleted_at = NONE
+        FOR delete WHERE (user = $auth.id OR $access = 'backend_worker') AND deleted_at = NONE
             SET deleted_at = time::now();
 
 -- Profile table fields
@@ -126,7 +126,7 @@ DEFINE INDEX profile_vlog_embedding ON profile FIELDS vlog_embedding HNSW DIMENS
 -- Stores device tokens for push notifications
 DEFINE TABLE device SCHEMAFULL
     PERMISSIONS
-        FOR select, create, update, delete WHERE user = $auth.id OR $access = 'worker';
+        FOR select, create, update, delete WHERE user = $auth.id OR $access = 'backend_worker';
 
 -- Device table fields
 DEFINE FIELD user ON device TYPE record<user>;

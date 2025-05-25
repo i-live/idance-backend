@@ -12,7 +12,7 @@
 DEFINE TABLE country SCHEMAFULL
     PERMISSIONS
         FOR select FULL
-        FOR create, update, delete WHERE $access = 'worker';
+        FOR create, update, delete WHERE $access = 'backend_worker';
 
 DEFINE FIELD name ON country TYPE string;
 DEFINE FIELD code ON country TYPE string;
@@ -26,7 +26,7 @@ DEFINE INDEX country_name ON country FIELDS name;
 DEFINE TABLE state SCHEMAFULL
     PERMISSIONS
         FOR select FULL
-        FOR create, update, delete WHERE $access = 'worker';
+        FOR create, update, delete WHERE $access = 'backend_worker';
 
 DEFINE FIELD name ON state TYPE string;
 DEFINE FIELD code ON state TYPE string;
@@ -41,7 +41,7 @@ DEFINE INDEX state_country ON state FIELDS country;
 DEFINE TABLE county SCHEMAFULL
     PERMISSIONS
         FOR select FULL
-        FOR create, update, delete WHERE $access = 'worker';
+        FOR create, update, delete WHERE $access = 'backend_worker';
 
 DEFINE FIELD name ON county TYPE string;
 DEFINE FIELD state ON county TYPE record<state>;
@@ -55,7 +55,7 @@ DEFINE INDEX county_state ON county FIELDS state;
 DEFINE TABLE city SCHEMAFULL
     PERMISSIONS
         FOR select FULL
-        FOR create, update, delete WHERE $access = 'worker';
+        FOR create, update, delete WHERE $access = 'backend_worker';
 
 DEFINE FIELD name ON city TYPE string;
 DEFINE FIELD county ON city TYPE option<record<county>>;
@@ -77,7 +77,7 @@ DEFINE INDEX city_coordinates ON city FIELDS coordinates MTREE DIMENSION 2;
 DEFINE TABLE dance_style SCHEMAFULL
     PERMISSIONS
         FOR select FULL
-        FOR create, update, delete WHERE $access = 'worker';
+        FOR create, update, delete WHERE $access = 'backend_worker';
 
 DEFINE FIELD name ON dance_style TYPE string;
 DEFINE FIELD description ON dance_style TYPE option<string>;
@@ -92,7 +92,7 @@ DEFINE INDEX dance_style_category ON dance_style FIELDS category;
 DEFINE TABLE interest SCHEMAFULL
     PERMISSIONS
         FOR select FULL
-        FOR create, update, delete WHERE $access = 'worker';
+        FOR create, update, delete WHERE $access = 'backend_worker';
 
 DEFINE FIELD name ON interest TYPE string;
 DEFINE FIELD description ON interest TYPE option<string>;
@@ -107,7 +107,7 @@ DEFINE INDEX interest_category ON interest FIELDS category;
 DEFINE TABLE social_platform SCHEMAFULL
     PERMISSIONS
         FOR select FULL
-        FOR create, update, delete WHERE $access = 'worker';
+        FOR create, update, delete WHERE $access = 'backend_worker';
 
 DEFINE FIELD name ON social_platform TYPE string;
 DEFINE FIELD base_url ON social_platform TYPE string;

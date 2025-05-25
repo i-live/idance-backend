@@ -11,10 +11,10 @@
 -- User-generated content (posts, stories)
 DEFINE TABLE vlog SCHEMALESS
     PERMISSIONS
-        FOR select WHERE author.user_status = 'active' AND (is_public = true OR author = $auth.id) OR $access = 'worker'
-        FOR create WHERE author = $auth.id OR $access = 'worker'
-        FOR update WHERE author = $auth.id OR $access = 'worker'
-        FOR delete WHERE author = $auth.id OR $access = 'worker';
+        FOR select WHERE author.user_status = 'active' AND (is_public = true OR author = $auth.id) OR $access = 'backend_worker'
+        FOR create WHERE author = $auth.id OR $access = 'backend_worker'
+        FOR update WHERE author = $auth.id OR $access = 'backend_worker'
+        FOR delete WHERE author = $auth.id OR $access = 'backend_worker';
 
 DEFINE FIELD author ON vlog TYPE record<user>;
 DEFINE FIELD title ON vlog TYPE option<string>;
@@ -43,9 +43,9 @@ DEFINE INDEX vlog_created_at ON vlog FIELDS created_at;
 -- Tracks likes on vlogs
 DEFINE TABLE vlog_like SCHEMAFULL
     PERMISSIONS
-        FOR select WHERE user = $auth.id OR $access = 'worker'
-        FOR create, delete WHERE user = $auth.id OR $access = 'worker'
-        FOR update WHERE $access = 'worker';
+        FOR select WHERE user = $auth.id OR $access = 'backend_worker'
+        FOR create, delete WHERE user = $auth.id OR $access = 'backend_worker'
+        FOR update WHERE $access = 'backend_worker';
 
 DEFINE FIELD user ON vlog_like TYPE record<user>;
 DEFINE FIELD vlog ON vlog_like TYPE record<vlog>;
