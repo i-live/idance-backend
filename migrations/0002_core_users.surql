@@ -100,20 +100,14 @@ DEFINE INDEX user_deleted_at ON user FIELDS deleted_at;
 -- location data, preferences, and portfolio items
 DEFINE TABLE profile SCHEMAFULL
     PERMISSIONS
-        -- Users can view their own profile
-        FOR select WHERE user = $auth.id
-        
-        -- Public can view profiles of active users with limited fields
-        FOR select WHERE user.user_status = 'active'
-            FIELDS user, age, height, weight, body_type, ethnicity, hair_color, eye_color, 
-                   location, bio, portfolio, social_links, search_preferences
+        -- Users can view their own profile, public can view profiles of active users
+        FOR select WHERE user = $auth.id OR user.user_status = 'active'
         
         -- Users can create/update their own profile, backend workers can manage any
         FOR create, update WHERE user = $auth.id OR $access = 'backend_worker'
         
-        -- Soft delete only
-        FOR delete WHERE (user = $auth.id OR $access = 'backend_worker') AND deleted_at = NONE
-            SET deleted_at = time::now();
+        -- Hard delete allowed for admins and backend workers only
+        FOR delete WHERE $access = 'backend_worker' OR $auth.role = 'admin';
 
 -- Profile table fields
 DEFINE FIELD user ON profile TYPE record<user>;
@@ -137,19 +131,19 @@ DEFINE FIELD location.street ON profile TYPE option<string>;
 
 -- Profile content
 DEFINE FIELD bio ON profile TYPE option<string>;
-DEFINE FIELD portfolio ON profile TYPE array 
+DEFINE FIELD portfolio ON profile TYPE array
     DEFAULT []
-    ASSERT $value == NONE OR array::len($value) <= 50 
-    ASSERT $value == NONE OR array::all($value, function($v) { 
-        return type::is::string($v.url) 
+    ASSERT $value == NONE OR array::len($value) <= 50
+    ASSERT $value == NONE OR array::all($value, |$v| {
+        type::is::string($v.url)
         AND type::is::string($v.type)
         AND $v.type INSIDE ["image", "video", "document"]
     });
-DEFINE FIELD social_links ON profile TYPE array 
+DEFINE FIELD social_links ON profile TYPE array
     DEFAULT []
     ASSERT $value == NONE OR array::len($value) <= 10
-    ASSERT $value == NONE OR array::all($value, function($v) {
-        return type::is::string($v.platform)
+    ASSERT $value == NONE OR array::all($value, |$v| {
+        type::is::string($v.platform)
         AND type::is::string($v.url)
         AND string::is::url($v.url)
     });
