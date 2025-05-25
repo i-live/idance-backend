@@ -12,6 +12,118 @@ iDance uses SurrealDB as its primary database, leveraging its modern features fo
 - **Scalability**: Cloud-hosted with edge caching
 - **Security**: Record-level permissions and access controls
 
+## 📊 Entity Relationship Diagram (ERD)
+
+```mermaid
+erDiagram
+    %% Core User Tables
+    user ||--o| profile : "has"
+    user ||--o{ device : "registers"
+    
+    %% Location Hierarchy
+    country ||--o{ state : "contains"
+    state ||--o{ county : "contains"
+    county ||--o{ city : "contains"
+    profile }o--|| country : "located_in"
+    profile }o--|| state : "located_in"
+    profile }o--|| county : "located_in"
+    profile }o--|| city : "located_in"
+    
+    %% Social Interactions
+    user ||--o{ follow : "follows"
+    user ||--o{ follow : "followed_by"
+    user ||--o{ swipe : "swipes"
+    user ||--o{ swipe : "swiped_on"
+    user ||--o{ match : "matches_with"
+    user ||--o{ referred : "refers"
+    user ||--o{ referred : "referred_by"
+    
+    %% User Associations
+    user ||--o{ user_dance_style : "practices"
+    dance_style ||--o{ user_dance_style : "practiced_by"
+    user ||--o{ user_interest : "interested_in"
+    interest ||--o{ user_interest : "interests"
+    
+    %% Communication
+    match ||--|| chat : "enables"
+    chat ||--o{ message : "contains"
+    user ||--o{ message : "sends"
+    user ||--o{ comments : "writes"
+    user ||--o{ notification : "receives"
+    
+    %% Content & Media
+    user ||--o{ vlog : "creates"
+    vlog ||--o{ vlog_like : "liked_by"
+    user ||--o{ vlog_like : "likes"
+    vlog ||--o{ comments : "commented_on"
+    
+    %% Groups & Sites
+    user ||--o{ group_member : "member_of"
+    group ||--o{ group_member : "has_members"
+    user ||--o{ site : "owns"
+    group ||--o{ site : "owns"
+    site ||--o{ content_block : "contains"
+    
+    %% Reference Data
+    social_platform ||--o{ profile : "linked_to"
+    
+    %% Key Attributes
+    user {
+        string id PK
+        string email UK
+        string username UK
+        string first_name
+        string last_name
+        string user_status
+        string user_tier
+        datetime created_at
+    }
+    
+    profile {
+        record user PK "FK to user.id"
+        int age
+        string body_type
+        geometry location_coordinates
+        array vlog_embedding
+        array lifestyle_tags
+        datetime created_at
+    }
+    
+    match {
+        record user1 PK "FK to user.id"
+        record user2 PK "FK to user.id"
+        datetime matched_at
+        bool is_active
+    }
+    
+    chat {
+        string id PK
+        record match FK "FK to match.id"
+        array participants
+        record last_message
+        datetime last_activity
+    }
+    
+    vlog {
+        string id PK
+        record author FK "FK to user.id"
+        string content_type
+        string media_url
+        bool is_public
+        int likes_count
+        datetime created_at
+    }
+    
+    group {
+        string id PK
+        string name
+        string group_type
+        geometry location_coordinates
+        bool is_public
+        int member_count
+    }
+```
+
 ## 🏗️ Architecture Components
 
 ### **Database Structure**
