@@ -7,30 +7,64 @@
 -- Authentication Access Methods
 -- ########################################################
 
--- User Authentication Access (SurrealDB v2.0 RECORD-based with enhanced features)
--- Supports both traditional email/password and OAuth authentication
+-- Unified User Authentication Access (SurrealDB v2.0 RECORD-based)
+-- Handles both email/password and OAuth authentication flows
 DEFINE ACCESS user ON DATABASE TYPE RECORD
     WITH JWT ALGORITHM HS256 KEY '${SURREALDB_JWT_SECRET}'
     
-    -- Signup logic for new users (email/password)
+    -- Signup logic for new users (supports both email/password and OAuth)
     SIGNUP (
-        CREATE user SET
-            email = $email,
-            password = IF $password != NONE THEN crypto::argon2::generate($password) ELSE NONE END,
-            oauth_providers = IF $oauth_providers != NONE THEN $oauth_providers ELSE [] END,
-            username = $username,
-            first_name = $first_name,
-            last_name = $last_name,
-            user_status = 'pending_waitlist_approval',
-            user_tier = 'basic',
-            created_at = time::now(),
-            updated_at = time::now()
+        -- Check if this is an OAuth signup
+        IF $provider != NONE AND $provider_id != NONE THEN {
+            -- OAuth signup flow
+            LET $existing = SELECT * FROM user WHERE oauth_providers[?provider = $provider].id = $provider_id;
+            IF $existing {
+                RETURN $existing[0];
+            } ELSE {
+                CREATE user SET
+                    email = $email,
+                    oauth_providers = [{
+                        provider: $provider,
+                        id: $provider_id,
+                        email: $email,
+                        name: $name,
+                        picture: $picture
+                    }],
+                    username = $username OR $email,
+                    first_name = $first_name,
+                    last_name = $last_name,
+                    user_status = 'pending_waitlist_approval',
+                    user_tier = 'basic',
+                    created_at = time::now(),
+                    updated_at = time::now()
+            };
+        } ELSE {
+            -- Traditional email/password signup
+            CREATE user SET
+                email = $email,
+                password = IF $password != NONE THEN crypto::argon2::generate($password) ELSE NONE END,
+                oauth_providers = [],
+                username = $username,
+                first_name = $first_name,
+                last_name = $last_name,
+                user_status = 'pending_waitlist_approval',
+                user_tier = 'basic',
+                created_at = time::now(),
+                updated_at = time::now()
+        }
     )
     
-    -- Signin logic for existing users (email/password)
+    -- Signin logic for existing users (supports both email/password and OAuth)
     SIGNIN (
-        SELECT * FROM user WHERE
-            email = $email AND password != NONE AND crypto::argon2::compare(password, $password)
+        -- Check if this is an OAuth signin
+        IF $provider != NONE AND $provider_id != NONE THEN {
+            -- OAuth signin flow
+            SELECT * FROM user WHERE oauth_providers[?provider = $provider].id = $provider_id
+        } ELSE {
+            -- Traditional email/password signin
+            SELECT * FROM user WHERE
+                email = $email AND password != NONE AND crypto::argon2::compare(password, $password)
+        }
     )
     
     -- Enhanced authentication with user status validation
@@ -62,55 +96,6 @@ DEFINE ACCESS user ON DATABASE TYPE RECORD
     DURATION FOR TOKEN 1h, FOR SESSION 12h
 ;
 
--- OAuth Authentication Access (separate access method for OAuth flows)
-DEFINE ACCESS oauth ON DATABASE TYPE RECORD
-    WITH JWT ALGORITHM HS256 KEY '${SURREALDB_JWT_SECRET}'
-    
-    -- OAuth signup - creates user if doesn't exist, links if exists
-    SIGNUP (
-        LET $existing = SELECT * FROM user WHERE oauth_providers[?provider = $provider].id = $provider_id;
-        IF $existing {
-            RETURN $existing[0];
-        } ELSE {
-            CREATE user SET
-                email = $email,
-                oauth_providers = [{
-                    provider: $provider,
-                    id: $provider_id,
-                    email: $email,
-                    name: $name,
-                    picture: $picture
-                }],
-                username = $email,
-                first_name = $first_name,
-                last_name = $last_name,
-                user_status = 'pending_waitlist_approval',
-                user_tier = 'basic',
-                created_at = time::now(),
-                updated_at = time::now()
-        };
-    )
-    
-    -- OAuth signin
-    SIGNIN (
-        SELECT * FROM user WHERE oauth_providers[?provider = $provider].id = $provider_id
-    )
-    
-    AUTHENTICATE {
-        IF $auth.id {
-            LET $user = SELECT * FROM user WHERE id = $auth.id;
-            IF $user AND $user[0].user_status = 'active' {
-                UPDATE user SET last_active_at = time::now() WHERE id = $auth.id;
-                RETURN $auth.id;
-            } ELSE {
-                THROW "OAuth user account is not active";
-            };
-        };
-    }
-    
-    DURATION FOR TOKEN 1h, FOR SESSION 12h
-;
-
 -- Worker Authentication Access
 -- For Cloudflare Workers to access the database
 DEFINE ACCESS worker ON DATABASE TYPE JWT
@@ -122,28 +107,7 @@ DEFINE ACCESS worker ON DATABASE TYPE JWT
 -- Authentication Utility Functions
 -- ########################################################
 
--- Legacy functions for backward compatibility (can be removed after migration)
-DEFINE FUNCTION fn::signup($email: string, $password: string, $oauth_providers: array, $username: string, $first_name: string, $last_name: string) {
-    CREATE user SET
-        email = $email,
-        password = IF $password != NONE THEN crypto::argon2::generate($password) ELSE NONE END,
-        oauth_providers = $oauth_providers,
-        username = $username,
-        first_name = $first_name,
-        last_name = $last_name,
-        user_status = 'pending_waitlist_approval',
-        user_tier = 'basic',
-        created_at = time::now(),
-        updated_at = time::now()
-};
-
-DEFINE FUNCTION fn::signin($email: string, $password: string, $provider: string, $provider_id: string) {
-    SELECT * FROM user WHERE
-        (email = $email AND password != NONE AND crypto::argon2::compare(password, $password)) OR
-        (oauth_providers[?provider = $provider].id = $provider_id)
-};
-
--- Enhanced utility functions
+-- Utility function to validate user access and status
 DEFINE FUNCTION fn::validate_user_access($user_id: record<user>) {
     LET $user = SELECT * FROM user WHERE id = $user_id;
     IF !$user {
@@ -155,6 +119,42 @@ DEFINE FUNCTION fn::validate_user_access($user_id: record<user>) {
     RETURN $user[0];
 };
 
-DEFINE FUNCTION fn::cleanup_expired_sessions() {
-    DELETE user_session WHERE expires_at < time::now() OR is_active = false;
+-- Utility function to link OAuth provider to existing user
+DEFINE FUNCTION fn::link_oauth_provider($user_id: record<user>, $provider: string, $provider_id: string, $email: string, $name: string, $picture: string) {
+    -- Check if provider is already linked
+    LET $user = SELECT * FROM user WHERE id = $user_id;
+    IF !$user {
+        THROW "User not found";
+    };
+    
+    -- Check if this OAuth account is already linked to another user
+    LET $existing = SELECT * FROM user WHERE oauth_providers[?provider = $provider].id = $provider_id AND id != $user_id;
+    IF $existing {
+        THROW "OAuth account already linked to another user";
+    };
+    
+    -- Add OAuth provider to user's oauth_providers array
+    UPDATE user SET oauth_providers += [{
+        provider: $provider,
+        id: $provider_id,
+        email: $email,
+        name: $name,
+        picture: $picture,
+        linked_at: time::now()
+    }] WHERE id = $user_id;
+    
+    RETURN true;
+};
+
+-- Utility function to unlink OAuth provider from user
+DEFINE FUNCTION fn::unlink_oauth_provider($user_id: record<user>, $provider: string) {
+    LET $user = SELECT * FROM user WHERE id = $user_id;
+    IF !$user {
+        THROW "User not found";
+    };
+    
+    -- Remove the OAuth provider from the array
+    UPDATE user SET oauth_providers = array::filter(oauth_providers, |$p| $p.provider != $provider) WHERE id = $user_id;
+    
+    RETURN true;
 };
