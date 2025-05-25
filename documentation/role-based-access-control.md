@@ -35,7 +35,7 @@ We chose a **role-based system** over a group-based system for the following rea
 **Permissions**:
 - **View**: Own complete user record + public fields of active users
 - **Update**: Own user record only
-- **Delete**: Can soft-delete own account
+- **Delete**: Can soft-delete own account only (no hard delete)
 - **Fields Access**: All own fields + public fields of others (id, username, first_name, last_name, profile_picture_url)
 
 **Use Cases**:
@@ -87,7 +87,7 @@ We chose a **role-based system** over a group-based system for the following rea
 **Permissions**:
 - **View**: All user records and all fields
 - **Update**: Any user record
-- **Delete**: Can soft-delete any user account
+- **Delete**: Can soft-delete OR hard-delete any user account
 - **Fields Access**: All fields including sensitive data (password hashes, OAuth providers, deletion info)
 
 **Use Cases**:
@@ -158,9 +158,41 @@ FOR select WHERE id = $auth.id OR user_status = 'active' OR $auth.role IN ['admi
 -- Users can update their own record, admins can update any, support/moderators cannot update
 FOR update WHERE id = $auth.id OR $access = 'backend_worker' OR $auth.role = 'admin'
 
--- Soft delete only - only admins can delete
-FOR delete WHERE (id = $auth.id OR $access = 'backend_worker' OR $auth.role = 'admin') AND deleted_at = NONE
+-- Hard delete allowed for admins and backend workers only
+FOR delete WHERE $access = 'backend_worker' OR $auth.role = 'admin'
 ```
+
+### Deletion Strategy: Soft Delete + Hard Delete
+
+The system supports both soft and hard deletion:
+
+#### **Soft Delete (Recommended for User Operations)**
+Use the dedicated function for user-facing deletions:
+
+```sql
+-- Soft delete a user (sets deleted_at timestamp)
+SELECT fn::soft_delete_user(user:example_id);
+```
+
+**Benefits:**
+- Preserves data for potential recovery
+- Maintains referential integrity
+- Audit trail preservation
+- GDPR compliance (can be restored if needed)
+
+#### **Hard Delete (Admin/System Operations Only)**
+Direct deletion for administrative cleanup:
+
+```sql
+-- Hard delete (permanent removal) - Admin only
+DELETE user:example_id;
+```
+
+**Use Cases:**
+- GDPR "right to be forgotten" requests
+- Spam/abuse account cleanup
+- System maintenance
+- Data retention policy enforcement
 
 ### Field-Level Permissions Examples
 ```sql
@@ -230,6 +262,67 @@ PERMISSIONS FOR select WHERE id = $auth.id OR $access = 'backend_worker' OR $aut
    ```sql
    UPDATE user SET user_status = 'suspended' WHERE email = 'formerstaff@yourapp.com';
    ```
+
+3. **Account Removal Options**:
+   
+   **Option A: Soft Delete (Recommended)**
+   ```sql
+   -- Get the user ID first
+   LET $user = SELECT id FROM user WHERE email = 'formerstaff@yourapp.com';
+   -- Then soft delete (preserves data)
+   SELECT fn::soft_delete_user($user[0].id);
+   ```
+   
+   **Option B: Hard Delete (Permanent)**
+   ```sql
+   -- Permanent removal (admin only)
+   DELETE user WHERE email = 'formerstaff@yourapp.com';
+   ```
+
+### User Account Deletion
+
+#### **User Self-Deletion (Soft Delete Only)**
+```sql
+-- Users can only soft delete their own account
+SELECT fn::soft_delete_user($auth.id);
+```
+
+#### **Admin Account Management**
+
+**Soft Delete (Recoverable)**:
+```sql
+-- Soft delete any user account (preserves data)
+SELECT fn::soft_delete_user(user:specific_user_id);
+```
+
+**Hard Delete (Permanent)**:
+```sql
+-- Permanent deletion (use with caution)
+DELETE user:specific_user_id;
+```
+
+**Restore Soft-Deleted Account**:
+```sql
+-- Only admins can restore deleted accounts
+UPDATE user SET deleted_at = NONE, updated_at = time::now()
+WHERE id = user:specific_user_id AND deleted_at != NONE;
+```
+
+#### **GDPR Compliance**
+
+**Right to be Forgotten (Hard Delete)**:
+```sql
+-- Permanent data removal for GDPR compliance
+DELETE user WHERE email = 'user@example.com';
+```
+
+**Data Export Before Deletion**:
+```sql
+-- Export user data before permanent deletion
+SELECT * FROM user WHERE email = 'user@example.com';
+-- Then delete
+DELETE user WHERE email = 'user@example.com';
+```
 
 ### Emergency Access Procedures
 

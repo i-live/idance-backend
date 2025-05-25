@@ -251,3 +251,26 @@ DEFINE FUNCTION fn::unlink_oauth_provider($user_id: record<user>, $provider: str
     
     RETURN true;
 };
+
+-- Utility function to soft delete users (sets deleted_at timestamp)
+DEFINE FUNCTION fn::soft_delete_user($user_id: record<user>) {
+    -- Check if user exists and is not already deleted
+    LET $user = SELECT * FROM $user_id WHERE deleted_at = NONE;
+    
+    IF !$user {
+        THROW "User not found or already deleted";
+    };
+    
+    -- Check permissions: user can delete own account, admins can delete any
+    IF $user_id != $auth.id AND $auth.role != 'admin' AND $access != 'backend_worker' {
+        THROW "Permission denied: cannot delete this user";
+    };
+    
+    -- Perform soft delete
+    UPDATE $user_id SET
+        deleted_at = time::now(),
+        updated_at = time::now()
+    WHERE deleted_at = NONE;
+    
+    RETURN "User soft deleted successfully";
+};

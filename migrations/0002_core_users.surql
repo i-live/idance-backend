@@ -54,9 +54,8 @@ DEFINE TABLE user SCHEMAFULL
         -- Users can update their own record, admins can update any, support/moderators cannot update
         FOR update WHERE id = $auth.id OR $access = 'backend_worker' OR $auth.role = 'admin'
         
-        -- Soft delete only (set deleted_at instead of actual deletion) - only admins can delete
-        FOR delete WHERE (id = $auth.id OR $access = 'backend_worker' OR $auth.role = 'admin') AND deleted_at = NONE
-            SET deleted_at = time::now();
+        -- Hard delete allowed for admins and backend workers only
+        FOR delete WHERE $access = 'backend_worker' OR $auth.role = 'admin';
 
 -- User table fields
 DEFINE FIELD email ON user TYPE string ASSERT string::is::email($value)
