@@ -1,7 +1,12 @@
 -- migrations/0001_authentication.surql
 -- Authentication: Access Methods and Security Functions
--- This migration sets up SurrealDB v2.0 authentication with JWT tokens
+-- This migration sets up SurrealDB v2.0 authentication with JWT tokens and role-based access
 -- Requires: 0000_namespace_database.surql
+--
+-- ROLE SYSTEM INTEGRATION:
+-- All new users are created with role = 'user' by default
+-- Admin roles must be assigned manually after user creation:
+-- UPDATE user SET role = 'admin' WHERE email = 'admin@yourapp.com';
 
 -- ########################################################
 -- Authentication Helper Functions
@@ -69,6 +74,7 @@ DEFINE FUNCTION fn::signup_username_password($email: string, $password: string, 
             username = $username OR string::split($email, '@')[0],
             first_name = $first_name OR '',
             last_name = $last_name OR '',
+            role = 'user',
             user_status = 'pending_waitlist_approval',
             user_tier = 'basic',
             created_at = time::now(),
@@ -111,6 +117,7 @@ DEFINE FUNCTION fn::signup_oauth($email: string, $provider: string, $provider_id
             username = $username OR string::split($email, '@')[0],
             first_name = $first_name OR string::split($name OR '', ' ')[0] OR '',
             last_name = $last_name OR string::split($name OR '', ' ')[1] OR '',
+            role = 'user',
             user_status = 'pending_waitlist_approval',
             user_tier = 'basic',
             created_at = time::now(),

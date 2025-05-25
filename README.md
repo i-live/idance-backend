@@ -110,6 +110,7 @@ SURREALDB_WORKER_JWT_SECRET=your-worker-secret
 ### Essential Guides
 
 - **[Authentication Guide](./documentation/authentication.md)**: Complete authentication setup
+- **[Role-Based Access Control](./documentation/role-based-access-control.md)**: User roles and permissions system
 - **[JWT Secrets Guide](./documentation/jwt-secrets-guide.md)**: Secure secret management
 - **[Database Schema](./documentation/database.md)**: Database design and relationships
 - **[Architecture Overview](./documentation/architecture.md)**: System design and patterns
