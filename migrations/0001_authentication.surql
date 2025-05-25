@@ -4,6 +4,121 @@
 -- Requires: 0000_namespace_database.surql
 
 -- ########################################################
+-- Authentication Helper Functions
+-- ########################################################
+
+-- NOTE: SurrealDB SIGNUP blocks have syntax limitations and cannot use LET/IF statements.
+-- Reference: https://github.com/surrealdb/docs.surrealdb.com/blob/main/src/content/doc-surrealql/statements/define/access/record.mdx
+-- SIGNUP blocks can only contain simple expressions or function calls, unlike AUTHENTICATE blocks.
+-- Therefore, complex signup logic (duplicate prevention, account linking) must be in functions.
+
+-- HOW VARIABLES ARE PASSED TO ACCESS METHODS:
+-- Client SDKs pass variables via the 'variables' object in signup/signin calls:
+--
+-- JavaScript Example:
+-- await db.signup({
+--     namespace: 'surrealdb',
+--     database: 'docs',
+--     access: 'username_password',
+--     variables: {
+--         email: 'user@example.com',
+--         password: 'secret123',
+--         username: 'johndoe',
+--         first_name: 'John',
+--         last_name: 'Doe'
+--     }
+-- });
+--
+-- These variables become $-prefixed parameters in SIGNUP/SIGNIN/AUTHENTICATE blocks:
+-- - variables.email → $email
+-- - variables.password → $password
+-- - variables.username → $username
+-- - variables.first_name → $first_name
+-- - variables.last_name → $last_name
+-- - variables.provider → $provider (for OAuth)
+-- - variables.provider_id → $provider_id (for OAuth)
+-- - variables.name → $name (for OAuth full name)
+-- - variables.picture → $picture (for OAuth avatar)
+--
+-- AUTHENTICATE block also has access to:
+-- - $auth: The authenticated user record (after successful signin)
+-- - $token: JWT token claims (for JWT-based authentication)
+-- - $session: Current session information
+
+-- Function to handle username/password signup or linking to existing OAuth accounts
+DEFINE FUNCTION fn::signup_username_password($email: string, $password: string, $username: option<string>, $first_name: option<string>, $last_name: option<string>) {
+    -- Check if user with same email already exists
+    LET $existing = SELECT * FROM user WHERE email = $email;
+    
+    IF array::len($existing) > 0 {
+        -- User exists, add password to existing user (likely OAuth-only user adding email/password)
+        UPDATE user SET
+            password = crypto::argon2::generate($password),
+            username = $username OR username,
+            first_name = $first_name OR first_name,
+            last_name = $last_name OR last_name,
+            updated_at = time::now()
+        WHERE email = $email;
+        RETURN $existing[0];
+    } ELSE {
+        -- Create new user with email/password
+        RETURN CREATE user SET
+            email = $email,
+            password = crypto::argon2::generate($password),
+            oauth_providers = [],
+            username = $username OR string::split($email, '@')[0],
+            first_name = $first_name OR '',
+            last_name = $last_name OR '',
+            user_status = 'pending_waitlist_approval',
+            user_tier = 'basic',
+            created_at = time::now(),
+            updated_at = time::now();
+    };
+};
+
+-- Function to handle OAuth signup or linking to existing accounts
+DEFINE FUNCTION fn::signup_oauth($email: string, $provider: string, $provider_id: string, $username: option<string>, $first_name: option<string>, $last_name: option<string>, $name: option<string>, $picture: option<string>) {
+    -- First check if OAuth provider account already exists
+    LET $existing_oauth = SELECT * FROM user WHERE oauth_providers[?provider = $provider].id = $provider_id;
+    IF array::len($existing_oauth) > 0 {
+        RETURN $existing_oauth[0];
+    };
+    
+    -- Check if user with same email already exists (prevent duplicates)
+    LET $existing_email = SELECT * FROM user WHERE email = $email;
+    IF array::len($existing_email) > 0 {
+        -- Link OAuth provider to existing user
+        UPDATE user SET oauth_providers += [{
+            provider: $provider,
+            id: $provider_id,
+            email: $email,
+            name: $name,
+            picture: $picture,
+            linked_at: time::now()
+        }] WHERE email = $email;
+        RETURN $existing_email[0];
+    } ELSE {
+        -- Create new user with OAuth data
+        RETURN CREATE user SET
+            email = $email,
+            oauth_providers = [{
+                provider: $provider,
+                id: $provider_id,
+                email: $email,
+                name: $name,
+                picture: $picture
+            }],
+            username = $username OR string::split($email, '@')[0],
+            first_name = $first_name OR string::split($name OR '', ' ')[0] OR '',
+            last_name = $last_name OR string::split($name OR '', ' ')[1] OR '',
+            user_status = 'pending_waitlist_approval',
+            user_tier = 'basic',
+            created_at = time::now(),
+            updated_at = time::now();
+    };
+};
+
+-- ########################################################
 -- Authentication Access Methods
 -- ########################################################
 
@@ -11,32 +126,7 @@
 -- Handles traditional email/password authentication with NextAuth.js integration
 DEFINE ACCESS username_password ON DATABASE TYPE RECORD
     SIGNUP (
-        -- Check if user with same email already exists
-        LET $existing = SELECT * FROM user WHERE email = $email;
-        IF $existing {
-            -- Add password to existing user (likely OAuth-only user adding email/password)
-            UPDATE user SET
-                password = $password AND crypto::argon2::generate($password),
-                username = $username OR username,
-                first_name = $first_name OR first_name,
-                last_name = $last_name OR last_name,
-                updated_at = time::now()
-            WHERE email = $email;
-            RETURN $existing[0];
-        } ELSE {
-            -- Create new user with email/password
-            CREATE user SET
-                email = $email,
-                password = $password AND crypto::argon2::generate($password),
-                oauth_providers = [],
-                username = $username OR string::split($email, '@')[0],
-                first_name = $first_name OR '',
-                last_name = $last_name OR '',
-                user_status = 'pending_waitlist_approval',
-                user_tier = 'basic',
-                created_at = time::now(),
-                updated_at = time::now()
-        };
+        fn::signup_username_password($email, $password, $username, $first_name, $last_name)
     )
     SIGNIN (
         SELECT * FROM user WHERE
@@ -72,44 +162,7 @@ DEFINE ACCESS username_password ON DATABASE TYPE RECORD
 -- OAuth Authentication Access (separate access method for OAuth flows)
 DEFINE ACCESS oauth ON DATABASE TYPE RECORD
     SIGNUP (
-        -- First check if OAuth provider account already exists
-        LET $existing_oauth = SELECT * FROM user WHERE oauth_providers[?provider = $provider].id = $provider_id;
-        IF $existing_oauth {
-            RETURN $existing_oauth[0];
-        } ELSE {
-            -- Check if user with same email already exists (prevent duplicates)
-            LET $existing_email = SELECT * FROM user WHERE email = $email;
-            IF $existing_email {
-                -- Link OAuth provider to existing user
-                UPDATE user SET oauth_providers += [{
-                    provider: $provider,
-                    id: $provider_id,
-                    email: $email,
-                    name: $name,
-                    picture: $picture,
-                    linked_at: time::now()
-                }] WHERE email = $email;
-                RETURN $existing_email[0];
-            } ELSE {
-                -- Create new user with OAuth data
-                CREATE user SET
-                    email = $email,
-                    oauth_providers = [{
-                        provider: $provider,
-                        id: $provider_id,
-                        email: $email,
-                        name: $name,
-                        picture: $picture
-                    }],
-                    username = $username OR string::split($email, '@')[0],
-                    first_name = $first_name OR string::split($name OR '', ' ')[0] OR '',
-                    last_name = $last_name OR string::split($name OR '', ' ')[1] OR '',
-                    user_status = 'pending_waitlist_approval',
-                    user_tier = 'basic',
-                    created_at = time::now(),
-                    updated_at = time::now()
-            };
-        };
+        fn::signup_oauth($email, $provider, $provider_id, $username, $first_name, $last_name, $name, $picture)
     )
     SIGNIN (
         SELECT * FROM user WHERE oauth_providers[?provider = $provider].id = $provider_id
