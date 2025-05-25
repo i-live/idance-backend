@@ -7,67 +7,27 @@
 -- Authentication Access Methods
 -- ########################################################
 
--- Unified User Authentication Access (SurrealDB v2.0 RECORD-based)
--- Handles both email/password and OAuth authentication flows
+-- User Authentication Access (SurrealDB v2.0 RECORD-based with JWT support)
+-- Supports both traditional email/password and OAuth authentication with NextAuth.js integration
 DEFINE ACCESS user ON DATABASE TYPE RECORD
-    WITH JWT ALGORITHM HS256 KEY '${SURREALDB_JWT_SECRET}'
-    
-    -- Signup logic for new users (supports both email/password and OAuth)
     SIGNUP (
-        -- Check if this is an OAuth signup
-        IF $provider != NONE AND $provider_id != NONE THEN {
-            -- OAuth signup flow
-            LET $existing = SELECT * FROM user WHERE oauth_providers[?provider = $provider].id = $provider_id;
-            IF $existing {
-                RETURN $existing[0];
-            } ELSE {
-                CREATE user SET
-                    email = $email,
-                    oauth_providers = [{
-                        provider: $provider,
-                        id: $provider_id,
-                        email: $email,
-                        name: $name,
-                        picture: $picture
-                    }],
-                    username = $username OR $email,
-                    first_name = $first_name,
-                    last_name = $last_name,
-                    user_status = 'pending_waitlist_approval',
-                    user_tier = 'basic',
-                    created_at = time::now(),
-                    updated_at = time::now()
-            };
-        } ELSE {
-            -- Traditional email/password signup
-            CREATE user SET
-                email = $email,
-                password = IF $password != NONE THEN crypto::argon2::generate($password) ELSE NONE END,
-                oauth_providers = [],
-                username = $username,
-                first_name = $first_name,
-                last_name = $last_name,
-                user_status = 'pending_waitlist_approval',
-                user_tier = 'basic',
-                created_at = time::now(),
-                updated_at = time::now()
-        }
+        CREATE user SET
+            email = $email,
+            password = $password AND crypto::argon2::generate($password),
+            oauth_providers = $oauth_providers OR [],
+            username = $username,
+            first_name = $first_name,
+            last_name = $last_name,
+            user_status = 'pending_waitlist_approval',
+            user_tier = 'basic',
+            created_at = time::now(),
+            updated_at = time::now()
     )
-    
-    -- Signin logic for existing users (supports both email/password and OAuth)
     SIGNIN (
-        -- Check if this is an OAuth signin
-        IF $provider != NONE AND $provider_id != NONE THEN {
-            -- OAuth signin flow
-            SELECT * FROM user WHERE oauth_providers[?provider = $provider].id = $provider_id
-        } ELSE {
-            -- Traditional email/password signin
-            SELECT * FROM user WHERE
-                email = $email AND password != NONE AND crypto::argon2::compare(password, $password)
-        }
+        SELECT * FROM user WHERE
+            email = $email AND password != NONE AND crypto::argon2::compare(password, $password)
     )
-    
-    -- Enhanced authentication with user status validation
+    WITH JWT ALGORITHM HS256 KEY '${SURREALDB_JWT_SECRET}'
     AUTHENTICATE {
         IF $auth.id {
             -- Verify user is still active and update last_active_at
@@ -91,15 +51,56 @@ DEFINE ACCESS user ON DATABASE TYPE RECORD
             };
         };
     }
-    
-    -- Set token and session durations
     DURATION FOR TOKEN 1h, FOR SESSION 12h
 ;
 
--- Worker Authentication Access
--- For Cloudflare Workers to access the database
+-- OAuth Authentication Access (separate access method for OAuth flows)
+DEFINE ACCESS oauth ON DATABASE TYPE RECORD
+    SIGNUP (
+        LET $existing = SELECT * FROM user WHERE oauth_providers[?provider = $provider].id = $provider_id;
+        IF $existing {
+            RETURN $existing[0];
+        } ELSE {
+            CREATE user SET
+                email = $email,
+                oauth_providers = [{
+                    provider: $provider,
+                    id: $provider_id,
+                    email: $email,
+                    name: $name,
+                    picture: $picture
+                }],
+                username = $username OR $email,
+                first_name = $first_name,
+                last_name = $last_name,
+                user_status = 'pending_waitlist_approval',
+                user_tier = 'basic',
+                created_at = time::now(),
+                updated_at = time::now()
+        };
+    )
+    SIGNIN (
+        SELECT * FROM user WHERE oauth_providers[?provider = $provider].id = $provider_id
+    )
+    WITH JWT ALGORITHM HS256 KEY '${SURREALDB_JWT_SECRET}'
+    AUTHENTICATE {
+        IF $auth.id {
+            LET $user = SELECT * FROM user WHERE id = $auth.id;
+            IF $user AND $user[0].user_status = 'active' {
+                UPDATE user SET last_active_at = time::now() WHERE id = $auth.id;
+                RETURN $auth.id;
+            } ELSE {
+                THROW "OAuth user account is not active";
+            };
+        };
+    }
+    DURATION FOR TOKEN 1h, FOR SESSION 12h
+;
+
+-- Worker Authentication Access (for Cloudflare Workers - system level)
+-- This one correctly uses TYPE JWT since workers need system-level access
 DEFINE ACCESS worker ON DATABASE TYPE JWT
-    WITH ALGORITHM HS256 KEY '${SURREALDB_WORKER_JWT_SECRET}'
+    ALGORITHM HS256 KEY '${SURREALDB_WORKER_JWT_SECRET}'
     DURATION FOR TOKEN 24h
 ;
 
