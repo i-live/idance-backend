@@ -37,10 +37,17 @@ use database dev;
 
 -- User Authentication Access
 -- JWT-based authentication with OAuth2 support for NextAuth.js integration
-DEFINE ACCESS user ON DATABASE TYPE RECORD
-    SIGNUP ( CREATE user SET
+-- User Authentication Access (JWT-based for NextAuth.js compatibility)
+DEFINE ACCESS user ON DATABASE TYPE JWT
+    WITH ISSUER KEY 'your-jwt-secret-key'
+    WITH ALGORITHM HS256
+    WITH DURATION 1h;
+
+-- User signup function (called by your backend)
+DEFINE FUNCTION fn::signup($email: string, $password: string, $oauth_providers: array, $username: string, $first_name: string, $last_name: string) {
+    CREATE user SET
         email = $email,
-        password = crypto::argon2::generate($password),
+        password = IF $password != NONE THEN crypto::argon2::generate($password) ELSE NONE END,
         oauth_providers = $oauth_providers,
         username = $username,
         first_name = $first_name,
@@ -49,19 +56,21 @@ DEFINE ACCESS user ON DATABASE TYPE RECORD
         user_tier = 'basic',
         created_at = time::now(),
         updated_at = time::now()
-    )
-    SIGNIN ( SELECT * FROM user WHERE
+};
+
+-- User signin function (called by your backend)
+DEFINE FUNCTION fn::signin($email: string, $password: string, $provider: string, $provider_id: string) {
+    SELECT * FROM user WHERE
         (email = $email AND password != NONE AND crypto::argon2::compare(password, $password)) OR
         (oauth_providers[?provider = $provider].id = $provider_id)
-    )
-    WITH JWT ALGORITHM HS256 DURATION 1h;
+};
 
 -- Worker Authentication Access
 -- For Cloudflare Workers to access the database
 DEFINE ACCESS worker ON DATABASE TYPE JWT
     WITH ISSUER KEY '<jwt-secret>'
     WITH ALGORITHM HS256
-    DURATION 24h;
+    WITH DURATION 24h;
 
 -- ########################################################
 -- User Table

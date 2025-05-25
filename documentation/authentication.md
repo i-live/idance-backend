@@ -36,15 +36,43 @@ DEFINE DATABASE test;   -- Testing environment
 
 Each database requires its own access definitions to be applied separately.
 
+## Cross-Platform Compatibility
+
+This authentication system is designed to work seamlessly across multiple platforms:
+
+### Supported Platforms
+- **Web Applications** (Next.js with NextAuth.js)
+- **React Native Mobile Apps** (iOS and Android)
+- **Backend Services** (Cloudflare Workers, Node.js, etc.)
+
+### Unified Backend Approach
+All platforms use the same backend API endpoints for authentication:
+- **Single Source of Truth**: All authentication logic is centralized in your backend
+- **Consistent JWT Tokens**: Same JWT tokens work across web and mobile
+- **Shared User Database**: All platforms access the same SurrealDB user records
+- **OAuth Flexibility**: OAuth providers work on both web and mobile through the backend
+
+### Platform-Specific Integration
+- **Web (NextAuth.js)**: NextAuth.js handles OAuth flows and calls your backend API
+- **Mobile (React Native)**: Direct API calls to your backend, with libraries like `expo-auth-session` for OAuth
+- **Backend Services**: Direct SurrealDB function calls with worker JWT tokens
+
 ## SurrealDB Schema
 
-### User Authentication Access
+### User Authentication Access (JWT-based for NextAuth.js)
 
 ```sql
-DEFINE ACCESS user ON DATABASE TYPE RECORD
-    SIGNUP ( CREATE user SET
+-- User Authentication Access (JWT-based for NextAuth.js compatibility)
+DEFINE ACCESS user ON DATABASE TYPE JWT
+    WITH ISSUER KEY 'your-jwt-secret-key'
+    WITH ALGORITHM HS256
+    WITH DURATION 1h;
+
+-- User signup function (called by your backend)
+DEFINE FUNCTION fn::signup($email: string, $password: string, $oauth_providers: array, $username: string, $first_name: string, $last_name: string) {
+    CREATE user SET
         email = $email,
-        password = crypto::argon2::generate($password),
+        password = IF $password != NONE THEN crypto::argon2::generate($password) ELSE NONE END,
         oauth_providers = $oauth_providers,
         username = $username,
         first_name = $first_name,
@@ -53,12 +81,14 @@ DEFINE ACCESS user ON DATABASE TYPE RECORD
         user_tier = 'basic',
         created_at = time::now(),
         updated_at = time::now()
-    )
-    SIGNIN ( SELECT * FROM user WHERE
+};
+
+-- User signin function (called by your backend)
+DEFINE FUNCTION fn::signin($email: string, $password: string, $provider: string, $provider_id: string) {
+    SELECT * FROM user WHERE
         (email = $email AND password != NONE AND crypto::argon2::compare(password, $password)) OR
         (oauth_providers[?provider = $provider].id = $provider_id)
-    )
-    WITH JWT ALGORITHM HS256 DURATION 1h;
+};
 ```
 
 ### Worker Authentication Access
@@ -67,34 +97,49 @@ DEFINE ACCESS user ON DATABASE TYPE RECORD
 DEFINE ACCESS worker ON DATABASE TYPE JWT
     WITH ISSUER KEY '<jwt-secret>'
     WITH ALGORITHM HS256
-    DURATION 24h;
+    WITH DURATION 24h;
 ```
 
 ## Authentication Methods
 
+### JWT-Based Authentication for NextAuth.js
+
+This approach uses JWT tokens that are compatible with NextAuth.js while leveraging SurrealDB's authentication system.
+
+**Key Benefits:**
+- **NextAuth.js Compatibility**: JWT tokens work seamlessly with NextAuth.js
+- **Centralized Authentication**: Your backend handles all authentication logic
+- **Flexible Integration**: Supports both traditional and OAuth authentication flows
+
 ### 1. Email/Password Authentication
 
 **SIGNUP Process:**
-- Creates new user record with hashed password using Argon2
+- Your backend calls `fn::signup()` function with user data
+- Function creates new user record with hashed password using Argon2
 - Sets default user status to `pending_waitlist_approval`
 - Sets default user tier to `basic`
-- Stores creation and update timestamps
+- Your backend generates JWT token for the user
 
 **SIGNIN Process:**
-- Verifies email exists and password is not null
+- Your backend calls `fn::signin()` function with credentials
+- Function verifies email exists and password is not null
 - Uses Argon2 to compare provided password with stored hash
-- Returns user record if authentication successful
+- Your backend generates JWT token if authentication successful
 
 ### 2. OAuth Authentication
 
 **SIGNUP Process:**
-- Creates user record with OAuth provider information
-- Stores provider data in `oauth_providers` array field
+- NextAuth.js handles OAuth flow and returns user data
+- Your backend calls `fn::signup()` with OAuth provider information
+- Function creates user record with provider data in `oauth_providers` array
 - No password field required for OAuth-only users
+- Your backend generates JWT token for the user
 
 **SIGNIN Process:**
-- Matches user by provider and provider-specific user ID
-- Uses array query syntax: `oauth_providers[?provider = $provider].id = $provider_id`
+- NextAuth.js handles OAuth flow and returns user data
+- Your backend calls `fn::signin()` with provider credentials
+- Function matches user by provider and provider-specific user ID
+- Your backend generates JWT token if user found
 
 ## OAuth Providers Data Structure
 
@@ -409,4 +454,104 @@ await db.signin({ /* user credentials */ })
 3. **Data Synchronization**: Implement proper data migration strategies if needed
 4. **Testing**: Test authentication in each database environment separately
 
-This authentication system provides a robust, secure foundation for user management with support for both traditional and modern OAuth-based authentication methods, with proper database isolation for different environments.
+## React Native Integration
+
+### Authentication Flow for Mobile Apps
+
+React Native apps can use the same backend API endpoints as the web application:
+
+```javascript
+// React Native authentication service
+class AuthService {
+  constructor() {
+    this.baseURL = 'https://your-backend-api.com'
+  }
+
+  // Email/Password Sign In
+  async signInWithCredentials(email, password) {
+    const response = await fetch(`${this.baseURL}/auth/signin`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password })
+    })
+    
+    if (response.ok) {
+      const { token, user } = await response.json()
+      await this.storeToken(token)
+      return { token, user }
+    }
+    throw new Error('Authentication failed')
+  }
+
+  // OAuth Sign In (using expo-auth-session or similar)
+  async signInWithOAuth(provider) {
+    // Use expo-auth-session or react-native-app-auth
+    const oauthResult = await this.performOAuthFlow(provider)
+    
+    const response = await fetch(`${this.baseURL}/auth/oauth-signin`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        provider: provider,
+        provider_id: oauthResult.user.id,
+        email: oauthResult.user.email,
+        name: oauthResult.user.name,
+        picture: oauthResult.user.picture
+      })
+    })
+    
+    if (response.ok) {
+      const { token, user } = await response.json()
+      await this.storeToken(token)
+      return { token, user }
+    }
+    throw new Error('OAuth authentication failed')
+  }
+
+  // Store JWT token securely
+  async storeToken(token) {
+    // Use @react-native-async-storage/async-storage or expo-secure-store
+    await SecureStore.setItemAsync('auth_token', token)
+  }
+
+  // Get stored token
+  async getToken() {
+    return await SecureStore.getItemAsync('auth_token')
+  }
+
+  // Make authenticated API calls
+  async authenticatedFetch(url, options = {}) {
+    const token = await this.getToken()
+    return fetch(url, {
+      ...options,
+      headers: {
+        ...options.headers,
+        'Authorization': `Bearer ${token}`
+      }
+    })
+  }
+}
+```
+
+### OAuth Libraries for React Native
+
+**Recommended Libraries:**
+- **Expo**: `expo-auth-session` for OAuth flows
+- **React Native**: `react-native-app-auth` for OAuth flows
+- **Storage**: `expo-secure-store` or `@react-native-keychain/react-native-keychain` for secure token storage
+
+### Backend API Endpoints
+
+Your backend should expose these endpoints for both web and mobile:
+
+```javascript
+// Backend API endpoints (same for web and mobile)
+POST /auth/signin              // Email/password authentication
+POST /auth/signup              // User registration
+POST /auth/oauth-signin        // OAuth authentication
+POST /auth/refresh             // Token refresh
+POST /auth/logout              // User logout
+GET  /auth/me                  // Get current user info
+```
+
+This authentication system provides a robust, secure foundation for user management with support for both traditional and modern OAuth-based authentication methods, with proper database isolation for different environments and full cross-platform compatibility.
