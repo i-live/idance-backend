@@ -1,30 +1,18 @@
 import { Surreal } from 'surrealdb'
 
-export interface SurrealDBConfig {
-  url: string
-  namespace: string
-  database: string
-  jwtSecret?: string
-  workerJwtSecret?: string
-}
-
-export class SurrealDBClient {
+// Create a singleton SurrealDB client instance
+class SurrealDBClient {
   private static instance: SurrealDBClient
   private db: Surreal
-  private config: SurrealDBConfig
-  private isConnected = false
+  private isConnected: boolean = false
 
-  private constructor(config: SurrealDBConfig) {
+  private constructor() {
     this.db = new Surreal()
-    this.config = config
   }
 
-  public static getInstance(config?: SurrealDBConfig): SurrealDBClient {
+  public static getInstance(): SurrealDBClient {
     if (!SurrealDBClient.instance) {
-      if (!config) {
-        throw new Error('SurrealDBClient config is required for first initialization')
-      }
-      SurrealDBClient.instance = new SurrealDBClient(config)
+      SurrealDBClient.instance = new SurrealDBClient()
     }
     return SurrealDBClient.instance
   }
@@ -35,14 +23,32 @@ export class SurrealDBClient {
     }
 
     try {
-      await this.db.connect(this.config.url)
+      const url = process.env.SURREALDB_URL || 'ws://localhost:8000/rpc'
+      const namespace = process.env.SURREALDB_NAMESPACE || 'idance'
+      const database = process.env.SURREALDB_DATABASE || 'dev'
+      const username = process.env.SURREALDB_ROOT_USER || 'root'
+      const password = process.env.SURREALDB_ROOT_PASS || 'root'
+
+      // Connect to the database
+      await this.db.connect(url)
+
+      // Select namespace and database
       await this.db.use({
-        namespace: this.config.namespace,
-        database: this.config.database,
+        namespace,
+        database
       })
+
+      // Sign in as root user
+      await this.db.signin({
+        username,
+        password
+      })
+
       this.isConnected = true
+      console.log('✅ Connected to SurrealDB')
     } catch (error) {
-      console.error('Failed to connect to SurrealDB:', error)
+      console.error('❌ Failed to connect to SurrealDB:', error)
+      this.isConnected = false
       throw error
     }
   }
@@ -51,122 +57,59 @@ export class SurrealDBClient {
     if (this.isConnected) {
       await this.db.close()
       this.isConnected = false
+      console.log('🔌 Disconnected from SurrealDB')
     }
   }
 
-  public getDB(): Surreal {
+  public async query<T = any>(sql: string, vars?: Record<string, any>): Promise<T[]> {
+    await this.ensureConnected()
+    return this.db.query(sql, vars)
+  }
+
+  public async select<T = any>(thing: string): Promise<T[]> {
+    await this.ensureConnected()
+    const result = await this.db.select(thing)
+    return result as T[]
+  }
+
+  public async create<T = any>(thing: string, data?: Record<string, any>): Promise<T> {
+    await this.ensureConnected()
+    const result = await this.db.create(thing, data)
+    return result as T
+  }
+
+  public async update<T = any>(thing: string, data?: Record<string, any>): Promise<T> {
+    await this.ensureConnected()
+    const result = await this.db.update(thing, data)
+    return result as T
+  }
+
+  public async merge<T = any>(thing: string, data?: Record<string, any>): Promise<T> {
+    await this.ensureConnected()
+    const result = await this.db.merge(thing, data)
+    return result as T
+  }
+
+  public async delete(thing: string): Promise<void> {
+    await this.ensureConnected()
+    await this.db.delete(thing)
+  }
+
+  private async ensureConnected(): Promise<void> {
     if (!this.isConnected) {
-      throw new Error('SurrealDB client is not connected. Call connect() first.')
+      await this.connect()
     }
+  }
+
+  public getDb(): Surreal {
     return this.db
   }
 
-  public async signUp(credentials: {
-    access: 'username_password' | 'oauth'
-    email: string
-    password?: string
-    username?: string
-    first_name?: string
-    last_name?: string
-    provider?: string
-    provider_id?: string
-    name?: string
-    picture?: string
-  }): Promise<any> {
-    await this.connect()
-    return await this.db.signup({
-      namespace: this.config.namespace,
-      database: this.config.database,
-      access: credentials.access,
-      variables: {
-        email: credentials.email,
-        password: credentials.password,
-        username: credentials.username,
-        first_name: credentials.first_name,
-        last_name: credentials.last_name,
-        provider: credentials.provider,
-        provider_id: credentials.provider_id,
-        name: credentials.name,
-        picture: credentials.picture,
-      }
-    })
-  }
-
-  public async signIn(credentials: {
-    access: 'username_password' | 'oauth'
-    email?: string
-    password?: string
-    provider?: string
-    provider_id?: string
-  }): Promise<any> {
-    await this.connect()
-    return await this.db.signin({
-      namespace: this.config.namespace,
-      database: this.config.database,
-      access: credentials.access,
-      variables: {
-        email: credentials.email,
-        password: credentials.password,
-        provider: credentials.provider,
-        provider_id: credentials.provider_id,
-      }
-    })
-  }
-
-  public async authenticate(token: string): Promise<any> {
-    await this.connect()
-    return await this.db.authenticate(token)
-  }
-
-  public async query(sql: string, vars?: Record<string, any>): Promise<any> {
-    await this.connect()
-    return await this.db.query(sql, vars)
-  }
-
-  public async select(table: string): Promise<any> {
-    await this.connect()
-    return await this.db.select(table)
-  }
-
-  public async create(table: string, data: Record<string, any>): Promise<any> {
-    await this.connect()
-    return await this.db.create(table, data)
-  }
-
-  public async update(id: string, data: Record<string, any>): Promise<any> {
-    await this.connect()
-    return await this.db.update(id, data)
-  }
-
-  public async delete(id: string): Promise<any> {
-    await this.connect()
-    return await this.db.delete(id)
+  public isDbConnected(): boolean {
+    return this.isConnected
   }
 }
 
-// Default configuration factory
-export function createSurrealDBConfig(): SurrealDBConfig {
-  const url = process.env.SURREALDB_URL || process.env.NEXT_PUBLIC_SURREALDB_URL
-  const namespace = process.env.SURREALDB_NAMESPACE || 'idance'
-  const database = process.env.SURREALDB_DATABASE || 'dev'
-  const jwtSecret = process.env.SURREALDB_JWT_SECRET
-  const workerJwtSecret = process.env.SURREALDB_WORKER_JWT_SECRET
-
-  if (!url) {
-    throw new Error('SURREALDB_URL or NEXT_PUBLIC_SURREALDB_URL environment variable is required')
-  }
-
-  return {
-    url,
-    namespace,
-    database,
-    jwtSecret,
-    workerJwtSecret,
-  }
-}
-
-// Export a default instance getter
-export function getSurrealDB(): SurrealDBClient {
-  const config = createSurrealDBConfig()
-  return SurrealDBClient.getInstance(config)
-}
+// Export singleton instance
+export const surrealClient = SurrealDBClient.getInstance()
+export default surrealClient
