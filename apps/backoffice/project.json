@@ -1,0 +1,75 @@
+{
+  "name": "backoffice",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "apps/backoffice/src",
+  "projectType": "application",
+  "targets": {
+    "dev": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "next dev -p 3002",
+        "cwd": "apps/backoffice"
+      }
+    },
+    "build": {
+      "executor": "nx:run-commands",
+      "outputs": ["{projectRoot}/.next"],
+      "options": {
+        "command": "next build",
+        "cwd": "apps/backoffice"
+      },
+      "dependsOn": ["^build"]
+    },
+    "start": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "next start -p 3002",
+        "cwd": "apps/backoffice"
+      },
+      "dependsOn": ["build"]
+    },
+    "lint": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "next lint",
+        "cwd": "apps/backoffice"
+      }
+    },
+    "test": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "vitest",
+        "cwd": "apps/backoffice"
+      }
+    },
+    "test:run": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "vitest run",
+        "cwd": "apps/backoffice"
+      }
+    },
+    "test:coverage": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "vitest run --coverage",
+        "cwd": "apps/backoffice"
+      }
+    },
+    "type-check": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "tsc --noEmit",
+        "cwd": "apps/backoffice"
+      }
+    },
+    "setup-test-user": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "nx run auth:setup-test-user:dev"
+      }
+    }
+  },
+  "tags": ["scope:backoffice", "type:app"],
+  "implicitDependencies": ["auth", "ui"]
+}

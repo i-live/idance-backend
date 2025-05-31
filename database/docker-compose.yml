@@ -1,0 +1,135 @@
+# SurrealDB Local Development Environment
+#
+# Usage:
+#   Development (with WSS, production parity): docker compose up -d
+#   Production-like (with TiKV):              docker compose --profile tikv up -d
+#
+# After starting, run migrations with: ./scripts/run-migration.sh
+
+services:
+  # Generate self-signed certificates for local WSS
+  cert-generator:
+    image: alpine:latest
+    container_name: idance-cert-generator
+    volumes:
+      - certs:/certs
+    command: >
+      sh -c "
+        apk add --no-cache openssl &&
+        if [ ! -f /certs/server.crt ]; then
+          openssl req -x509 -newkey rsa:4096 -keyout /certs/server.key -out /certs/server.crt -days 365 -nodes -subj '/CN=localhost' &&
+          chmod 644 /certs/server.crt /certs/server.key &&
+          echo 'Generated self-signed certificates for local development'
+        else
+          echo 'Certificates already exist'
+        fi
+      "
+
+  # Development SurrealDB (with WSS for production parity)
+  surrealdb:
+    image: surrealdb/surrealdb:latest
+    container_name: idance-surrealdb-dev
+    ports:
+      - "8000:8000"
+    volumes:
+      - certs:/certs:ro
+    command:
+      - start
+      - --log=info
+      - --user=root
+      - --pass=root
+      - --bind=0.0.0.0:8000
+      - --web-crt=/certs/server.crt
+      - --web-key=/certs/server.key
+      - memory
+    environment:
+      - SURREAL_LOG=info
+    depends_on:
+      cert-generator:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD-SHELL", "curl -k -f https://localhost:8000/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    restart: unless-stopped
+
+  # SurrealDB Studio for database management
+  surrealdb-studio:
+    image: surrealdb/surrealist:latest
+    container_name: idance-surrealdb-studio
+    ports:
+      - "8080:8080"
+    depends_on:
+      surrealdb:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # Production-like setup with TiKV (persistent storage)
+  tikv-pd:
+    image: pingcap/pd:latest
+    container_name: idance-tikv-pd
+    profiles: ["tikv"]
+    ports:
+      - "2379:2379"
+    command:
+      - --name=pd
+      - --data-dir=/pd-data
+      - --client-urls=http://0.0.0.0:2379
+      - --peer-urls=http://0.0.0.0:2380
+      - --advertise-client-urls=http://tikv-pd:2379
+      - --advertise-peer-urls=http://tikv-pd:2380
+      - --initial-cluster=pd=http://tikv-pd:2380
+    volumes:
+      - tikv_pd_data:/pd-data
+    restart: unless-stopped
+
+  tikv-node:
+    image: pingcap/tikv:latest
+    container_name: idance-tikv-node
+    profiles: ["tikv"]
+    ports:
+      - "20160:20160"
+    command:
+      - --pd-endpoints=http://tikv-pd:2379
+      - --addr=0.0.0.0:20160
+      - --data-dir=/tikv-data
+    volumes:
+      - tikv_node_data:/tikv-data
+    depends_on:
+      - tikv-pd
+    restart: unless-stopped
+
+  surrealdb-tikv:
+    image: surrealdb/surrealdb:latest
+    container_name: idance-surrealdb-tikv
+    profiles: ["tikv"]
+    ports:
+      - "8001:8000"
+    command:
+      - start
+      - --log=info
+      - --user=root
+      - --pass=root
+      - --bind=0.0.0.0:8000
+      - tikv://tikv-pd:2379
+    environment:
+      - SURREAL_LOG=info
+    depends_on:
+      - tikv-node
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/health || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+
+volumes:
+  certs:
+    driver: local
+  tikv_pd_data:
+    driver: local
+  tikv_node_data:
+    driver: local

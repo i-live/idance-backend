@@ -1,35 +1,192 @@
 version: 2.1
+
+# Define reusable commands
+commands:
+  setup_environment:
+    description: "Set up Node.js and dependencies"
+    steps:
+      - checkout
+      - run:
+          name: Install pnpm
+          command: |
+            curl -fsSL https://get.pnpm.io/install.sh | sh -
+            echo 'export PATH="$HOME/.local/share/pnpm:$PATH"' >> $BASH_ENV
+            source $BASH_ENV
+      - restore_cache:
+          keys:
+            - pnpm-deps-v1-{{ checksum "pnpm-lock.yaml" }}
+            - pnpm-deps-v1-
+      - run:
+          name: Install dependencies
+          command: pnpm install --frozen-lockfile
+      - save_cache:
+          key: pnpm-deps-v1-{{ checksum "pnpm-lock.yaml" }}
+          paths:
+            - node_modules
+            - ~/.pnpm-store
+
+  setup_database:
+    description: "Run database migrations for CI/CD"
+    steps:
+      - run:
+          name: Run database migrations
+          command: |
+            cd database
+            chmod +x scripts/run-migration.sh
+            ./scripts/run-migration.sh
+          environment:
+            SURREALDB_URL: $SURREALDB_CICD_URL
+            SURREALDB_NAMESPACE: $SURREALDB_CICD_NAMESPACE
+            SURREALDB_DATABASE: $SURREALDB_CICD_DATABASE
+            SURREALDB_ROOT_USER: $SURREALDB_CICD_ROOT_USER
+            SURREALDB_ROOT_PASS: $SURREALDB_CICD_ROOT_PASS
+
+# Define jobs
 jobs:
+  test:
+    docker:
+      - image: cimg/node:20.11
+    steps:
+      - setup_environment
+      - setup_database
+      - run:
+          name: Run tests
+          command: pnpm test
+          environment:
+            NODE_ENV: test
+            SURREALDB_URL: $SURREALDB_CICD_URL
+            SURREALDB_NAMESPACE: $SURREALDB_CICD_NAMESPACE
+            SURREALDB_DATABASE: $SURREALDB_CICD_DATABASE
+            SURREALDB_ROOT_USER: $SURREALDB_CICD_ROOT_USER
+            SURREALDB_ROOT_PASS: $SURREALDB_CICD_ROOT_PASS
+            SURREALDB_JWT_SECRET: $SURREALDB_JWT_SECRET
+            SURREALDB_WORKER_JWT_SECRET: $SURREALDB_WORKER_JWT_SECRET
+            NEXTAUTH_SECRET: $NEXTAUTH_SECRET
+            NEXTAUTH_URL: http://localhost:3002
+
+  lint:
+    docker:
+      - image: cimg/node:20.11
+    steps:
+      - setup_environment
+      - run:
+          name: Run linting
+          command: pnpm lint
+
   build:
     docker:
-      - image: cimg/node:18.0
+      - image: cimg/node:20.11
     steps:
-      - checkout
-      - run: npm install -g pnpm
-      - run: pnpm install
-      - run: npx nx affected:build
-      - run: npx nx affected:test
-    cache:
-      paths:
-        - ~/.pnpm-store
-        - node_modules
-        - .nx/cache
-  build-mobile:
-    macos:
-      xcode: "16.0.0"
+      - setup_environment
+      - run:
+          name: Build applications
+          command: pnpm build
+          environment:
+            NODE_ENV: production
+            SURREALDB_URL: $SURREALDB_CICD_URL
+            SURREALDB_NAMESPACE: $SURREALDB_CICD_NAMESPACE
+            SURREALDB_DATABASE: $SURREALDB_CICD_DATABASE
+            SURREALDB_ROOT_USER: $SURREALDB_CICD_ROOT_USER
+            SURREALDB_ROOT_PASS: $SURREALDB_CICD_ROOT_PASS
+            SURREALDB_JWT_SECRET: $SURREALDB_JWT_SECRET
+            SURREALDB_WORKER_JWT_SECRET: $SURREALDB_WORKER_JWT_SECRET
+            NEXTAUTH_SECRET: $NEXTAUTH_SECRET
+      - persist_to_workspace:
+          root: .
+          paths:
+            - dist
+            - apps/*/dist
+            - apps/*/.next
+
+  deploy_staging:
+    docker:
+      - image: cimg/node:20.11
     steps:
-      - checkout
-      - run: npm install -g pnpm expo-cli
-      - run: pnpm install
-      - run: cd apps/mobile && expo install
-      - run: npx nx build mobile --platform ios
-    cache:
-      paths:
-        - ~/.pnpm-store
-        - node_modules
-        - .nx/cache
+      - setup_environment
+      - attach_workspace:
+          at: .
+      - run:
+          name: Deploy to Cloudflare Pages (Staging)
+          command: |
+            # Install Wrangler CLI
+            pnpm add -g wrangler
+            
+            # Deploy backoffice to staging
+            cd apps/backoffice
+            wrangler pages deploy dist --project-name idance-backoffice-staging
+          environment:
+            CLOUDFLARE_API_TOKEN: $CLOUDFLARE_API_TOKEN
+            CLOUDFLARE_ACCOUNT_ID: $CLOUDFLARE_ACCOUNT_ID
+
+  deploy_production:
+    docker:
+      - image: cimg/node:20.11
+    steps:
+      - setup_environment
+      - attach_workspace:
+          at: .
+      - run:
+          name: Deploy to Cloudflare Pages (Production)
+          command: |
+            # Install Wrangler CLI
+            pnpm add -g wrangler
+            
+            # Deploy backoffice to production
+            cd apps/backoffice
+            wrangler pages deploy dist --project-name idance-backoffice-prod
+          environment:
+            CLOUDFLARE_API_TOKEN: $CLOUDFLARE_API_TOKEN
+            CLOUDFLARE_ACCOUNT_ID: $CLOUDFLARE_ACCOUNT_ID
+
+# Define workflows
 workflows:
-  build-and-test:
+  version: 2
+  test_and_deploy:
     jobs:
-      - build
-      - build-mobile
+      - test:
+          filters:
+            branches:
+              ignore: main
+      - lint:
+          filters:
+            branches:
+              ignore: main
+      - build:
+          requires:
+            - test
+            - lint
+          filters:
+            branches:
+              ignore: main
+      - deploy_staging:
+          requires:
+            - build
+          filters:
+            branches:
+              only: develop
+      
+      # Production workflow (main branch)
+      - test:
+          name: test_production
+          filters:
+            branches:
+              only: main
+      - lint:
+          name: lint_production
+          filters:
+            branches:
+              only: main
+      - build:
+          name: build_production
+          requires:
+            - test_production
+            - lint_production
+          filters:
+            branches:
+              only: main
+      - deploy_production:
+          requires:
+            - build_production
+          filters:
+            branches:
+              only: main
