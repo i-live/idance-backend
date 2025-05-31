@@ -191,6 +191,24 @@ iDance connects dancers through mobile and web platforms for networking, matchin
 
 ## Infrastructure
 
+### Secret Management
+**Strategy:** Git-crypt for encrypted environment files in repository
+- **Development:** Local `.env.local` files (gitignored) for development
+- **Repository:** Encrypted `.env` files using git-crypt for team sharing
+- **Production:** Cloudflare Workers environment variables for deployment
+- **Mobile:** Expo environment variables for app builds
+
+**Environment Files:**
+- `.env` - Encrypted with git-crypt, contains all secrets
+- `.env.example` - Public template showing required variables
+- `.env.local` - Local development overrides (gitignored)
+- `apps/*/env.local` - App-specific local development files (gitignored)
+
+**Access Control:**
+- Git-crypt keys managed by team leads
+- New developers get decrypted access after onboarding
+- Production secrets deployed via Cloudflare dashboard or CLI
+
 ### Deployment
 - **Mobile:** EAS Build (iOS/Android) + OTA Updates
 - **Web:** Cloudflare Pages (SSR/Static)

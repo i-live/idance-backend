@@ -1,1 +1,102 @@
+# Environment files (encrypted with git-crypt)
 .env filter=git-crypt diff=git-crypt
+.env.local filter=git-crypt diff=git-crypt
+.env.production filter=git-crypt diff=git-crypt
+.env.staging filter=git-crypt diff=git-crypt
+# Note: .env.example files are NOT encrypted (they're templates)
+
+# Text files
+*.md text
+*.txt text
+*.json text
+*.js text
+*.ts text
+*.tsx text
+*.jsx text
+*.css text
+*.scss text
+*.sass text
+*.html text
+*.xml text
+*.yml text
+*.yaml text
+*.toml text
+*.ini text
+*.cfg text
+*.conf text
+
+# Ensure line endings are normalized
+*.js text eol=lf
+*.ts text eol=lf
+*.tsx text eol=lf
+*.jsx text eol=lf
+*.json text eol=lf
+*.md text eol=lf
+*.css text eol=lf
+*.scss text eol=lf
+*.html text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+
+# Binary files
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.svg binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.eot binary
+*.otf binary
+*.pdf binary
+*.zip binary
+*.tar.gz binary
+*.tgz binary
+
+# Archive files
+*.7z binary
+*.dmg binary
+*.gz binary
+*.iso binary
+*.jar binary
+*.rar binary
+*.tar binary
+*.zip binary
+*.war binary
+*.ear binary
+*.sar binary
+*.class binary
+
+# Video files
+*.mov binary
+*.mp4 binary
+*.mp3 binary
+*.flv binary
+*.fla binary
+*.swf binary
+
+# Fonts
+*.ttf binary
+*.eot binary
+*.woff binary
+*.woff2 binary
+
+# Executables
+*.exe binary
+*.pyc binary
+
+# Lock files should not be merged
+package-lock.json binary
+yarn.lock binary
+pnpm-lock.yaml text
+
+# Linguist overrides for better language detection
+*.css linguist-vendored=false
+*.scss linguist-vendored=false
+*.js linguist-vendored=false
+*.ts linguist-vendored=false
+*.html linguist-vendored=false
+docs/* linguist-documentation
+*.md linguist-documentation
