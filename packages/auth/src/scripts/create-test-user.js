@@ -94,7 +94,7 @@ async function createTestUser() {
     console.log('👤 Creating test user...')
     
     const testUser = {
-      email: 'admin@idance.com',
+      email: 'admin@idance.live',
       password_hash: hashedPassword,
       first_name: 'Admin',
       last_name: 'User',

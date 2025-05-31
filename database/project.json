@@ -4,45 +4,40 @@
   "projectType": "library",
   "sourceRoot": "database",
   "targets": {
+    "install": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "./scripts/install-migrations.sh"
+      }
+    },
     "migrate": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "chmod +x database/scripts/run-migration.sh && ./database/scripts/run-migration.sh",
-        "cwd": "."
-      },
-      "configurations": {
-        "development": {
-          "command": "chmod +x database/scripts/run-migration.sh && ./database/scripts/run-migration.sh"
-        },
-        "ci": {
-          "command": "chmod +x database/scripts/run-migration.sh && ./database/scripts/run-migration.sh",
-          "env": {
-            "SURREALDB_URL": "$SURREALDB_CICD_URL",
-            "SURREALDB_NAMESPACE": "$SURREALDB_CICD_NAMESPACE", 
-            "SURREALDB_DATABASE": "$SURREALDB_CICD_DATABASE",
-            "SURREALDB_ROOT_USER": "$SURREALDB_CICD_ROOT_USER",
-            "SURREALDB_ROOT_PASS": "$SURREALDB_CICD_ROOT_PASS"
-          }
-        }
+        "command": "surrealdb-migrations apply"
       }
     },
-    "migrate-specific": {
+    "migrate-down": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "chmod +x database/scripts/run-migration.sh && ./database/scripts/run-migration.sh --migration {args.migration}",
-        "cwd": "."
+        "command": "surrealdb-migrations apply --down"
       }
     },
-    "test-connection": {
+    "migrate-to": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "surreal sql --endpoint $SURREALDB_URL --user $SURREALDB_ROOT_USER --pass $SURREALDB_ROOT_PASS --ns $SURREALDB_NAMESPACE --db $SURREALDB_DATABASE --pretty",
-        "cwd": "."
-      },
-      "configurations": {
-        "ci": {
-          "command": "surreal sql --endpoint $SURREALDB_CICD_URL --user $SURREALDB_CICD_ROOT_USER --pass $SURREALDB_CICD_ROOT_PASS --ns $SURREALDB_CICD_NAMESPACE --db $SURREALDB_CICD_DATABASE --pretty"
-        }
+        "command": "surrealdb-migrations apply --down {args.migration}"
+      }
+    },
+    "create-migration": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "surrealdb-migrations create {args.name}"
+      }
+    },
+    "create-migration-with-down": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "surrealdb-migrations create {args.name} --down"
       }
     }
   },

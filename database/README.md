@@ -1,170 +1,103 @@
-# iDance Database Setup
+# Database Migrations
 
-This directory contains the SurrealDB database setup for the iDance platform, including Docker Compose configurations, migrations, and management scripts.
+This directory contains the database schema and migration setup for the iDance platform using SurrealDB.
 
 ## Quick Start
 
-### 1. Start Local Database
+1. **Install the migration tool:**
+   ```bash
+   pnpm db:install
+   ```
 
-**Prerequisites**: Ensure Docker is running
-- **Windows/WSL**: Start Docker Desktop
-- **Linux**: `sudo systemctl start docker`
-- **macOS**: Start Docker Desktop
+2. **Run migrations (includes namespace/database setup):**
+   ```bash
+   pnpm db:migrate
+   ```
 
-```bash
-# Start development database (in-memory, fast)
-cd database
-docker compose up -d
+## Available Commands
 
-# Wait for health check, then run migrations
-./scripts/run-migration.sh
+| Command | Description |
+|---------|-------------|
+| `pnpm db:install` | Install the surrealdb-migrations CLI tool |
+| `pnpm db:migrate` | Apply all pending migrations (includes namespace/DB setup) |
+| `pnpm db:migrate-down` | Revert the last migration |
+| `pnpm db:create-migration --args.name="AddUserTable"` | Create a new migration |
+
+## Migration Files
+
+All migration files are properly timestamped and ordered:
+
 ```
-
-### 2. Access Database
-
-- **SurrealDB Endpoint**: wss://localhost:8000 (WSS with self-signed cert)
-- **SurrealDB Studio**: http://localhost:8080 (visual database management)
-- **Default Credentials**: `root` / `root`
-
-## Database Configurations
-
-### Development (Default)
-- **Storage**: In-memory (fast, data lost on restart)
-- **Port**: 8000
-- **Use case**: Local development, testing, CI/CD
-
-```bash
-docker compose up -d
-```
-
-### Production-like (TiKV)
-- **Storage**: TiKV (persistent, distributed)
-- **Port**: 8001
-- **Use case**: Staging, performance testing
-
-```bash
-docker compose --profile tikv up -d
+database/migrations/
+├── 20250531_174300_NamespaceDatabase.surql    # Namespace/DB setup
+├── 20250531_174301_authentication.surql       # Auth system
+├── 20250531_174302_core_users.surql          # User tables
+├── 20250531_174303_lookup_tables.surql       # Reference data
+├── 20250531_174304_social_interactions.surql # Social features
+├── 20250531_174305_messaging.surql           # Messaging system
+├── 20250531_174306_content_vlogs.surql       # Content/vlogs
+├── 20250531_174307_groups_sites.surql        # Groups/sites
+└── 20250531_174308_events_triggers.surql     # Events/triggers
 ```
 
 ## Environment Variables
 
-Copy the environment template and configure:
+The migration tool uses these environment variables (automatically set from your `.env` file):
+
+- `SURREAL_MIG_ADDRESS` - SurrealDB connection URL
+- `SURREAL_MIG_USER` - Database username
+- `SURREAL_MIG_PASS` - Database password
+- `SURREAL_MIG_NS` - Database namespace
+- `SURREAL_MIG_DB` - Database name
+
+## Creating New Migrations
+
+To create a new migration:
 
 ```bash
-cp ../.env.example ../.env
-# Edit .env with your database credentials
+pnpm db:create-migration --args.name="DescriptiveChangeName"
 ```
 
-Required variables for local development:
-```env
-SURREALDB_URL=wss://localhost:8000
-SURREALDB_NAMESPACE=idance
-SURREALDB_DATABASE=dev
-SURREALDB_ROOT_USER=root
-SURREALDB_ROOT_PASS=root
-SURREALDB_JWT_SECRET=your-jwt-secret-here
-SURREALDB_WORKER_JWT_SECRET=your-worker-jwt-secret-here
-```
-
-## Migration System
-
-### Run All Migrations
-```bash
-./scripts/run-migration.sh
-```
-
-### Run Specific Migration
-```bash
-./scripts/run-migration.sh --migration 0003
-```
-
-### Migration Files
-- `0000_namespace_database.surql` - Foundation setup
-- `0001_authentication.surql` - User authentication & JWT
-- `0002_core_users.surql` - User profiles & devices
-- `0003_lookup_tables.surql` - Countries, states, dance styles
-- `0004_social_interactions.surql` - Follows, matches, swipes
-- `0005_messaging.surql` - Real-time chat
-- `0006_content_vlogs.surql` - User-generated content
-- `0007_groups_sites.surql` - Dance groups & websites
-- `0008_events_triggers.surql` - Automation & notifications
+This creates a timestamped migration file in the `migrations/` directory.
 
 ## Database Schema
 
-The database includes:
+The migrations create a comprehensive schema including:
 
-- **Authentication**: JWT-based auth with OAuth support
-- **User Management**: Profiles, devices, preferences
-- **Social Features**: Following, matching, swiping
-- **Content**: Vlogs, posts, media
-- **Groups**: Dance groups and custom websites
-- **Messaging**: Real-time chat and notifications
-- **Lookup Data**: Countries, states, cities, dance styles
+### Core Tables
+- **user** - User accounts with role-based access control
+- **profile** - User profiles with location and preferences
+- **device** - Device tokens for push notifications
 
-## CI/CD Integration
+### Lookup Tables
+- **country, state, county, city** - Location hierarchy
+- **dance_style** - Dance styles and categories
+- **interest** - User interests and hobbies
+- **social_platform** - Social media platforms
 
-### GitHub Actions
-```yaml
-services:
-  surrealdb:
-    image: surrealdb/surrealdb:latest
-    ports:
-      - 8000:8000
-    options: >-
-      --health-cmd "curl -f http://localhost:8000/health"
-      --health-interval 10s
-      --health-timeout 5s
-      --health-retries 5
-```
+### Social Features
+- **friendship, follow, block** - Social relationships
+- **message, conversation** - Messaging system
+- **vlog, vlog_like, vlog_comment** - Content system
 
-### Production Deployment
+### Groups & Sites
+- **group, group_member** - User groups
+- **site, site_member** - User sites/pages
 
-For production, consider:
-- **SurrealDB Cloud** for managed hosting
-- **TiKV cluster** for self-hosted distributed storage
-- **Backup strategies** for data persistence
-- **Monitoring** with Prometheus/Grafana
+### Events & Triggers
+- **event, event_participant** - Event management
+- Various triggers for data consistency
 
 ## Troubleshooting
 
-### Database Won't Start
-```bash
-# Check logs
-docker compose logs surrealdb
-
-# Restart services
-docker compose down && docker compose up -d
-```
-
-### Migration Failures
-```bash
-# Check environment variables
-./scripts/run-migration.sh --skip-validation
-
-# Run specific migration
-./scripts/run-migration.sh --migration 0001
-```
-
-### Connection Issues
-```bash
-# Test connection
-curl http://localhost:8000/health
-
-# Check if port is available
-netstat -tulpn | grep 8000
-```
+- **Migration tool not found**: Run `pnpm db:install` to install the CLI
+- **Connection issues**: Check your `.env` file has correct SurrealDB credentials
+- **Permission errors**: Ensure your SurrealDB user has admin privileges
+- **Namespace/DB issues**: The first migration automatically creates namespace and databases
 
 ## Development Workflow
 
-1. **Start database**: `docker compose up -d`
-2. **Run migrations**: `./scripts/run-migration.sh`
-3. **Develop your app** with connection to `http://localhost:8000`
-4. **Use SurrealDB Studio** at `http://localhost:8080` for debugging
-5. **Stop database**: `docker compose down`
-
-## Security Notes
-
-- Default credentials (`root`/`root`) are for development only
-- JWT secrets must be 32+ characters in production
-- Use environment variables for all sensitive data
-- Enable TLS in production deployments
+1. **Day 0 Setup**: `pnpm db:install && pnpm db:migrate`
+2. **Daily Development**: `pnpm db:migrate` (applies any new migrations)
+3. **Schema Changes**: Create new migration files, don't modify existing ones
+4. **Rollbacks**: Use `pnpm db:migrate-down` if needed

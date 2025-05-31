@@ -29,27 +29,28 @@ cd idance
 
 ### 2. Install Dependencies
 
-This will install all dependencies for the entire monorepo, including NX:
+This will install all dependencies for the entire monorepo:
 
 ```bash
 pnpm install
 ```
 
-### 3. Add NX to PATH (Optional but Recommended)
+### 3. Install NX CLI Globally (Recommended)
 
-After installation, add NX to your PATH so you can use `nx` commands directly:
+Install NX globally to use `nx` commands directly from anywhere:
 
 ```bash
-# Add to your shell profile (~/.bashrc, ~/.zshrc, etc.)
-export PATH="$PATH:./node_modules/.bin"
-
-# Or reload your shell
-source ~/.bashrc  # or ~/.zshrc
+pnpm add -g nx@20.8.2
 ```
 
-Alternatively, you can always use `pnpm exec nx` instead of `nx` for any NX commands.
+Verify the installation:
 
-### 3. Set Up Environment Variables
+```bash
+nx --version
+# Should show both Local and Global versions
+```
+
+### 4. Set Up Environment Variables
 
 #### For Backoffice Development
 
@@ -160,6 +161,16 @@ pnpm exec nx run auth:test
 ### Database Setup
 
 ```bash
+# Run database migrations
+pnpm db:migrate
+# or with nx directly
+nx run database:migrate
+
+# Test database connection
+pnpm db:test-connection
+# or with nx directly
+nx run database:test-connection
+
 # Create test user for development
 pnpm setup:test-user:dev
 
@@ -249,21 +260,20 @@ SURREALDB_ROOT_PASS="root"
 
 #### 1. "nx: command not found"
 
-NX is installed as a dev dependency. You have a few options:
+Install NX globally for direct access:
 
-**Option A: Add NX to PATH (recommended)**
 ```bash
-export PATH="$PATH:./node_modules/.bin"
-source ~/.bashrc  # or ~/.zshrc
-nx run backoffice:dev  # Now works directly
+pnpm add -g nx@20.8.2
 ```
 
-**Option B: Use pnpm exec**
+Alternative options:
+
+**Option A: Use pnpm exec**
 ```bash
 pnpm exec nx run backoffice:dev
 ```
 
-**Option C: Use npm scripts (easiest)**
+**Option B: Use npm scripts (easiest)**
 ```bash
 pnpm dev  # Uses the predefined scripts
 ```

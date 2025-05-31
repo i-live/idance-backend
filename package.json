@@ -9,14 +9,16 @@
     "test": "nx run-many --target=test --all",
     "lint": "nx run-many --target=lint --all",
     "type-check": "nx run-many --target=type-check --all",
+    "db:install": "nx run database:install",
     "db:migrate": "nx run database:migrate",
-    "db:migrate:ci": "nx run database:migrate:ci",
-    "db:test-connection": "nx run database:test-connection",
+    "db:migrate-down": "nx run database:migrate-down",
+    "db:create-migration": "nx run database:create-migration",
     "setup:test-user": "nx run auth:setup-test-user:dev",
     "setup:test-user:dev": "nx run auth:setup-test-user:dev",
     "setup:test-user:staging": "nx run auth:setup-test-user:staging",
     "setup:test-user:prod": "nx run auth:setup-test-user:production",
-    "ci:setup-test-user": "nx run auth:setup-test-user:ci"
+    "ci:setup-test-user": "nx run auth:setup-test-user:ci",
+    "nx": "nx"
   },
   "devDependencies": {
     "@types/node": "^22.9.0",
