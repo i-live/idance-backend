@@ -11,6 +11,19 @@ The authentication system supports:
 - **JWT tokens** - Stateless authentication with configurable duration
 - **Worker access** - Separate authentication for Cloudflare Workers
 
+### Auth Flow
+```mermaid
+  A[User] --> B[Sign In]
+  B --> C{Provider}
+  C --> D[Google OAuth]
+  C --> E[Credentials]
+  D --> F[NextAuth.js]
+  E --> F
+  F --> G[SurrealDB]
+  G --> H[JWT Session]
+  H --> I[User Site / Backoffice / Mobile]
+```
+
 ## 🏗️ Architecture
 
 ### **Single Access Method Design**

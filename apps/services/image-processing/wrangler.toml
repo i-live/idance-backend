@@ -1,0 +1,3 @@
+name = "idance-image-processing"
+compatibility_date = "2025-05-31"
+main = "./src/index.ts"

@@ -1,0 +1,6 @@
+name = "idance-user-site"
+compatibility_date = "2025-05-31"
+pages_build_output_dir = "./dist"
+
+[vars]
+SURREALDB_URL = "http://localhost:8000/rpc"
