@@ -29,14 +29,14 @@ iDance is a dance-focused social app enabling users to create dynamic, customiza
   - `/backend/*`: Cloudflare Workers (notifications, image processing, vectorization, scheduler).
 - **Packages**: `/packages/auth` (NextAuth.js, Expo auth), `/utils`, `/types`.
 - **Database**: SurrealDB with migrations in `/database/migrations`.
-- **Documentation**: `/docs` (Markdown/Mermaid), synced to GitLab Wiki.
+- **Documentation**: `/docs` (Markdown/Mermaid).
 - **CI/CD**: CircleCI (6,000 minutes), Nx Cloud (50,000 credits).
-- **Hosting**: GitLab (primary), GitHub (mirror), Cloudflare for apps/workers.
+- **Hosting**: Github (primary), Gitlab (mirror), Cloudflare for apps/workers.
 - **Development**: Windows laptop, Claude Code for coding/PRs/Wiki updates.
 
 ## Directory Structure
 ```
-idance-project/
+idance/
 ├── apps/
 │   ├── user-sites/           # Next.js (Cloudflare Pages)
 │   ├── backoffice/           # Next.js (Cloudflare Pages)
@@ -78,7 +78,7 @@ idance-project/
 ## Setup
 1. **Clone Repository**:
    ```bash
-   git clone https://gitlab.com/idance/idance.git
+   git clone git@github.com:idancelive/idance.git
    cd idance
    ```
 2. **Install Dependencies**:
