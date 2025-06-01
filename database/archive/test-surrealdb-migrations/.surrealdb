@@ -1,0 +1,10 @@
+[core]
+path = "./"
+schema = "./schemas"
+
+[db]
+address = "wss://idance-06bg7jcbqdt9v6n0fvh78r4in4.aws-use1.surreal.cloud"
+username = "root"
+password = "YmPNol1t6HLObt"
+namespace = "idance"
+database = "test_migrations"

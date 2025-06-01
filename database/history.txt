@@ -1,101 +1,101 @@
 #V2
--- This enables proper migration state management per database
+--         username: 'johndoe',
+--         first_name: 'John',
+--         last_name: 'Doe'
+--     }
+-- });
+--
+-- These variables become $-prefixed parameters in SIGNUP/SIGNIN/AUTHENTICATE blocks:
+-- - variables.email → $email
+-- - variables.password → $password
+-- - variables.username → $username
+-- - variables.first_name → $first_name
+-- - variables.last_name → $last_name
+-- - variables.provider → $provider (for OAuth)
+-- - variables.provider_id → $provider_id (for OAuth)
+-- - variables.name → $name (for OAuth full name)
+-- - variables.picture → $picture (for OAuth avatar)
+--
+-- AUTHENTICATE block also has access to:
+-- - $auth: The authenticated user record (after successful signin)
+-- - $token: JWT token claims (for JWT-based authentication)
+-- - $session: Current session information
+-- Function to handle username/password signup or linking to existing OAuth accounts
+    CREATE migration_history SET        migration_number = '0002',        migration_name = 'authentication',        migration_file = '0002_authentication_up.surql',        applied_at = time::now(),        applied_by = 'migration_script',        execution_time_ms = 19037;
+    
+-- migrations/0001_authentication.surql
+-- Authentication: Access Methods and Security Functions
+-- This migration sets up SurrealDB v2.0 authentication with JWT tokens and role-based access
+-- Requires: 0000_namespace_database.surql
+--
+-- ROLE SYSTEM INTEGRATION:
+-- All new users are created with role = 'user' by default
+-- Admin roles must be assigned manually after user creation:
+-- UPDATE user SET role = 'admin' WHERE email = 'admin@yourapp.com';
+BEGIN TRANSACTION;
 -- ########################################################
--- Migration Tracking Table
+-- Authentication Helper Functions
 -- ########################################################
--- Create the migration_history table to track applied migrations
-DEFINE TABLE migration_history SCHEMAFULL;
--- Migration tracking fields
-DEFINE FIELD migration_number ON migration_history TYPE string;
-DEFINE FIELD migration_name ON migration_history TYPE string;
-DEFINE FIELD migration_file ON migration_history TYPE string;
-DEFINE FIELD applied_at ON migration_history TYPE datetime DEFAULT time::now();
-DEFINE FIELD applied_by ON migration_history TYPE option<string>;
-DEFINE FIELD checksum ON migration_history TYPE option<string>;
-DEFINE FIELD execution_time_ms ON migration_history TYPE option<int>;
--- Create indexes for the migration_history table
-DEFINE INDEX migration_history_number ON migration_history FIELDS migration_number UNIQUE;
-DEFINE INDEX migration_history_applied_at ON migration_history FIELDS applied_at;
-DEFINE INDEX migration_history_name ON migration_history FIELDS migration_name;
--- Record this migration as applied
-CREATE migration_history:0001 SET    migration_number = "0001",    migration_name = "migration_tracking",    migration_file = "0001_migration_tracking_up.surql",    applied_at = time::now(),    applied_by = "migration_script",    checksum = "initial";
-    CREATE migration_history SET        migration_number = '0001',        migration_name = 'migration_tracking',        migration_file = '0001_migration_tracking_up.surql',        applied_at = time::now(),        applied_by = 'migration_script',        execution_time_ms = 8891;
+-- NOTE: SurrealDB SIGNUP blocks have syntax limitations and cannot use LET/IF statements.
+-- Reference: https://github.com/surrealdb/docs.surrealdb.com/blob/main/src/content/doc-surrealql/statements/define/access/record.mdx
+-- SIGNUP blocks can only contain simple expressions or function calls, unlike AUTHENTICATE blocks.
+-- Therefore, complex signup logic (duplicate prevention, account linking) must be in functions.
+-- HOW VARIABLES ARE PASSED TO ACCESS METHODS:
+-- Client SDKs pass variables via the 'variables' object in signup/signin calls:
+--
+-- JavaScript Example:
+-- await db.signup({
+--     namespace: 'surrealdb',
+--     database: 'docs',
+--     access: 'username_password',
+--     variables: {
+--         email: 'user@example.com',
+--         password: 'secret123',
+--         username: 'johndoe',
+--         first_name: 'John',
+--         last_name: 'Doe'
+--     }
+-- });
+--
+-- These variables become $-prefixed parameters in SIGNUP/SIGNIN/AUTHENTICATE blocks:
+-- - variables.email → $email
+-- - variables.password → $password
+-- - variables.username → $username
+-- - variables.first_name → $first_name
+-- - variables.last_name → $last_name
+-- - variables.provider → $provider (for OAuth)
+-- - variables.provider_id → $provider_id (for OAuth)
+-- - variables.name → $name (for OAuth full name)
+-- - variables.picture → $picture (for OAuth avatar)
+--
+-- AUTHENTICATE block also has access to:
+-- - $auth: The authenticated user record (after successful signin)
+-- - $token: JWT token claims (for JWT-based authentication)
+-- - $session: Current session information
+-- Function to handle username/password signup or linking to existing OAuth accounts
+    CREATE migration_history SET        migration_number = '0002',        migration_name = 'authentication',        migration_file = '0002_authentication_up.surql',        applied_at = time::now(),        applied_by = 'migration_script',        execution_time_ms = 19099;
     
-REMOVE TABLE health_check;
-REMOVE TABLE migration_history;
-REMOVE TABLE health_check;
-REMOVE TABLE migration_history;
-USE NAMESPACE idance;
-USE DATABASE local;
-DEFINE TABLE health_check SCHEMAFULL;
-DEFINE FIELD created_at ON TABLE health_check TYPE datetime DEFAULT time::now();
-CREATE health_check SET created_at = time::now();
-SELECT * FROM health_check;
-SELECT * FROM migration_history WHERE migration_number = '0001';
-DEFINE TABLE migration_history SCHEMAFULL;
-DEFINE FIELD migration_number ON migration_history TYPE string;
-DEFINE FIELD migration_name ON migration_history TYPE string;
-DEFINE FIELD migration_file ON migration_history TYPE string;
-DEFINE FIELD applied_at ON migration_history TYPE datetime DEFAULT time::now();
-DEFINE FIELD applied_by ON migration_history TYPE option<string>;
-DEFINE FIELD checksum ON migration_history TYPE option<string>;
-DEFINE FIELD execution_time_ms ON migration_history TYPE option<int>;
-DEFINE INDEX migration_history_number ON migration_history FIELDS migration_number UNIQUE;
-DEFINE INDEX migration_history_applied_at ON migration_history FIELDS applied_at;
-DEFINE INDEX migration_history_name ON migration_history FIELDS migration_name;
-CREATE migration_history:0001 SET migration_number = "0001", migration_name = "migration_tracking", migration_file = "0001_migration_tracking_up.surql", applied_at = time::now(), applied_by = "migration_script", checksum = "initial";
-    CREATE migration_history SET        migration_number = '0001',        migration_name = 'migration_tracking',        migration_file = '0001_migration_tracking_up.surql',        applied_at = time::now(),        applied_by = 'migration_script',        execution_time_ms = 34854;
-    
-SELECT * FROM migration_history;
-SELECT * FROM migration_history WHERE migration_number = '0001';
-REMOVE TABLE migration_history;
-    DELETE FROM migration_history WHERE migration_number = '0001';
-    
-SELECT * FROM migration_history WHERE migration_number = '0001';
-DEFINE TABLE migration_history SCHEMAFULL;
-DEFINE FIELD migration_number ON migration_history TYPE string;
-DEFINE FIELD migration_name ON migration_history TYPE string;
-DEFINE FIELD migration_file ON migration_history TYPE string;
-DEFINE FIELD applied_at ON migration_history TYPE datetime DEFAULT time::now();
-DEFINE FIELD applied_by ON migration_history TYPE option<string>;
-DEFINE FIELD checksum ON migration_history TYPE option<string>;
-DEFINE FIELD execution_time_ms ON migration_history TYPE option<int>;
-DEFINE INDEX migration_history_number ON migration_history FIELDS migration_number UNIQUE;
-DEFINE INDEX migration_history_applied_at ON migration_history FIELDS applied_at;
-DEFINE INDEX migration_history_name ON migration_history FIELDS migration_name;
-CREATE migration_history:0001 SET migration_number = "0001", migration_name = "migration_tracking", migration_file = "0001_migration_tracking_up.surql", applied_at = time::now(), applied_by = "migration_script", checksum = "initial";
-    CREATE migration_history SET        migration_number = '0001',        migration_name = 'migration_tracking',        migration_file = '0001_migration_tracking_up.surql',        applied_at = time::now(),        applied_by = 'migration_script',        execution_time_ms = 34832;
-    
-REMOVE TABLE health_check;
-REMOVE TABLE migration_history;
+-- Simple test migration
+BEGIN TRANSACTION;
+-- Create a simple table
+DEFINE TABLE test_table SCHEMAFULL;
+-- Define a simple field
+DEFINE FIELD name ON TABLE test_table TYPE string;
+-- Create a simple function
+DEFINE FUNCTION fn::test_function($name: string) {    RETURN "Hello " + $name;};
+-- Insert test data
+CREATE test_table SET name = "test";
+COMMIT TRANSACTION;
+-- Simple test without transaction
+DEFINE TABLE test_table2 SCHEMAFULL;
+DEFINE FIELD name ON TABLE test_table2 TYPE string;
+CREATE test_table2 SET name = "test2";
+DEFINE TABLE test_table3 SCHEMAFULL;
+DEFINE FIELD name ON TABLE test_table3 TYPE string;
+CREATE test_table3 SET name = 'test3';
 INFO FOR DB;
-REMOVE TABLE user_dance_style;
-REMOVE TABLE vlog;
-REMOVE TABLE chat;
-REMOVE TABLE user;
-REMOVE TABLE group;
-REMOVE TABLE country;
-REMOVE TABLE migration_history;
-REMOVE TABLE health_check;
-SELECT * FROM migration_history WHERE migration_number = '0001';
-DEFINE TABLE migration_history SCHEMAFULL;
-DEFINE FIELD migration_number ON migration_history TYPE string;
-DEFINE FIELD migration_name ON migration_history TYPE string;
-DEFINE FIELD migration_file ON migration_history TYPE string;
-DEFINE FIELD applied_at ON migration_history TYPE datetime DEFAULT time::now();
-DEFINE FIELD applied_by ON migration_history TYPE option<string>;
-DEFINE FIELD checksum ON migration_history TYPE option<string>;
-DEFINE FIELD execution_time_ms ON migration_history TYPE option<int>;
-DEFINE INDEX migration_history_number ON migration_history FIELDS migration_number UNIQUE;
-DEFINE INDEX migration_history_applied_at ON migration_history FIELDS applied_at;
-DEFINE INDEX migration_history_name ON migration_history FIELDS migration_name;
-CREATE migration_history:0001 SET migration_number = "0001", migration_name = "migration_tracking", migration_file = "0001_migration_tracking_up.surql", applied_at = time::now(), applied_by = "migration_script", checksum = "initial";
-    CREATE migration_history SET        migration_number = '0001',        migration_name = 'migration_tracking',        migration_file = '0001_migration_tracking_up.surql',        applied_at = time::now(),        applied_by = 'migration_script',        execution_time_ms = 34548;
-    
-SELECT * FROM migration_history WHERE migration_number = '0001';
-REMOVE TABLE migration_history;
-    DELETE FROM migration_history WHERE migration_number = '0001';
-    
-INFO FOR DB;
-SELECT * FROM health_check LIMIT 5;
-SELECT * FROM migration_history;
+-- Minimal authentication test
+BEGIN TRANSACTION;
+-- Simple function with parameters (like your migration)
+DEFINE FUNCTION fn::test_signup($email: string, $password: string) {    LET $existing = SELECT * FROM user WHERE email = $email;        IF array::len($existing) > 0 {        THROW "User already exists";    };        RETURN "User can be created";};
+COMMIT TRANSACTION;

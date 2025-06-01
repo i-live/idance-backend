@@ -232,41 +232,20 @@ remove_migration_record() {
     "
 }
 
-# Execute SQL file by parsing statements
+# Execute SQL file directly without modification
 execute_sql_file() {
     local sql_file=$1
     
     echo -e "${BLUE}  Executing SQL file: $(basename "$sql_file")${NC}"
     
-    # Read the file and split into individual statements
-    # Remove comments and empty lines, then split on semicolons
-    local temp_sql=$(mktemp)
-    
-    # Process the SQL file: remove comments, empty lines, and split on semicolons
-    grep -v '^[[:space:]]*--' "$sql_file" | grep -v '^[[:space:]]*$' | tr '\n' ' ' | sed 's/;/;\n/g' | grep -v '^[[:space:]]*$' > "$temp_sql"
-    
-    # Execute each statement individually
-    local statement_num=0
-    while IFS= read -r statement; do
-        if [[ -n "$statement" && "$statement" != *"--"* ]]; then
-            statement_num=$((statement_num + 1))
-            # Clean up the statement
-            clean_statement=$(echo "$statement" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' | sed 's/[[:space:]]\+/ /g')
-            
-            if [[ -n "$clean_statement" ]]; then
-                echo -e "${BLUE}    Statement $statement_num: ${clean_statement:0:50}...${NC}"
-                
-                if ! echo "$clean_statement" | surreal sql --endpoint "$SURREALDB_URL" --username "$SURREALDB_ROOT_USER" --password "$SURREALDB_ROOT_PASS" --namespace "$SURREALDB_NAMESPACE" --database "$SURREALDB_DATABASE" --hide-welcome --json >/dev/null 2>&1; then
-                    echo -e "${RED}❌ Failed to execute statement: $clean_statement${NC}"
-                    rm -f "$temp_sql"
-                    return 1
-                fi
-            fi
-        fi
-    done < "$temp_sql"
-    
-    rm -f "$temp_sql"
-    return 0
+    # Execute the file directly - let SurrealDB handle everything
+    if surreal sql --endpoint "$SURREALDB_URL" --username "$SURREALDB_ROOT_USER" --password "$SURREALDB_ROOT_PASS" --namespace "$SURREALDB_NAMESPACE" --database "$SURREALDB_DATABASE" --hide-welcome < "$sql_file"; then
+        echo -e "${GREEN}    ✅ Migration executed successfully${NC}"
+        return 0
+    else
+        echo -e "${RED}❌ Failed to execute migration file: $(basename "$sql_file")${NC}"
+        return 1
+    fi
 }
 
 # Run a single migration
@@ -290,6 +269,7 @@ run_migration() {
     if [ "$direction" = "up" ] && [ "$migration_number" != "0000" ] && [ "$FORCE_RERUN" = false ]; then
         if is_migration_applied "$migration_number"; then
             echo -e "${YELLOW}⏭️  Migration $migration_number already applied, skipping${NC}"
+            echo -e "${BLUE}💡 Use --force to re-run this migration${NC}"
             return 0
         fi
     fi
@@ -304,18 +284,24 @@ run_migration() {
     
     # Create temporary directory for processed migration
     local temp_dir=$(mktemp -d)
-    local temp_migration="$temp_dir/migration_with_secrets.surql"
+    local temp_migration="$temp_dir/migration.surql"
     
-    # Substitute environment variables in migration file
-    envsubst < "migrations/$migration_file" > "$temp_migration"
-    
-    # Verify substitution worked
-    if grep -q '\${' "$temp_migration"; then
-        echo -e "${RED}❌ Error: Some environment variables were not substituted in $migration_file${NC}"
-        echo "Remaining placeholders:"
-        grep '\${' "$temp_migration" || true
-        rm -rf "$temp_dir"
-        return 1
+    # Handle environment variable substitution ONLY for specific variables
+    if grep -q '${SURREALDB_' "migrations/$migration_file"; then
+        echo -e "${BLUE}  Substituting environment variables...${NC}"
+        # Only substitute SURREALDB_ prefixed environment variables
+        envsubst "\$SURREALDB_JWT_SECRET \$SURREALDB_WORKER_JWT_SECRET" < "migrations/$migration_file" > "$temp_migration"
+        
+        # Verify substitution worked
+        if grep -q '\${SURREALDB_' "$temp_migration"; then
+            echo -e "${RED}❌ Error: Some SURREALDB environment variables were not substituted${NC}"
+            grep '\${SURREALDB_' "$temp_migration" || true
+            rm -rf "$temp_dir"
+            return 1
+        fi
+    else
+        # No environment variables to substitute, use file directly
+        cp "migrations/$migration_file" "$temp_migration"
     fi
     
     # Run the migration with timing
