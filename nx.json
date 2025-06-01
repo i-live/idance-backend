@@ -1,13 +1,6 @@
 {
-  "nxCloudId": "${NX_CLOUD_ID}",
   "tasksRunnerOptions": {
     "default": {
-      "runner": "nx-cloud",
-      "options": {
-        "cacheableOperations": ["build", "test", "lint"]
-      }
-    },
-    "local": {
       "runner": "nx/tasks-runners/default",
       "options": {
         "cacheableOperations": ["build", "test", "lint"]
