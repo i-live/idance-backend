@@ -27,6 +27,7 @@ SPECIFIC_MIGRATION=""
 SKIP_VALIDATION=false
 MIGRATION_DIRECTION="up"
 ENV_FILE=""
+FORCE_RERUN=false
 
 while [[ $# -gt 0 ]]; do
     case $1 in
@@ -46,6 +47,10 @@ while [[ $# -gt 0 ]]; do
             ENV_FILE="$2"
             shift 2
             ;;
+        --force)
+            FORCE_RERUN=true
+            shift
+            ;;
         --help)
             echo "Usage: $0 [OPTIONS]"
             echo ""
@@ -54,6 +59,7 @@ while [[ $# -gt 0 ]]; do
             echo "  --down              Run down migrations (rollback)"
             echo "  --skip-validation   Skip environment variable validation"
             echo "  --env-file PATH     Specify custom .env file location"
+            echo "  --force             Force re-run migrations even if already applied"
             echo "  --help             Show this help message"
             echo ""
             echo "Examples:"
@@ -61,6 +67,7 @@ while [[ $# -gt 0 ]]; do
             echo "  $0 --migration 0003          # Run specific up migration"
             echo "  $0 --migration 0003 --down   # Rollback specific migration"
             echo "  $0 --down                    # Rollback last migration"
+            echo "  $0 --force                   # Force re-run all migrations"
             echo "  $0 --env-file ../.env        # Use custom .env file"
             exit 0
             ;;
@@ -176,7 +183,7 @@ is_migration_applied() {
     fi
     
     # Check if migration_history table exists and migration is recorded
-    local result=$(surreal sql --conn "$SURREALDB_URL" --user "$SURREALDB_ROOT_USER" --pass "$SURREALDB_ROOT_PASS" --ns "$SURREALDB_NAMESPACE" --db "$SURREALDB_DATABASE" "SELECT * FROM migration_history WHERE migration_number = '$migration_number';" 2>/dev/null || echo "")
+    local result=$(surreal sql --endpoint "$SURREALDB_URL" --username "$SURREALDB_ROOT_USER" --password "$SURREALDB_ROOT_PASS" --namespace "$SURREALDB_NAMESPACE" --database "$SURREALDB_DATABASE" --hide-welcome --json 2>/dev/null <<< "SELECT * FROM migration_history WHERE migration_number = '$migration_number';" || echo "")
     
     if [[ "$result" == *"$migration_number"* ]]; then
         return 0  # Migration applied
@@ -200,7 +207,7 @@ record_migration() {
     
     local execution_time=$((end_time - start_time))
     
-    surreal sql --conn "$SURREALDB_URL" --user "$SURREALDB_ROOT_USER" --pass "$SURREALDB_ROOT_PASS" --ns "$SURREALDB_NAMESPACE" --db "$SURREALDB_DATABASE" "
+    surreal sql --endpoint "$SURREALDB_URL" --username "$SURREALDB_ROOT_USER" --password "$SURREALDB_ROOT_PASS" --namespace "$SURREALDB_NAMESPACE" --database "$SURREALDB_DATABASE" --hide-welcome >/dev/null 2>&1 <<< "
     CREATE migration_history SET
         migration_number = '$migration_number',
         migration_name = '$migration_name',
@@ -208,7 +215,7 @@ record_migration() {
         applied_at = time::now(),
         applied_by = 'migration_script',
         execution_time_ms = $execution_time;
-    " >/dev/null 2>&1
+    "
 }
 
 # Remove migration from tracking table
@@ -220,9 +227,46 @@ remove_migration_record() {
         return 0
     fi
     
-    surreal sql --conn "$SURREALDB_URL" --user "$SURREALDB_ROOT_USER" --pass "$SURREALDB_ROOT_PASS" --ns "$SURREALDB_NAMESPACE" --db "$SURREALDB_DATABASE" "
+    surreal sql --endpoint "$SURREALDB_URL" --username "$SURREALDB_ROOT_USER" --password "$SURREALDB_ROOT_PASS" --namespace "$SURREALDB_NAMESPACE" --database "$SURREALDB_DATABASE" --hide-welcome >/dev/null 2>&1 <<< "
     DELETE FROM migration_history WHERE migration_number = '$migration_number';
-    " >/dev/null 2>&1
+    "
+}
+
+# Execute SQL file by parsing statements
+execute_sql_file() {
+    local sql_file=$1
+    
+    echo -e "${BLUE}  Executing SQL file: $(basename "$sql_file")${NC}"
+    
+    # Read the file and split into individual statements
+    # Remove comments and empty lines, then split on semicolons
+    local temp_sql=$(mktemp)
+    
+    # Process the SQL file: remove comments, empty lines, and split on semicolons
+    grep -v '^[[:space:]]*--' "$sql_file" | grep -v '^[[:space:]]*$' | tr '\n' ' ' | sed 's/;/;\n/g' | grep -v '^[[:space:]]*$' > "$temp_sql"
+    
+    # Execute each statement individually
+    local statement_num=0
+    while IFS= read -r statement; do
+        if [[ -n "$statement" && "$statement" != *"--"* ]]; then
+            statement_num=$((statement_num + 1))
+            # Clean up the statement
+            clean_statement=$(echo "$statement" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' | sed 's/[[:space:]]\+/ /g')
+            
+            if [[ -n "$clean_statement" ]]; then
+                echo -e "${BLUE}    Statement $statement_num: ${clean_statement:0:50}...${NC}"
+                
+                if ! echo "$clean_statement" | surreal sql --endpoint "$SURREALDB_URL" --username "$SURREALDB_ROOT_USER" --password "$SURREALDB_ROOT_PASS" --namespace "$SURREALDB_NAMESPACE" --database "$SURREALDB_DATABASE" --hide-welcome --json >/dev/null 2>&1; then
+                    echo -e "${RED}❌ Failed to execute statement: $clean_statement${NC}"
+                    rm -f "$temp_sql"
+                    return 1
+                fi
+            fi
+        fi
+    done < "$temp_sql"
+    
+    rm -f "$temp_sql"
+    return 0
 }
 
 # Run a single migration
@@ -243,7 +287,7 @@ run_migration() {
     fi
     
     # For up migrations, check if already applied (except bootstrap)
-    if [ "$direction" = "up" ] && [ "$migration_number" != "0000" ]; then
+    if [ "$direction" = "up" ] && [ "$migration_number" != "0000" ] && [ "$FORCE_RERUN" = false ]; then
         if is_migration_applied "$migration_number"; then
             echo -e "${YELLOW}⏭️  Migration $migration_number already applied, skipping${NC}"
             return 0
@@ -278,7 +322,7 @@ run_migration() {
     echo -e "${YELLOW}⚡ Running migration $migration_number ($direction)...${NC}"
     local start_time=$(date +%s%3N)
     
-    if surreal import --conn "$SURREALDB_URL" --user "$SURREALDB_ROOT_USER" --pass "$SURREALDB_ROOT_PASS" --ns "$SURREALDB_NAMESPACE" --db "$SURREALDB_DATABASE" "$temp_migration"; then
+    if execute_sql_file "$temp_migration"; then
         local end_time=$(date +%s%3N)
         local execution_time=$((end_time - start_time))
         

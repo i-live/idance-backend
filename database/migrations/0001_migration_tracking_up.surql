@@ -7,9 +7,7 @@
 -- ########################################################
 
 -- Create the migration_history table to track applied migrations
-DEFINE TABLE migration_history SCHEMAFULL
-    PERMISSIONS
-        FOR select, create, update, delete WHERE $access = 'backend_worker' OR $auth.role = 'admin';
+DEFINE TABLE migration_history SCHEMAFULL;
 
 -- Migration tracking fields
 DEFINE FIELD migration_number ON migration_history TYPE string;

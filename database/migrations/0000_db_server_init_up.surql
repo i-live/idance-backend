@@ -1,25 +1,20 @@
 -- migrations/0000_namespace_database.surql
--- Foundation: Namespace and Database Setup
--- This migration establishes the basic SurrealDB structure for the iDance application
+-- Foundation: Basic Setup for Cloud SurrealDB
+-- This migration establishes the basic structure for the iDance application
 -- Must be run first before any other migrations
 
 -- ########################################################
--- Namespace and Database Setup
+-- Basic Setup for Cloud SurrealDB
 -- ########################################################
 
--- Define the namespace
-DEFINE NAMESPACE ${SURREALDB_NAMESPACE};
-
--- Use the namespace
+-- Note: For cloud SurrealDB instances, namespace and database are pre-configured
+-- We just need to ensure we're using the correct namespace and database
 USE NAMESPACE ${SURREALDB_NAMESPACE};
-
--- Define databases for different environments
-DEFINE DATABASE dev;
-DEFINE DATABASE prod;
-DEFINE DATABASE test;
-
--- Note: The specific database to use should be selected when connecting
--- Example: USE DATABASE dev; (for development environment)
--- Example: USE DATABASE prod; (for production environment)
--- Example: USE DATABASE test; (for testing environment)
 USE DATABASE ${SURREALDB_DATABASE};
+
+-- Basic health check - create a simple table to verify connection
+DEFINE TABLE health_check SCHEMAFULL;
+DEFINE FIELD created_at ON TABLE health_check TYPE datetime DEFAULT time::now();
+
+-- Insert a test record to verify everything is working
+CREATE health_check SET created_at = time::now();

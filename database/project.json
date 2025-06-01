@@ -7,7 +7,51 @@
     "migrate": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "database/scripts/run-migration.sh"
+        "command": "database/scripts/migrate-wrapper.sh",
+        "cwd": "."
+      },
+      "configurations": {
+        "down": {
+          "command": "database/scripts/migrate-wrapper.sh --down"
+        },
+        "force": {
+          "command": "database/scripts/migrate-wrapper.sh --force"
+        }
+      }
+    },
+    "db:status": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "database/scripts/check_database_state.sh",
+        "cwd": "."
+      }
+    },
+    "db:test": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "database/scripts/test_specific_migration.sh",
+        "cwd": "."
+      }
+    },
+    "db:cleanup": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "database/scripts/cleanup_database.sh",
+        "cwd": "."
+      }
+    },
+    "db:version": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "database/scripts/check_surreal_version.sh",
+        "cwd": "."
+      }
+    },
+    "db:simple-test": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "database/scripts/simple_test.sh",
+        "cwd": "."
       }
     }
   }
