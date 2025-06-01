@@ -1,0 +1,6 @@
+{
+  "name": "surrealdb-migration-test",
+  "sourceRoot": "packages/surrealdb-migration-test",
+  "projectType": "library",
+  "targets": {}
+}
