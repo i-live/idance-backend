@@ -1,0 +1,43 @@
+{
+  "name": "auth",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "packages/auth/src",
+  "projectType": "library",
+  "targets": {
+    "build": {
+      "executor": "@nx/js:tsc",
+      "outputs": ["{options.outputPath}"],
+      "options": {
+        "outputPath": "packages/auth/dist",
+        "main": "packages/auth/src/index.ts",
+        "tsConfig": "packages/auth/tsconfig.json"
+      }
+    },
+    "setup-test-user": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "node packages/auth/src/scripts/create-test-user.js",
+        "cwd": "{workspaceRoot}"
+      },
+      "configurations": {
+        "dev": {
+          "command": "node packages/auth/src/scripts/create-test-user.js apps/backoffice/.env.local",
+          "cwd": "{workspaceRoot}"
+        },
+        "staging": {
+          "command": "node packages/auth/src/scripts/create-test-user.js .env.staging",
+          "cwd": "{workspaceRoot}"
+        },
+        "production": {
+          "command": "node packages/auth/src/scripts/create-test-user.js .env.production",
+          "cwd": "{workspaceRoot}"
+        },
+        "ci": {
+          "command": "node packages/auth/src/scripts/create-test-user.js .env",
+          "cwd": "{workspaceRoot}"
+        }
+      }
+    }
+  },
+  "tags": ["scope:shared", "type:library"]
+}

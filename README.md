@@ -75,34 +75,44 @@ idance/
 - **Shared**: `/packages/auth` centralizes logic, storing users in SurrealDB.
 - **Dynamic Sites**: `/user-sites` fetches user-specific data via DNS/database.
 
-## Setup
-1. **Clone Repository**:
-   ```bash
-   git clone git@github.com:idancelive/idance.git
-   cd idance
-   ```
-2. **Install Dependencies**:
-   ```bash
-   pnpm install
-   ```
-3. **Configure Environment**:
-   - Copy `.env.example` to `.env.local` in `/user-site`, `/backoffice`, `/mobile`.
-   - Add `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `NEXTAUTH_SECRET`, `SURREALDB_URL`.
-4. **Run SurrealDB**:
-   ```bash
-   docker run -d -p 8000:8000 surrealdb/surrealdb:latest
-   ```
-5. **Apply Migrations**:
-   ```bash
-   pnpm nx run database:apply-migrations
-   ```
-6. **Start Development**:
-   - User Site: `pnpm nx dev user-site`
-   - Backoffice: `pnpm nx dev backoffice`
-   - Mobile: `pnpm nx start mobile`
-7. **Deploy**:
-   - Cloudflare Pages/Workers: `pnpm nx deploy user-site`
-   - Expo: `pnpm nx build mobile --platform ios`
+## Quick Start
+
+For detailed setup instructions, see the [Installation Guide](./docs/installation.md).
+
+### Prerequisites
+- Node.js v18+
+- pnpm v8+
+- SurrealDB Cloud account (recommended)
+
+### Basic Setup
+```bash
+# 1. Clone and install
+git clone https://github.com/idancelive/idance.git
+cd idance
+pnpm install
+
+# 2. Configure environment
+cp apps/backoffice/.env.example apps/backoffice/.env.local
+# Edit .env.local with your SurrealDB Cloud credentials
+
+# 3. Create test user
+pnpm setup:test-user:dev
+
+# 4. Start development
+pnpm dev
+```
+
+Visit http://localhost:3002 and sign in with:
+- **Email**: `admin@idance.com`
+- **Password**: `admin123`
+
+### Available Commands
+- `pnpm dev` - Start backoffice development server
+- `pnpm build` - Build all projects
+- `pnpm test` - Run all tests
+- `pnpm setup:test-user:dev` - Create test user in database
+
+For more commands and detailed setup, see [Installation Guide](./docs/installation.md).
 
 ## CI/CD
 - **CircleCI**: Builds/tests (macOS for iOS), configured in `.circleci/config.yml`.
