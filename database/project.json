@@ -4,42 +4,12 @@
   "projectType": "library",
   "sourceRoot": "database",
   "targets": {
-    "install": {
-      "executor": "nx:run-commands",
-      "options": {
-        "command": "./scripts/install-migrations.sh"
-      }
-    },
     "migrate": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "surrealdb-migrations apply"
-      }
-    },
-    "migrate-down": {
-      "executor": "nx:run-commands",
-      "options": {
-        "command": "surrealdb-migrations apply --down"
-      }
-    },
-    "migrate-to": {
-      "executor": "nx:run-commands",
-      "options": {
-        "command": "surrealdb-migrations apply --down {args.migration}"
-      }
-    },
-    "create-migration": {
-      "executor": "nx:run-commands",
-      "options": {
-        "command": "surrealdb-migrations create {args.name}"
-      }
-    },
-    "create-migration-with-down": {
-      "executor": "nx:run-commands",
-      "options": {
-        "command": "surrealdb-migrations create {args.name} --down"
+        "command": "./scripts/run-migration.sh",
+        "cwd": "database"
       }
     }
-  },
-  "tags": ["database", "infrastructure"]
+  }
 }

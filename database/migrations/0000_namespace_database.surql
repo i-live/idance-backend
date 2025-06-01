@@ -8,10 +8,10 @@
 -- ########################################################
 
 -- Define the namespace
-DEFINE NAMESPACE idance;
+DEFINE NAMESPACE ${SURREALDB_NAMESPACE};
 
 -- Use the namespace
-USE NAMESPACE idance;
+USE NAMESPACE ${SURREALDB_NAMESPACE};
 
 -- Define databases for different environments
 DEFINE DATABASE dev;
@@ -22,4 +22,4 @@ DEFINE DATABASE test;
 -- Example: USE DATABASE dev; (for development environment)
 -- Example: USE DATABASE prod; (for production environment)
 -- Example: USE DATABASE test; (for testing environment)
-USE DATABASE dev;
+USE DATABASE ${SURREALDB_DATABASE};

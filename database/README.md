@@ -4,61 +4,72 @@ This directory contains the database schema and migration setup for the iDance p
 
 ## Quick Start
 
-1. **Install the migration tool:**
-   ```bash
-   pnpm db:install
-   ```
+Run all migrations:
+```bash
+pnpm db:migrate
+```
 
-2. **Run migrations (includes namespace/database setup):**
-   ```bash
-   pnpm db:migrate
-   ```
+## Migration Script Features
+
+The `run-migration.sh` script provides:
+
+- **Environment Variable Substitution**: Safely injects secrets from `.env` without committing them
+- **Validation**: Checks all required environment variables and JWT secret lengths
+- **Sequential Execution**: Runs migrations in proper dependency order (0000-0008)
+- **Error Handling**: Stops on first failure with clear error messages
+- **Selective Migration**: Run specific migrations with `--migration` flag
+- **Failsafes**: Multiple validation checks before execution
 
 ## Available Commands
 
 | Command | Description |
 |---------|-------------|
-| `pnpm db:install` | Install the surrealdb-migrations CLI tool |
-| `pnpm db:migrate` | Apply all pending migrations (includes namespace/DB setup) |
-| `pnpm db:migrate-down` | Revert the last migration |
-| `pnpm db:create-migration --args.name="AddUserTable"` | Create a new migration |
+| `pnpm db:migrate` | Run all migrations in sequence |
+| `./scripts/run-migration.sh --migration 0003` | Run specific migration |
+| `./scripts/run-migration.sh --skip-validation` | Skip environment validation |
+| `./scripts/run-migration.sh --help` | Show help and usage |
 
 ## Migration Files
 
-All migration files are properly timestamped and ordered:
+All migration files support environment variable substitution:
 
 ```
 database/migrations/
-├── 20250531_174300_NamespaceDatabase.surql    # Namespace/DB setup
-├── 20250531_174301_authentication.surql       # Auth system
-├── 20250531_174302_core_users.surql          # User tables
-├── 20250531_174303_lookup_tables.surql       # Reference data
-├── 20250531_174304_social_interactions.surql # Social features
-├── 20250531_174305_messaging.surql           # Messaging system
-├── 20250531_174306_content_vlogs.surql       # Content/vlogs
-├── 20250531_174307_groups_sites.surql        # Groups/sites
-└── 20250531_174308_events_triggers.surql     # Events/triggers
+├── 0000_namespace_database.surql     # Namespace and database setup
+├── 0001_authentication.surql         # Authentication system
+├── 0002_core_users.surql             # User tables and profiles
+├── 0003_lookup_tables.surql          # Reference data
+├── 0004_social_interactions.surql    # Social features
+├── 0005_messaging.surql              # Messaging system
+├── 0006_content_vlogs.surql          # Content and vlogs
+├── 0007_groups_sites.surql           # Groups and sites
+└── 0008_events_triggers.surql        # Events and triggers
 ```
 
 ## Environment Variables
 
-The migration tool uses these environment variables (automatically set from your `.env` file):
-
-- `SURREAL_MIG_ADDRESS` - SurrealDB connection URL
-- `SURREAL_MIG_USER` - Database username
-- `SURREAL_MIG_PASS` - Database password
-- `SURREAL_MIG_NS` - Database namespace
-- `SURREAL_MIG_DB` - Database name
-
-## Creating New Migrations
-
-To create a new migration:
+Required variables in your `.env` file:
 
 ```bash
-pnpm db:create-migration --args.name="DescriptiveChangeName"
+SURREALDB_URL=ws://localhost:8000/rpc
+SURREALDB_NAMESPACE=idance
+SURREALDB_DATABASE=dev
+SURREALDB_ROOT_USER=root
+SURREALDB_ROOT_PASS=your_secure_password
+SURREALDB_JWT_SECRET=your_jwt_secret_min_32_chars
+SURREALDB_WORKER_JWT_SECRET=your_worker_jwt_secret_min_32_chars
 ```
 
-This creates a timestamped migration file in the `migrations/` directory.
+## Variable Substitution
+
+Migration files can use environment variables with `${VARIABLE_NAME}` syntax:
+
+```sql
+-- Example from 0000_namespace_database.surql
+DEFINE NAMESPACE ${SURREALDB_NAMESPACE};
+USE NAMESPACE ${SURREALDB_NAMESPACE};
+USE DATABASE ${SURREALDB_DATABASE};
+```
 
 ## Database Schema
 
@@ -66,7 +77,7 @@ The migrations create a comprehensive schema including:
 
 ### Core Tables
 - **user** - User accounts with role-based access control
-- **profile** - User profiles with location and preferences
+- **profile** - User profiles with location and preferences  
 - **device** - Device tokens for push notifications
 
 ### Lookup Tables
@@ -90,14 +101,17 @@ The migrations create a comprehensive schema including:
 
 ## Troubleshooting
 
-- **Migration tool not found**: Run `pnpm db:install` to install the CLI
-- **Connection issues**: Check your `.env` file has correct SurrealDB credentials
+- **Environment file missing**: Copy `.env.example` to `.env` and configure
+- **JWT secrets too short**: Generate with `openssl rand -base64 64`
+- **SurrealDB CLI missing**: Install from https://surrealdb.com/docs/installation
+- **Connection issues**: Check your SurrealDB server is running and accessible
 - **Permission errors**: Ensure your SurrealDB user has admin privileges
-- **Namespace/DB issues**: The first migration automatically creates namespace and databases
 
 ## Development Workflow
 
-1. **Day 0 Setup**: `pnpm db:install && pnpm db:migrate`
-2. **Daily Development**: `pnpm db:migrate` (applies any new migrations)
-3. **Schema Changes**: Create new migration files, don't modify existing ones
-4. **Rollbacks**: Use `pnpm db:migrate-down` if needed
+1. **Setup**: Copy `.env.example` to `.env` and configure
+2. **Run migrations**: `pnpm db:migrate`
+3. **Test specific migration**: `./scripts/run-migration.sh --migration 0003`
+4. **Schema changes**: Create new migration files, don't modify existing ones
+
+The migration system provides robust error handling, environment variable substitution, and comprehensive validation for production-ready database management.
