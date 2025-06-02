@@ -1,7 +1,7 @@
 {
   "generators": {
     "migration": {
-      "factory": "./dist/generators/migration/generator.js",
+      "factory": "./src/generators/migration/generator.js",
       "schema": "./src/generators/migration/schema.json",
       "description": "Generate a new SurrealDB migration"
     }

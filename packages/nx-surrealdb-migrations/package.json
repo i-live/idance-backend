@@ -1,6 +1,10 @@
 {
   "name": "@idance/nx-surrealdb-migrations",
   "version": "0.0.1",
+  "main": "dist/packages/nx-surrealdb-migrations/src/index.js",
+  "types": "dist/packages/nx-surrealdb-migrations/src/index.d.ts",
+  "generators": "./src/generators.json",
+  "executors": "./src/executors.json",
   "dependencies": {
     "surrealdb": "^1.3.2",
     "tslib": "^2.3.0"
@@ -17,8 +21,6 @@
     "ts-jest": "^29.1.2",
     "eslint": "^9.8.0"
   },
-  "main": "src/index.js",
-  "types": "src/index.d.ts",
   "nx": {
     "includedScripts": []
   }

@@ -1,17 +1,17 @@
 {
   "executors": {
     "migrate": {
-      "implementation": "./dist/executors/migrate/executor.js",
+      "implementation": "./src/executors/migrate/executor.js",
       "schema": "./src/executors/migrate/schema.json",
       "description": "Run pending SurrealDB migrations"
     },
     "rollback": {
-      "implementation": "./dist/executors/rollback/executor.js",
+      "implementation": "./src/executors/rollback/executor.js",
       "schema": "./src/executors/rollback/schema.json",
       "description": "Rollback the last SurrealDB migration"
     },
     "status": {
-      "implementation": "./dist/executors/status/executor.js",
+      "implementation": "./src/executors/status/executor.js",
       "schema": "./src/executors/status/schema.json",
       "description": "Check migration status"
     }
