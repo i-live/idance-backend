@@ -6,6 +6,7 @@ export interface MigrationGeneratorSchema {
   name: string;
   project: string;
   migrationsDir?: string;
+  positionalArgs?: string[];
 }
 
 export default async function migrationGenerator(
@@ -14,7 +15,9 @@ export default async function migrationGenerator(
 ): Promise<void> {
   const normalizedOptions = {
     ...options,
-    name: options.name || (options as any).positionalArgs?.[0] || '',
+    name: options.name || options.positionalArgs?.[0] || '',
+    project: options.project,
+    migrationsDir: options.migrationsDir
   };
 
   if (!normalizedOptions.name) {
