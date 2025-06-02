@@ -2,6 +2,7 @@
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "outDir": "../../dist/packages/nx-surrealdb-migrations",
+    "rootDir": "src",
     "declaration": true,
     "types": ["node"],
     "resolveJsonModule": true,

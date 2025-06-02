@@ -1,8 +1,8 @@
 {
   "name": "@idance/nx-surrealdb-migrations",
   "version": "0.0.1",
-  "main": "dist/packages/nx-surrealdb-migrations/src/index.js",
-  "types": "dist/packages/nx-surrealdb-migrations/src/index.d.ts",
+  "main": "dist/packages/nx-surrealdb-migrations/index.js",
+  "types": "dist/packages/nx-surrealdb-migrations/index.d.ts",
   "generators": "./src/generators.json",
   "executors": "./src/executors.json",
   "dependencies": {

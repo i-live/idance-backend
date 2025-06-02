@@ -11,6 +11,7 @@
         "main": "packages/nx-surrealdb-migrations/src/index.ts",
         "tsConfig": "packages/nx-surrealdb-migrations/tsconfig.lib.json",
         "assets": [
+          "src/*.json",
           "*.md",
           "src/executors/*/schema.json",
           "src/generators/*/schema.json",
