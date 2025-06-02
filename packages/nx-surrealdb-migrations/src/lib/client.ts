@@ -1,57 +1,38 @@
-// packages/nx-surrealdb-migrations/src/lib/client.ts
 import { Surreal } from 'surrealdb';
-
-export interface SurrealDBConfig {
-  url: string;
-  namespace: string;
-  database: string;
-  username: string;
-  password: string;
-}
+import { SurrealDBConfig, SurrealQueryResult } from './types';
 
 export class SurrealDBClient {
   private db: Surreal;
-  private connected: boolean = false;
 
   constructor() {
     this.db = new Surreal();
   }
 
-  async connect(config: SurrealDBConfig): Promise<void> {
+  async connect(config: SurrealDBConfig) {
     try {
       await this.db.connect(config.url);
       await this.db.signin({
         username: config.username,
-        password: config.password
+        password: config.password,
       });
       await this.db.use({
         namespace: config.namespace,
-        database: config.database
+        database: config.database,
       });
-      this.connected = true;
-      console.log('✅ Connected to SurrealDB');
     } catch (error) {
       throw new Error(`Failed to connect to SurrealDB: ${error.message}`);
     }
   }
 
-  async query(sql: string): Promise<any> {
-    if (!this.connected) {
-      throw new Error('SurrealDB client not connected');
-    }
+  async query(sql: string): Promise<SurrealQueryResult[]> {
     try {
-      const result = await this.db.query(sql);
-      return result;
+      return await this.db.query(sql);
     } catch (error) {
-      throw new Error(`Query failed: ${error.message}`);
+      throw new Error(`Query execution failed: ${error.message}`);
     }
   }
 
-  async close(): Promise<void> {
-    if (this.connected) {
-      await this.db.close();
-      this.connected = false;
-      console.log('✅ SurrealDB connection closed');
-    }
+  async close() {
+    await this.db.close();
   }
 }

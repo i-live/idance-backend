@@ -1,53 +1,54 @@
-// packages/nx-surrealdb-migrations/src/executors/rollback/executor.ts
 import { ExecutorContext } from '@nx/devkit';
-import { join } from 'path';
-import { SurrealDBClient } from '../../lib/client';
-import { MigrationRunner } from '../../lib/migration-runner';
+import * as fs from 'fs/promises';
+import * as path from 'path';
+import { SurrealDBConfig, SurrealDBClient, MigrationParser, MigrationTracker } from '../../lib';
 
-export interface RollbackExecutorSchema {
-  migrationsPath: string;
-  url: string;
-  namespace: string;
-  database: string;
-  username: string;
-  password: string;
+export interface RollbackExecutorSchema extends SurrealDBConfig {
+  migrationsDir?: string;
 }
 
 export default async function runExecutor(
   options: RollbackExecutorSchema,
   context: ExecutorContext
 ): Promise<{ success: boolean }> {
+  const projectRoot = context.projectGraph?.nodes[context.projectName]?.data.root;
+  if (!projectRoot) {
+    throw new Error(`Project ${context.projectName} not found in project graph`);
+  };
+  const migrationsPath = path.join(context.root, projectRoot, options.migrationsDir || 'migrations');
+
   const client = new SurrealDBClient();
-  const migrationsPath = join(context.root, options.migrationsPath || 'database/migrations');
-
   try {
-    // Connect to SurrealDB
-    await client.connect({
-      url: options.url,
-      namespace: options.namespace,
-      database: options.database,
-      username: options.username,
-      password: options.password
-    });
+    await client.connect(options);
+    const tracker = new MigrationTracker(client);
+    await tracker.initialize();
 
-    const runner = new MigrationRunner(client, migrationsPath);
-    const applied = await runner.getAppliedMigrations();
-
+    const applied = await tracker.getAppliedMigrations();
     if (applied.length === 0) {
-      console.log('No migrations to rollback');
+      console.log('No migrations to rollback.');
       return { success: true };
     }
 
-    // Get the last applied migration
     const lastMigration = applied[applied.length - 1];
-    const migration = await runner.parseMigrationFile(lastMigration.filename);
-    await runner.rollbackMigration(migration);
+    const downFile = lastMigration.filename.replace('_up.surql', '_down.surql');
+    const downFilePath = path.join(migrationsPath, downFile);
 
-    console.log('✅ Rollback completed successfully');
-    return { success: true };
-  } catch (error) {
-    console.error(`❌ Rollback failed: ${error.message}`);
-    return { success: false };
+    try {
+      const content = await fs.readFile(downFilePath, 'utf-8');
+      const migration = MigrationParser.parseDown(content, downFile);
+
+      console.log(`Rolling back migration: ${lastMigration.filename}`);
+      const statements = MigrationParser.splitStatements(migration.up);
+      for (const statement of statements) {
+        await client.query(statement);
+      }
+      await tracker.removeMigration(lastMigration.id);
+      console.log(`✅ Rolled back: ${lastMigration.filename}`);
+      return { success: true };
+    } catch (error) {
+      console.error(`❌ Failed to rollback: ${lastMigration.filename}`, error);
+      return { success: false };
+    }
   } finally {
     await client.close();
   }

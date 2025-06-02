@@ -1,0 +1,22 @@
+{
+  "$schema": "http://json-schema.org/schema",
+  "title": "Migration Generator",
+  "description": "Generate a new SurrealDB migration",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Name of the migration"
+    },
+    "project": {
+      "type": "string",
+      "description": "Project name"
+    },
+    "migrationsDir": {
+      "type": "string",
+      "description": "Path to migrations directory",
+      "default": "migrations"
+    }
+  },
+  "required": ["name", "project"]
+}

@@ -38,11 +38,5 @@
     "jsdom": "^26.1.0",
     "typescript": "^5.6.3",
     "vitest": "^3.1.4"
-  },
-  "pnpm": {
-    "overrides": {
-      "@types/react": "^19.0.0",
-      "@types/react-dom": "^19.0.0"
-    }
   }
 }

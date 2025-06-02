@@ -11,7 +11,25 @@
     "build": {
       "dependsOn": ["^build"],
       "outputs": ["{projectRoot}/dist"]
+    },
+    "@nx/js:tsc": {
+      "cache": true,
+      "dependsOn": ["^build"],
+      "inputs": ["default", "^default"]
+    },
+    "@nx/eslint:lint": {
+      "cache": true,
+      "inputs": [
+        "default",
+        "{workspaceRoot}/.eslintrc.json",
+        "{workspaceRoot}/.eslintignore",
+        "{workspaceRoot}/eslint.config.mjs"
+      ]
     }
   },
-  "defaultBase": "main"
+  "defaultBase": "main",
+  "nxCloudId": "683d0ce209e9a67b1f62f68a",
+  "plugins": [
+    "@idance/nx-surrealdb-migrations"
+  ]
 }

@@ -1,0 +1,15 @@
+{
+  "$schema": "http://json-schema.org/schema",
+  "title": "Rollback Executor",
+  "description": "Rollback the last SurrealDB migration",
+  "type": "object",
+  "properties": {
+    "url": { "type": "string", "description": "SurrealDB URL" },
+    "namespace": { "type": "string", "description": "SurrealDB namespace" },
+    "database": { "type": "string", "description": "SurrealDB database" },
+    "username": { "type": "string", "description": "SurrealDB username" },
+    "password": { "type": "string", "description": "SurrealDB password" },
+    "migrationsDir": { "type": "string", "description": "Path to migrations", "default": "migrations" }
+  },
+  "required": ["url", "namespace", "database", "username", "password"]
+}

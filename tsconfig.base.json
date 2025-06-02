@@ -16,10 +16,12 @@
     "baseUrl": ".",
     "paths": {
       "@idance/auth": ["packages/auth/src/index.ts"],
+      "@idance/nx-surrealdb-migrations": [
+        "packages/nx-surrealdb-migrations/src/index.ts"
+      ],
       "@idance/types": ["packages/types/src/index.ts"],
       "@idance/ui": ["packages/ui/src/index.ts"],
-      "@idance/utils": ["packages/utils/src/index.ts"],
-      "@idance/nx-surrealdb-migrations": ["packages/nx-surrealdb-migrations/src/index.ts"]
+      "@idance/utils": ["packages/utils/src/index.ts"]
     }
   },
   "exclude": ["node_modules", "tmp"]
