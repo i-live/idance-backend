@@ -11,13 +11,20 @@
         "main": "packages/nx-surrealdb-migrations/src/index.ts",
         "tsConfig": "packages/nx-surrealdb-migrations/tsconfig.lib.json",
         "assets": [
+          {
+            "input": "packages/nx-surrealdb-migrations/src/generators/migration/files",
+            "glob": "**/*",
+            "output": "src/generators/migration/files"
+          },
+          {
+            "input": "packages/nx-surrealdb-migrations",
+            "glob": "*.json",
+            "output": "./"
+          },
           "src/*.json",
           "*.md",
           "src/executors/*/schema.json",
-          "src/generators/*/schema.json",
-          "src/generators.json",
-          "src/executors.json",
-          "src/generators/migration/files/*"
+          "src/generators/*/schema.json"
         ]
       }
     },

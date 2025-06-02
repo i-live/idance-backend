@@ -3,8 +3,8 @@
   "version": "0.0.1",
   "main": "dist/packages/nx-surrealdb-migrations/index.js",
   "types": "dist/packages/nx-surrealdb-migrations/index.d.ts",
-  "generators": "./src/generators.json",
-  "executors": "./src/executors.json",
+  "generators": "./generators.json",
+  "executors": "./executors.json",
   "dependencies": {
     "surrealdb": "^1.3.2",
     "tslib": "^2.3.0"

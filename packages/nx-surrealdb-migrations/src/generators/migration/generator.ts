@@ -1,4 +1,6 @@
 import { Tree, formatFiles, generateFiles, joinPathFragments, readProjectConfiguration } from '@nx/devkit';
+import { dirname } from 'path';
+import { fileURLToPath } from 'url';
 
 export interface MigrationGeneratorSchema {
   name: string;
@@ -9,11 +11,10 @@ export interface MigrationGeneratorSchema {
 export default async function migrationGenerator(
   tree: Tree,
   options: MigrationGeneratorSchema
-): Promise<string> {
-  // Normalize options to handle positional argument
+): Promise<void> {
   const normalizedOptions = {
     ...options,
-    name: options.name || (options as any).positionalArgs?.[0] || '', // Fallback for positional argument
+    name: options.name || (options as any).positionalArgs?.[0] || '',
   };
 
   if (!normalizedOptions.name) {
@@ -25,12 +26,15 @@ export default async function migrationGenerator(
   const projectRoot = projectConfig.root;
   const migrationsPath = joinPathFragments(projectRoot, normalizedOptions.migrationsDir || 'migrations');
 
-  generateFiles(tree, joinPathFragments(__dirname, 'files'), migrationsPath, {
+  const moduleDir = typeof __dirname !== 'undefined'
+    ? __dirname
+    : dirname(fileURLToPath(import.meta.url));
+
+  generateFiles(tree, joinPathFragments(moduleDir, 'files'), migrationsPath, {
     name: normalizedOptions.name,
     timestamp,
     date: new Date().toISOString(),
   });
 
   await formatFiles(tree);
-  return `Created migrations: ${timestamp}_${normalizedOptions.name}_up.surql, ${timestamp}_${normalizedOptions.name}_down.surql`;
 }
