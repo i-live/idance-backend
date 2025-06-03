@@ -1,4 +1,10 @@
-import { Tree, formatFiles, generateFiles, joinPathFragments, readProjectConfiguration } from '@nx/devkit';
+import {
+  Tree,
+  formatFiles,
+  generateFiles,
+  joinPathFragments,
+  readProjectConfiguration
+} from '@nx/devkit';
 import { dirname } from 'path';
 import { fileURLToPath } from 'url';
 
@@ -32,6 +38,14 @@ export default async function migrationGenerator(
   const moduleDir = typeof __dirname !== 'undefined'
     ? __dirname
     : dirname(fileURLToPath(import.meta.url));
+
+  console.log('Template path:', joinPathFragments(moduleDir, 'files'));
+  console.log('Output path:', migrationsPath);
+  console.log('Variables:', {
+    name: normalizedOptions.name,
+    timestamp,
+    date: new Date().toISOString(),
+  });
 
   generateFiles(tree, joinPathFragments(moduleDir, 'files'), migrationsPath, {
     name: normalizedOptions.name,
