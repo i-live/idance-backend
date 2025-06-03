@@ -3,6 +3,7 @@
   "sourceRoot": "packages/nx-surrealdb-migrations/src",
   "projectType": "library",
   "targets": {
+    
     "build": {
       "executor": "@nx/js:tsc",
       "outputs": ["{options.outputPath}"],
