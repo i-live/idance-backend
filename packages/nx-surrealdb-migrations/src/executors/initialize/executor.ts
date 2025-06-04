@@ -12,7 +12,7 @@ export interface InitializeExecutorSchema {
   pass: string;
   namespace?: string;
   database?: string;
-  initPath?: string;
+  path?: string;
   down?: boolean;
   envFile?: string;
   useTransactions?: boolean;
@@ -32,7 +32,7 @@ export default async function runExecutor(
     pass: options.pass ? replaceEnvVars(options.pass) : process.env.SURREALDB_ROOT_PASS,
     namespace: options.namespace ? replaceEnvVars(options.namespace) : process.env.SURREALDB_NAMESPACE,
     database: options.database ? replaceEnvVars(options.database) : process.env.SURREALDB_DATABASE,
-    initPath: options.initPath || 'init',
+    path: options.path ? replaceEnvVars(options.path) : process.env.MIGRATIONS_PATH,
     down: options.down || false,
     useTransactions: options.useTransactions ?? true
   };
@@ -42,8 +42,8 @@ export default async function runExecutor(
     throw new Error('Missing required configuration. Provide either through options or environment variables.');
   }
 
-  const initPath = resolveProjectPath(context, resolvedOptions.initPath);
-  console.log('Looking for init files in:', initPath);
+  const targetPath = resolveProjectPath(context, resolvedOptions.path);
+  console.log('Looking for files in:', targetPath);
 
   const client = new SurrealDBClient();
   try {
@@ -57,7 +57,7 @@ export default async function runExecutor(
 
     // Find all files and sort them (reverse order for down migrations)
     const suffix = resolvedOptions.down ? '_down.surql' : '_up.surql';
-    let files = (await fs.readdir(initPath))
+    let files = (await fs.readdir(targetPath))
       .filter(f => f.endsWith(suffix))
       .sort();
 
@@ -70,7 +70,7 @@ export default async function runExecutor(
 
     for (const file of files) {
       console.log(`Processing ${file}...`);
-      const filePath = path.join(initPath, file);
+      const filePath = path.join(targetPath, file);
       const content = await fs.readFile(filePath, 'utf8');
       
       const processedContent = QueryFileProcessor.process(content, {
@@ -90,4 +90,27 @@ export default async function runExecutor(
   } finally {
     await client.close();
   }
+}
+
+async function processFile(filePath: string, queries: string[]): Promise<string[]> {
+  const fileContent = await fs.readFile(filePath, 'utf8');
+  
+  // Check if file already has transaction wrappers
+  const hasBeginTransaction = fileContent.includes('BEGIN TRANSACTION');
+  const hasCommitTransaction = fileContent.includes('COMMIT TRANSACTION');
+
+  // Only wrap in transaction if neither exists
+  if (!hasBeginTransaction && !hasCommitTransaction) {
+    queries.push('BEGIN TRANSACTION;');
+  }
+
+  // Add the file content
+  queries.push(fileContent);
+
+  // Only add commit if we added begin
+  if (!hasBeginTransaction && !hasCommitTransaction) {
+    queries.push('COMMIT TRANSACTION;');
+  }
+
+  return queries;
 }

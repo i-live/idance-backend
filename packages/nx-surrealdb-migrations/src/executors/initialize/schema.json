@@ -22,11 +22,6 @@
       "type": "string",
       "description": "Database for operations"
     },
-    "initPath": {
-      "type": "string",
-      "description": "Path to initialization files",
-      "default": "init"
-    },
     "down": {
       "type": "boolean",
       "description": "Run down migrations instead of up",
@@ -41,6 +36,11 @@
       "type": "boolean",
       "description": "Wrap DML operations in transactions",
       "default": true
+    },
+    "path": {
+      "type": "string",
+      "description": "Path to migrations files (e.g., 'init','schema', 'seed', 'migrations')",  
+      "default": "init"
     }
   },
   "required": ["url", "user", "pass"]
