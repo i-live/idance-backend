@@ -91,26 +91,3 @@ export default async function runExecutor(
     await client.close();
   }
 }
-
-async function processFile(filePath: string, queries: string[]): Promise<string[]> {
-  const fileContent = await fs.readFile(filePath, 'utf8');
-  
-  // Check if file already has transaction wrappers
-  const hasBeginTransaction = fileContent.includes('BEGIN TRANSACTION');
-  const hasCommitTransaction = fileContent.includes('COMMIT TRANSACTION');
-
-  // Only wrap in transaction if neither exists
-  if (!hasBeginTransaction && !hasCommitTransaction) {
-    queries.push('BEGIN TRANSACTION;');
-  }
-
-  // Add the file content
-  queries.push(fileContent);
-
-  // Only add commit if we added begin
-  if (!hasBeginTransaction && !hasCommitTransaction) {
-    queries.push('COMMIT TRANSACTION;');
-  }
-
-  return queries;
-}
