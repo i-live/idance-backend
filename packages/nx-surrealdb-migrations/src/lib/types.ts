@@ -22,3 +22,20 @@ export interface SurrealQueryResult {
   status?: string;
   [key: string]: any; // Allow additional properties
 }
+
+// Type for INFO FOR DB; response
+export interface DbInfoResponse {
+  result: {
+    accesses?: Record<string, any>;
+    analyzers?: Record<string, any>;
+    apis?: Record<string, any>;
+    buckets?: Record<string, any>;
+    configs?: Record<string, any>;
+    functions?: Record<string, any>;
+    models?: Record<string, any>;
+    params?: Record<string, any>;
+    tables?: Record<string, any>; // Tables object is optional
+    users?: Record<string, any>;
+  } | null;
+  status?: string;
+}

@@ -27,6 +27,16 @@
       "description": "Run down migrations instead of up",
       "default": false
     },
+    "dryRun": {
+      "type": "boolean",
+      "description": "Dry-run mode: log migrations that would be applied without executing",
+      "default": false
+    },
+    "status": {
+      "type": "boolean",
+      "description": "Show status of migrations in the specified path (or all paths if none specified)",
+      "default": false
+    },
     "envFile": {
       "type": "string",
       "description": "Path to environment file",
@@ -39,7 +49,7 @@
     },
     "path": {
       "type": ["string", "number"],
-      "description": "Path to migrations subdirectory (e.g., '002_auth', '2', 'auth')"
+      "description": "Path to migrations subdirectory (e.g., '002_auth', '2', 'auth'); defaults to the highest numbered subdirectory"
     },
     "file": {
       "type": ["string", "number"],

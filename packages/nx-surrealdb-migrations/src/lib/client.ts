@@ -15,7 +15,6 @@ export class SurrealDBClient {
         namespace: config.namespace,
         database: config.database,
         username: config.username,
-        // Don't log the actual password
         hasPassword: !!config.password
       });
       
@@ -34,9 +33,9 @@ export class SurrealDBClient {
     }
   }
 
-  async query(sql: string): Promise<SurrealQueryResult[]> {
+  async query(sql: string, vars?: Record<string, unknown>): Promise<SurrealQueryResult[]> {
     try {
-      return await this.db.query(sql);
+      return await this.db.query(sql, vars);
     } catch (error) {
       throw new Error(`Query execution failed: ${error.message}`);
     }

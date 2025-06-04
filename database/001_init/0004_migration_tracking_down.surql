@@ -1,10 +1,9 @@
--- migrations/0001_migration_tracking_down.surql
--- Migration Tracking Teardown: Remove migration tracking table
--- WARNING: This will remove all migration history!
+-- migrations/0004_migration_tracking_down.surql
+-- Migration Tracking: Remove the migration_history table
 
--- ########################################################
--- Migration Tracking Teardown
--- ########################################################
+-- Remove indexes
+REMOVE INDEX IF EXISTS migration_history_applied_at ON migration_history;
+REMOVE INDEX IF NOT EXISTS migration_history_name ON migration_history;
 
--- Only remove if exists
+-- Remove the migration_history table
 REMOVE TABLE IF EXISTS migration_history;
