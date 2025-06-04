@@ -6,13 +6,21 @@
       "type": "string",
       "description": "SurrealDB instance URL"
     },
-    "rootUser": {
+    "user": {
       "type": "string",
-      "description": "Root user for instance-level operations"
+      "description": "User for instance operations"
     },
-    "rootPass": {
+    "pass": {
       "type": "string",
-      "description": "Root password"
+      "description": "User password"
+    },
+    "namespace": {
+      "type": "string",
+      "description": "Namespace for operations"
+    },
+    "database": {
+      "type": "string",
+      "description": "Database for operations"
     },
     "initPath": {
       "type": "string",
@@ -23,7 +31,12 @@
       "type": "boolean",
       "description": "Run down migrations instead of up",
       "default": false
+    },
+    "envFile": {
+      "type": "string",
+      "description": "Path to environment file",
+      "default": ".env"
     }
   },
-  "required": ["url", "rootUser", "rootPass"]
+  "required": ["url", "user", "pass"]
 }

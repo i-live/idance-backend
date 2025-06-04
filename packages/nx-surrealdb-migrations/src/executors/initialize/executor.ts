@@ -3,62 +3,64 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import { SurrealDBClient } from '../../lib/client';
 import { QueryFileProcessor } from '../../lib/query-file-processor';
-import { loadEnvFile } from '../../lib/env';
 import { resolveProjectPath } from '../../lib/project';
+import { loadEnvFile, replaceEnvVars } from '../../lib/env';
 
 export interface InitializeExecutorSchema {
   url: string;
-  rootUser: string;
-  rootPass: string;
+  user: string;
+  pass: string;
+  namespace?: string;
+  database?: string;
   initPath?: string;
   down?: boolean;
-  environments: Array<{
-    name: string;
-    namespaces: Array<{
-      name: string;
-      databases: Array<{
-        name: string;
-        adminUser: string;
-        adminPass: string;
-      }>;
-    }>;
-  }>;
+  envFile?: string;
 }
 
 export default async function runExecutor(
   options: InitializeExecutorSchema,
   context: ExecutorContext
 ): Promise<{ success: boolean }> {
-  loadEnvFile(context);
+  // Load environment variables from the specified envFile or default to .env
+  loadEnvFile(context, options.envFile);
 
-  const initPath = resolveProjectPath(context, options.initPath || 'init');
-  console.log('Looking for init files in:', initPath);
+  // First interpolate any env vars in provided options, then fall back to process.env
+  const resolvedOptions = {
+    url: options.url ? replaceEnvVars(options.url) : process.env.SURREALDB_URL,
+    user: options.user ? replaceEnvVars(options.user) : process.env.SURREALDB_ROOT_USER,
+    pass: options.pass ? replaceEnvVars(options.pass) : process.env.SURREALDB_ROOT_PASS,
+    namespace: options.namespace ? replaceEnvVars(options.namespace) : process.env.SURREALDB_NAMESPACE,
+    database: options.database ? replaceEnvVars(options.database) : process.env.SURREALDB_DATABASE,
+    initPath: options.initPath || 'init',
+    down: options.down || false
+  };
 
-  // Ensure init directory exists
-  try {
-    await fs.access(initPath);
-  } catch (error) {
-    throw new Error(`Init directory not found: ${initPath}`);
+  // Validate required options
+  if (!resolvedOptions.url || !resolvedOptions.user || !resolvedOptions.pass) {
+    throw new Error('Missing required configuration. Provide either through options or environment variables.');
   }
+
+  const initPath = resolveProjectPath(context, resolvedOptions.initPath);
+  console.log('Looking for init files in:', initPath);
 
   const client = new SurrealDBClient();
   try {
     await client.connect({
-      url: process.env.SURREALDB_URL,
-      username: process.env.SURREALDB_ROOT_USER,
-      password: process.env.SURREALDB_ROOT_PASS,
-      namespace: undefined,
-      database: undefined
+      url: resolvedOptions.url,
+      username: resolvedOptions.user,
+      password: resolvedOptions.pass,
+      namespace: resolvedOptions.namespace,
+      database: resolvedOptions.database
     });
 
     // Find all files and sort them (reverse order for down migrations)
-    const suffix = options.down ? '_down.surql' : '_up.surql';
+    const suffix = resolvedOptions.down ? '_down.surql' : '_up.surql';
     let files = (await fs.readdir(initPath))
       .filter(f => f.endsWith(suffix))
       .sort();
 
     // Reverse order for down migrations
-    if (options.down) {
+    if (resolvedOptions.down) {
       files = files.reverse();
     }
 
@@ -70,8 +72,8 @@ export default async function runExecutor(
       const content = await fs.readFile(filePath, 'utf8');
       
       const processedContent = QueryFileProcessor.process(content, {
-        defaultNamespace: process.env.SURREALDB_NAMESPACE,
-        defaultDatabase: process.env.SURREALDB_DATABASE
+        defaultNamespace: resolvedOptions.namespace,
+        defaultDatabase: resolvedOptions.database
       });
 
       console.log(`Executing queries from ${file}`);

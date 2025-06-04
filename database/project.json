@@ -5,74 +5,19 @@
       "executor": "@idance/nx-surrealdb-migrations:initialize",
       "options": {
         "url": "${SURREALDB_URL}",
-        "rootUser": "${SURREALDB_ROOT_USER}",
-        "rootPass": "${SURREALDB_ROOT_PASS}",
-        "environments": [
-          {
-            "name": "dev",
-            "namespaces": [
-              {
-                "name": "dev",
-                "databases": [
-                  {
-                    "name": "main",
-                    "adminUser": "${DEV_ADMIN_USER}",
-                    "adminPass": "${DEV_ADMIN_PASS}"
-                  }
-                ]
-              }
-            ]
-          },
-          {
-            "name": "prod",
-            "namespaces": [
-              {
-                "name": "prod",
-                "databases": [
-                  {
-                    "name": "main",
-                    "adminUser": "${PROD_ADMIN_USER}",
-                    "adminPass": "${PROD_ADMIN_PASS}"
-                  }
-                ]
-              }
-            ]
-          }
-        ]
-      }
-    },
-    "migrate": {
-      "executor": "@idance/nx-surrealdb-migrations:migrate",
-      "options": {
-        "url": "${SURREALDB_URL}",
+        "user": "${SURREALDB_ROOT_USER}",
+        "pass": "${SURREALDB_ROOT_PASS}",
         "namespace": "${SURREALDB_NAMESPACE}",
         "database": "${SURREALDB_DATABASE}",
-        "username": "${SURREALDB_ROOT_USER}",
-        "password": "${SURREALDB_ROOT_PASS}",
-        "migrationsDir": "migrations"
-      }
-    },
-    "rollback": {
-      "executor": "@idance/nx-surrealdb-migrations:rollback",
-      "options": {
-        "url": "${SURREALDB_URL}",
-        "namespace": "${SURREALDB_NAMESPACE}",
-        "database": "${SURREALDB_DATABASE}",
-        "username": "${SURREALDB_ROOT_USER}",
-        "password": "${SURREALDB_ROOT_PASS}",
-        "migrationsDir": "migrations"
-      }
-    },
-    "status": {
-      "executor": "@idance/nx-surrealdb-migrations:status",
-      "options": {
-        "url": "${SURREALDB_URL}",
-        "namespace": "${SURREALDB_NAMESPACE}",
-        "database": "${SURREALDB_DATABASE}",
-        "username": "${SURREALDB_ROOT_USER}",
-        "password": "${SURREALDB_ROOT_PASS}",
-        "migrationsDir": "migrations",
-        "verbose": true
+        "initPath": "init"
+      },
+      "configurations": {
+        "production": {
+          "envFile": ".env.production"
+        },
+        "development": {
+          "envFile": ".env"
+        }
       }
     }
   }

@@ -2,8 +2,9 @@ import * as dotenv from 'dotenv';
 import * as path from 'path';
 import { ExecutorContext } from '@nx/devkit';
 
-export function loadEnvFile(context: ExecutorContext): void {
-  dotenv.config({ path: path.join(context.root, '.env') });
+export function loadEnvFile(context: ExecutorContext, envFile?: string): void {
+  const envPath = path.join(context.root, envFile || '.env');
+  dotenv.config({ path: envPath });
 }
 
 export function replaceEnvVars(content: string): string {
