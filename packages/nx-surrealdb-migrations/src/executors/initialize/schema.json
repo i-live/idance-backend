@@ -38,9 +38,13 @@
       "default": true
     },
     "path": {
+      "type": ["string", "number"],
+      "description": "Path to migrations subdirectory (e.g., '002_auth', '2', 'auth')"
+    },
+    "initPath": {
       "type": "string",
-      "description": "Path to migrations files (e.g., 'init','schema', 'seed', 'migrations')",  
-      "default": "init"
+      "description": "Base path for migrations",
+      "default": "database"
     }
   },
   "required": ["url", "user", "pass"]

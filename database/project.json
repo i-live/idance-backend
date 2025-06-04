@@ -9,7 +9,7 @@
         "pass": "${SURREALDB_ROOT_PASS}",
         "namespace": "${SURREALDB_NAMESPACE}",
         "database": "${SURREALDB_DATABASE}",
-        "initPath": "init"
+        "initPath": "database"
       },
       "configurations": {
         "production": {

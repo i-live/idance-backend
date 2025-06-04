@@ -2,7 +2,7 @@ import { ExecutorContext } from '@nx/devkit';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { SurrealDBClient } from '../../lib/client';
-import { QueryFileProcessor } from '../../lib/query-file-processor';
+import { MigrationFileProcessor } from '../../lib/migration-file';
 import { resolveProjectPath } from '../../lib/project';
 import { loadEnvFile, replaceEnvVars } from '../../lib/env';
 
@@ -12,10 +12,11 @@ export interface InitializeExecutorSchema {
   pass: string;
   namespace?: string;
   database?: string;
-  path?: string;
+  path?: string | number;
   down?: boolean;
   envFile?: string;
   useTransactions?: boolean;
+  initPath?: string;
 }
 
 export default async function runExecutor(
@@ -25,16 +26,17 @@ export default async function runExecutor(
   // Load environment variables from the specified envFile or default to .env
   loadEnvFile(context, options.envFile);
 
-  // First interpolate any env vars in provided options, then fall back to process.env
+  // Resolve options with environment variable interpolation
   const resolvedOptions = {
     url: options.url ? replaceEnvVars(options.url) : process.env.SURREALDB_URL,
     user: options.user ? replaceEnvVars(options.user) : process.env.SURREALDB_ROOT_USER,
     pass: options.pass ? replaceEnvVars(options.pass) : process.env.SURREALDB_ROOT_PASS,
     namespace: options.namespace ? replaceEnvVars(options.namespace) : process.env.SURREALDB_NAMESPACE,
     database: options.database ? replaceEnvVars(options.database) : process.env.SURREALDB_DATABASE,
-    path: options.path ? replaceEnvVars(options.path) : process.env.MIGRATIONS_PATH,
+    path: options.path != null ? String(replaceEnvVars(String(options.path))) : undefined,
     down: options.down || false,
-    useTransactions: options.useTransactions ?? true
+    useTransactions: options.useTransactions ?? true,
+    initPath: options.initPath ? replaceEnvVars(options.initPath) : process.env.MIGRATIONS_PATH || 'database'
   };
 
   // Validate required options
@@ -42,7 +44,21 @@ export default async function runExecutor(
     throw new Error('Missing required configuration. Provide either through options or environment variables.');
   }
 
-  const targetPath = resolveProjectPath(context, resolvedOptions.path);
+  // Resolve base migrations directory
+  const basePath = resolveProjectPath(context, resolvedOptions.initPath);
+  console.log('Resolved basePath:', basePath);
+  let targetPath = basePath;
+
+  // If path is provided, resolve the subdirectory and validate it
+  if (resolvedOptions.path) {
+    const subDir = await MigrationFileProcessor.findMatchingSubdirectory(basePath, resolvedOptions.path);
+    if (!subDir) {
+      throw new Error(`No subdirectory found matching pattern: ${resolvedOptions.path}`);
+    }
+    targetPath = path.join(basePath, subDir);
+    console.log('Resolved targetPath:', targetPath);
+  }
+
   console.log('Looking for files in:', targetPath);
 
   const client = new SurrealDBClient();
@@ -55,15 +71,17 @@ export default async function runExecutor(
       database: resolvedOptions.database
     });
 
-    // Find all files and sort them (reverse order for down migrations)
-    const suffix = resolvedOptions.down ? '_down.surql' : '_up.surql';
-    let files = (await fs.readdir(targetPath))
-      .filter(f => f.endsWith(suffix))
-      .sort();
+    // Find all files in the target directory
+    const allFiles = await fs.readdir(targetPath);
+    console.log('Found files:', allFiles);
+    const files = MigrationFileProcessor.filterMigrationFiles(
+      allFiles,
+      undefined,
+      resolvedOptions.down ? 'down' : 'up'
+    );
 
-    // Reverse order for down migrations
-    if (resolvedOptions.down) {
-      files = files.reverse();
+    if (files.length === 0) {
+      throw new Error(`No migration files found in: ${targetPath}`);
     }
 
     console.log(`Found ${files.length} initialization file(s)`);
@@ -73,7 +91,7 @@ export default async function runExecutor(
       const filePath = path.join(targetPath, file);
       const content = await fs.readFile(filePath, 'utf8');
       
-      const processedContent = QueryFileProcessor.process(content, {
+      const processedContent = MigrationFileProcessor.processContent(content, {
         defaultNamespace: resolvedOptions.namespace,
         defaultDatabase: resolvedOptions.database,
         useTransactions: resolvedOptions.useTransactions ?? true

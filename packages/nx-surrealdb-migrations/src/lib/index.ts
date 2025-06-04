@@ -4,4 +4,4 @@ export * from './migration-tracker';
 export * from './types';
 export * from './env';
 export * from './project';
-export * from './query-file-processor';
+export * from './migration-file';

@@ -10,5 +10,9 @@ export function getProjectRoot(context: ExecutorContext): string {
 }
 
 export function resolveProjectPath(context: ExecutorContext, relativePath?: string): string {
-  return path.join(getProjectRoot(context), relativePath || '');
+  console.log('Context:', { root: context.root, projectName: context.projectName, relativePath }); // Debug log
+  const basePath = context.root; // Use workspace root
+  const resolved = relativePath ? path.join(basePath, relativePath) : basePath;
+  console.log('Resolved path:', resolved); // Debug log
+  return resolved;
 }
