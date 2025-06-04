@@ -11,13 +11,18 @@
       "description": "Root user for instance-level operations"
     },
     "rootPass": {
-      "type": "string", 
+      "type": "string",
       "description": "Root password"
     },
     "initPath": {
       "type": "string",
       "description": "Path to initialization files",
       "default": "init"
+    },
+    "down": {
+      "type": "boolean",
+      "description": "Run down migrations instead of up",
+      "default": false
     }
   },
   "required": ["url", "rootUser", "rootPass"]

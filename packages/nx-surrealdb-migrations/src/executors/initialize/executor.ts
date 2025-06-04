@@ -11,6 +11,7 @@ export interface InitializeExecutorSchema {
   rootUser: string;
   rootPass: string;
   initPath?: string;
+  down?: boolean;
   environments: Array<{
     name: string;
     namespaces: Array<{
@@ -50,9 +51,16 @@ export default async function runExecutor(
       database: undefined
     });
 
-    const files = (await fs.readdir(initPath))
-      .filter(f => f.endsWith('_up.surql'))
+    // Find all files and sort them (reverse order for down migrations)
+    const suffix = options.down ? '_down.surql' : '_up.surql';
+    let files = (await fs.readdir(initPath))
+      .filter(f => f.endsWith(suffix))
       .sort();
+
+    // Reverse order for down migrations
+    if (options.down) {
+      files = files.reverse();
+    }
 
     console.log(`Found ${files.length} initialization file(s)`);
 
