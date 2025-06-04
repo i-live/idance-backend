@@ -1,7 +1,13 @@
 import { ExecutorContext } from '@nx/devkit';
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import { SurrealDBConfig, SurrealDBClient, MigrationParser, MigrationTracker } from '../../lib';
+import { 
+  SurrealDBConfig, 
+  SurrealDBClient, 
+  MigrationParser, 
+  MigrationTracker 
+} from '../../lib';
+import { QueryFileProcessor } from '../../lib/query-file-processor';
 
 export interface RollbackExecutorSchema extends SurrealDBConfig {
   migrationsDir?: string;
@@ -29,26 +35,23 @@ export default async function runExecutor(
       return { success: true };
     }
 
-    const lastMigration = applied[applied.length - 1];
-    const downFile = lastMigration.filename.replace('_up.surql', '_down.surql');
-    const downFilePath = path.join(migrationsPath, downFile);
+    const migrationsToRollback = applied.slice(-1);
+    for (const migration of migrationsToRollback) {
+      const content = await fs.readFile(path.join(migrationsPath, migration.filename.replace('_up.', '_down.')), 'utf8');
+      const parsedMigration = MigrationParser.parseDown(content, migration.filename);
+      
+      const processedContent = QueryFileProcessor.process(parsedMigration.up, {
+        defaultNamespace: process.env.SURREALDB_NAMESPACE,
+        defaultDatabase: process.env.SURREALDB_DATABASE
+      });
 
-    try {
-      const content = await fs.readFile(downFilePath, 'utf-8');
-      const migration = MigrationParser.parseDown(content, downFile);
-
-      console.log(`Rolling back migration: ${lastMigration.filename}`);
-      const statements = MigrationParser.splitStatements(migration.up);
-      for (const statement of statements) {
-        await client.query(statement);
-      }
-      await tracker.removeMigration(lastMigration.id);
-      console.log(`✅ Rolled back: ${lastMigration.filename}`);
-      return { success: true };
-    } catch (error) {
-      console.error(`❌ Failed to rollback: ${lastMigration.filename}`, error);
-      return { success: false };
+      await client.query(processedContent);
+      await tracker.removeMigration(migration.id);
     }
+    return { success: true };
+  } catch (error) {
+    console.error('Error during rollback:', error);
+    return { success: false };
   } finally {
     await client.close();
   }

@@ -1,5 +1,10 @@
 {
   "executors": {
+    "initialize": {
+      "implementation": "../../../dist/packages/nx-surrealdb-migrations/src/executors/initialize/executor.js",
+      "schema": "../../../dist/packages/nx-surrealdb-migrations/src/executors/initialize/schema.json",
+      "description": "Initialize SurrealDB migrations"
+    },
     "migrate": {
       "implementation": "./src/executors/migrate/executor.js",
       "schema": "./src/executors/migrate/schema.json",
@@ -11,8 +16,8 @@
       "description": "Rollback the last SurrealDB migration"
     },
     "status": {
-      "implementation": "./src/executors/status/executor.js",
-      "schema": "./src/executors/status/schema.json",
+      "implementation": "../../../dist/packages/nx-surrealdb-migrations/src/executors/status/executor.js",
+      "schema": "../../../dist/packages/nx-surrealdb-migrations/src/executors/status/schema.json",
       "description": "Check migration status"
     }
   }

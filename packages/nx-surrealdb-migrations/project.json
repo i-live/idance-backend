@@ -26,7 +26,9 @@
           "*.md",
           "src/executors/*/schema.json",
           "src/generators/*/schema.json"
-        ]
+        ],
+        "updateBuildableProjectDepsInPackageJson": true,
+        "buildableProjectDepsInPackageJsonType": "dependencies"
       }
     },
     "lint": {

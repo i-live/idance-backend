@@ -10,6 +10,15 @@ export class SurrealDBClient {
 
   async connect(config: SurrealDBConfig) {
     try {
+      console.log('Attempting to connect with config:', {
+        url: config.url,
+        namespace: config.namespace,
+        database: config.database,
+        username: config.username,
+        // Don't log the actual password
+        hasPassword: !!config.password
+      });
+      
       await this.db.connect(config.url);
       await this.db.signin({
         username: config.username,
@@ -20,6 +29,7 @@ export class SurrealDBClient {
         database: config.database,
       });
     } catch (error) {
+      console.error('Connection error details:', error);
       throw new Error(`Failed to connect to SurrealDB: ${error.message}`);
     }
   }

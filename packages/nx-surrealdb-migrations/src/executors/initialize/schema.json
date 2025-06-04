@@ -1,0 +1,24 @@
+{
+  "$schema": "http://json-schema.org/schema",
+  "type": "object",
+  "properties": {
+    "url": {
+      "type": "string",
+      "description": "SurrealDB instance URL"
+    },
+    "rootUser": {
+      "type": "string",
+      "description": "Root user for instance-level operations"
+    },
+    "rootPass": {
+      "type": "string", 
+      "description": "Root password"
+    },
+    "initPath": {
+      "type": "string",
+      "description": "Path to initialization files",
+      "default": "init"
+    }
+  },
+  "required": ["url", "rootUser", "rootPass"]
+}

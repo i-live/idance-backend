@@ -1,7 +1,6 @@
 import { createTreeWithEmptyWorkspace } from '@nx/devkit/testing';
 import { Tree } from '@nx/devkit';
 import migrationGenerator from './generator';
-import { joinPathFragments } from '@nx/devkit';
 
 // Mock url and path modules to handle ESM compatibility
 jest.mock('url', () => {

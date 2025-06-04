@@ -6,5 +6,5 @@
 -- Migration Tracking Teardown
 -- ########################################################
 
--- Remove the migration_history table and all its data
+-- Remove all data and table
 REMOVE TABLE migration_history;

@@ -5,8 +5,8 @@ import {
   joinPathFragments,
   readProjectConfiguration
 } from '@nx/devkit';
-import { dirname } from 'path';
-import { fileURLToPath } from 'url';
+import * as path from 'path';
+import { MigrationParser } from '../../lib/migration-parser';
 
 export interface MigrationGeneratorSchema {
   name: string;
@@ -15,7 +15,23 @@ export interface MigrationGeneratorSchema {
   positionalArgs?: string[];
 }
 
-export default async function migrationGenerator(
+function generateUpMigration(options: MigrationGeneratorSchema): string {
+  return `-- ${options.name} Up Migration
+-- Created at: ${new Date().toISOString()}
+
+-- Add your up migration SQL here
+`;
+}
+
+function generateDownMigration(options: MigrationGeneratorSchema): string {
+  return `-- ${options.name} Down Migration
+-- Created at: ${new Date().toISOString()}
+
+-- Add your down migration SQL here
+`;
+}
+
+export async function migrationGenerator(
   tree: Tree,
   options: MigrationGeneratorSchema
 ): Promise<void> {
@@ -27,31 +43,34 @@ export default async function migrationGenerator(
   };
 
   if (!normalizedOptions.name) {
-    throw new Error('The "name" property is required. Provide it using --name or as a positional argument.');
+    throw new Error('The "name" property is required.');
   }
 
-  const timestamp = new Date().toISOString().replace(/[-:T]/g, '').split('.')[0];
   const projectConfig = readProjectConfiguration(tree, normalizedOptions.project);
   const projectRoot = projectConfig.root;
   const migrationsPath = joinPathFragments(projectRoot, normalizedOptions.migrationsDir || 'migrations');
 
-  const moduleDir = typeof __dirname !== 'undefined'
-    ? __dirname
-    : dirname(fileURLToPath(import.meta.url));
+  const moduleDir = __dirname;
+  const timestamp = new Date().getTime();
 
-  console.log('Template path:', joinPathFragments(moduleDir, 'files'));
-  console.log('Output path:', migrationsPath);
-  console.log('Variables:', {
-    name: normalizedOptions.name,
-    timestamp,
-    date: new Date().toISOString(),
-  });
+  const upFileName = `${timestamp}_${normalizedOptions.name}_up.surql`;
+  const downFileName = `${timestamp}_${normalizedOptions.name}_down.surql`;
 
-  generateFiles(tree, joinPathFragments(moduleDir, 'files'), migrationsPath, {
-    name: normalizedOptions.name,
-    timestamp,
-    date: new Date().toISOString(),
-  });
+  // Create up migration
+  const upContent = generateUpMigration(normalizedOptions);
+  tree.write(joinPathFragments(migrationsPath, upFileName), upContent);
+
+  // Create down migration
+  const downContent = generateDownMigration(normalizedOptions);
+  tree.write(joinPathFragments(migrationsPath, downFileName), downContent);
+
+  // Validate migrations can be parsed
+  try {
+    MigrationParser.parseUp(upContent, upFileName);
+    MigrationParser.parseDown(downContent, downFileName);
+  } catch (error) {
+    throw new Error(`Generated invalid migration files: ${error.message}`);
+  }
 
   await formatFiles(tree);
 }
