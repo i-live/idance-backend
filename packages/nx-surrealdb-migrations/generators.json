@@ -1,8 +1,8 @@
 {
   "generators": {
     "migration": {
-      "factory": "../../../dist/packages/nx-surrealdb-migrations/src/generators/migration/generator.js",
-      "schema": "../../../dist/packages/nx-surrealdb-migrations/src/generators/migration/schema.json",
+      "factory": "./src/generators/migration/generator.js",
+      "schema": "./src/generators/migration/schema.json",
       "description": "Generate a new SurrealDB migration"
     }
   }

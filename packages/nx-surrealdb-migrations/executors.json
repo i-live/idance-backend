@@ -6,13 +6,13 @@
       "description": "Initialize SurrealDB migrations"
     },
     "migrate": {
-      "implementation": "./src/executors/migrate/executor.js",
-      "schema": "./src/executors/migrate/schema.json",
+      "implementation": "../../../dist/packages/nx-surrealdb-migrations/src/executors/migrate/executor.js",
+      "schema": "../../../dist/packages/nx-surrealdb-migrations/src/executors/migrate/schema.json",
       "description": "Run pending SurrealDB migrations"
     },
     "rollback": {
-      "implementation": "./src/executors/rollback/executor.js",
-      "schema": "./src/executors/rollback/schema.json",
+      "implementation": "../../../dist/packages/nx-surrealdb-migrations/src/executors/rollback/executor.js",
+      "schema": "../../../dist/packages/nx-surrealdb-migrations/src/executors/rollback/schema.json",
       "description": "Rollback the last SurrealDB migration"
     },
     "status": {

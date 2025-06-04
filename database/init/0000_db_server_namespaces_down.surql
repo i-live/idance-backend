@@ -7,4 +7,4 @@
 -- ########################################################
 
 -- Remove the namespace (this removes everything)
-REMOVE NAMESPACE ${SURREALDB_NAMESPACE};
+REMOVE NAMESPACE IF EXISTS ${SURREALDB_NAMESPACE};

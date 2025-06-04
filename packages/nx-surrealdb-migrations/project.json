@@ -21,8 +21,11 @@
             "glob": "{package.json,generators.json,executors.json,README.md,LICENSE.md}",
             "output": "./"
           },
-          "src/executors/*/schema.json",
-          "src/generators/*/schema.json"
+          {
+            "input": "packages/nx-surrealdb-migrations/src",
+            "glob": "**/*/schema.json",
+            "output": "src"
+          }
         ],
         "updateBuildableProjectDepsInPackageJson": true,
         "buildableProjectDepsInPackageJsonType": "dependencies"

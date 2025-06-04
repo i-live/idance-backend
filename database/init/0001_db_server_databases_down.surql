@@ -7,6 +7,6 @@
 -- ########################################################
 
 -- Remove all databases (this will destroy all data!)
-REMOVE DATABASE dev;
-REMOVE DATABASE prod;
-REMOVE DATABASE test;
+REMOVE DATABASE IF EXISTS dev;
+REMOVE DATABASE IF EXISTS prod;
+REMOVE DATABASE IF EXISTS test;
