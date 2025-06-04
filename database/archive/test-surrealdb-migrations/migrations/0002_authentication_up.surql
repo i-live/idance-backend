@@ -60,9 +60,9 @@ DEFINE FUNCTION fn::signup_username_password($email: string, $password: string, 
         -- User exists, add password to existing user (likely OAuth-only user adding email/password)
         UPDATE user SET
             password = crypto::argon2::generate($password),
-            username = $username OR username,
-            first_name = $first_name OR first_name,
-            last_name = $last_name OR last_name,
+            username    = $username    ?? username,
+            first_name  = $first_name  ?? first_name,
+            last_name   = $last_name   ?? last_name,
             updated_at = time::now()
         WHERE email = $email;
         RETURN $existing[0];
@@ -173,7 +173,10 @@ DEFINE ACCESS oauth ON DATABASE TYPE RECORD
         fn::signup_oauth($email, $provider, $provider_id, $username, $first_name, $last_name, $name, $picture)
     )
     SIGNIN (
-        SELECT * FROM user WHERE oauth_providers[?provider = $provider].id = $provider_id
+    UPDATE user SET oauth_providers = array::filter(
+        oauth_providers,
+        $p -> $p.provider != $provider
+    ) WHERE id = $user_id;
     )
     WITH JWT ALGORITHM HS256 KEY '${SURREALDB_JWT_SECRET}'
     AUTHENTICATE {
@@ -248,7 +251,10 @@ DEFINE FUNCTION fn::unlink_oauth_provider($user_id: record<user>, $provider: str
     };
     
     -- Remove the OAuth provider from the array
-    UPDATE user SET oauth_providers = array::filter(oauth_providers, |$p| $p.provider != $provider) WHERE id = $user_id;
+    UPDATE user SET oauth_providers = array::filter(
+        oauth_providers,
+        $p -> $p.provider != $provider
+    ) WHERE id = $user_id;
     
     RETURN true;
 };

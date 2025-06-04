@@ -6,9 +6,6 @@
 -- Database Server Teardown
 -- ########################################################
 
--- Use the namespace first
-USE NAMESPACE ${SURREALDB_NAMESPACE};
-
 -- Remove all databases (this will destroy all data!)
 REMOVE DATABASE dev;
 REMOVE DATABASE prod;

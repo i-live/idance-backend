@@ -36,6 +36,11 @@
       "type": "string",
       "description": "Path to environment file",
       "default": ".env"
+    },
+    "useTransactions": {
+      "type": "boolean",
+      "description": "Wrap DML operations in transactions",
+      "default": true
     }
   },
   "required": ["url", "user", "pass"]

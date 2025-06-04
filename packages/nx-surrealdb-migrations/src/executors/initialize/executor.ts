@@ -5,6 +5,7 @@ import { SurrealDBClient } from '../../lib/client';
 import { QueryFileProcessor } from '../../lib/query-file-processor';
 import { resolveProjectPath } from '../../lib/project';
 import { loadEnvFile, replaceEnvVars } from '../../lib/env';
+import { u } from 'surrealdb';
 
 export interface InitializeExecutorSchema {
   url: string;
@@ -15,6 +16,7 @@ export interface InitializeExecutorSchema {
   initPath?: string;
   down?: boolean;
   envFile?: string;
+  useTransactions?: boolean;
 }
 
 export default async function runExecutor(
@@ -32,7 +34,8 @@ export default async function runExecutor(
     namespace: options.namespace ? replaceEnvVars(options.namespace) : process.env.SURREALDB_NAMESPACE,
     database: options.database ? replaceEnvVars(options.database) : process.env.SURREALDB_DATABASE,
     initPath: options.initPath || 'init',
-    down: options.down || false
+    down: options.down || false,
+    useTransactions: options.useTransactions ?? true
   };
 
   // Validate required options
@@ -73,7 +76,8 @@ export default async function runExecutor(
       
       const processedContent = QueryFileProcessor.process(content, {
         defaultNamespace: resolvedOptions.namespace,
-        defaultDatabase: resolvedOptions.database
+        defaultDatabase: resolvedOptions.database,
+        useTransactions: resolvedOptions.useTransactions ?? true
       });
 
       console.log(`Executing queries from ${file}`);

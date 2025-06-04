@@ -1,7 +1,6 @@
 import {
   Tree,
   formatFiles,
-  generateFiles,
   joinPathFragments,
   readProjectConfiguration
 } from '@nx/devkit';
@@ -50,7 +49,6 @@ export async function migrationGenerator(
   const projectRoot = projectConfig.root;
   const migrationsPath = joinPathFragments(projectRoot, normalizedOptions.migrationsDir || 'migrations');
 
-  const moduleDir = __dirname;
   const timestamp = new Date().getTime();
 
   const upFileName = `${timestamp}_${normalizedOptions.name}_up.surql`;
