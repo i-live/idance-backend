@@ -5,7 +5,6 @@ import { SurrealDBClient } from '../../lib/client';
 import { QueryFileProcessor } from '../../lib/query-file-processor';
 import { resolveProjectPath } from '../../lib/project';
 import { loadEnvFile, replaceEnvVars } from '../../lib/env';
-import { u } from 'surrealdb';
 
 export interface InitializeExecutorSchema {
   url: string;
