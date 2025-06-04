@@ -13,6 +13,7 @@ export interface InitializeExecutorSchema {
   namespace?: string;
   database?: string;
   path?: string | number;
+  file?: string | number;
   down?: boolean;
   envFile?: string;
   useTransactions?: boolean;
@@ -34,6 +35,7 @@ export default async function runExecutor(
     namespace: options.namespace ? replaceEnvVars(options.namespace) : process.env.SURREALDB_NAMESPACE,
     database: options.database ? replaceEnvVars(options.database) : process.env.SURREALDB_DATABASE,
     path: options.path != null ? String(replaceEnvVars(String(options.path))) : undefined,
+    file: options.file != null ? String(replaceEnvVars(String(options.file))) : undefined,
     down: options.down || false,
     useTransactions: options.useTransactions ?? true,
     initPath: options.initPath ? replaceEnvVars(options.initPath) : process.env.MIGRATIONS_PATH || 'database'
@@ -76,12 +78,12 @@ export default async function runExecutor(
     console.log('Found files:', allFiles);
     const files = MigrationFileProcessor.filterMigrationFiles(
       allFiles,
-      undefined,
+      resolvedOptions.file, // Pass file pattern
       resolvedOptions.down ? 'down' : 'up'
     );
 
     if (files.length === 0) {
-      throw new Error(`No migration files found in: ${targetPath}`);
+      throw new Error(`No migration files found in: ${targetPath}${resolvedOptions.file ? ` matching pattern: ${resolvedOptions.file}` : ''}`);
     }
 
     console.log(`Found ${files.length} initialization file(s)`);

@@ -84,25 +84,26 @@ export class MigrationFileProcessor {
     const migration = this.parseMigrationFile(filename);
     if (!migration) return false;
 
-    const normalizedPattern = pattern.replace(/^0+/, '');
+    const normalizedPattern = pattern.trim().toLowerCase().replace(/^0+/, '');
     const normalizedNumber = parseInt(migration.number, 10).toString();
 
     return (
-      filename === pattern ||
-      filename === `${pattern}.surql` ||
+      filename.toLowerCase() === pattern.toLowerCase() ||
+      filename.toLowerCase() === `${pattern.toLowerCase()}.surql` ||
       normalizedPattern === normalizedNumber ||
-      pattern === migration.name ||
-      pattern === `${normalizedNumber}_${migration.name}` ||
-      pattern === `${migration.number}_${migration.name}`
+      normalizedPattern === migration.name.toLowerCase() ||
+      normalizedPattern === `${normalizedNumber}_${migration.name.toLowerCase()}` ||
+      normalizedPattern === `${migration.number}_${migration.name.toLowerCase()}`
     );
   }
 
-  static filterMigrationFiles(files: string[], pattern?: string, direction: 'up' | 'down' = 'up'): string[] {
+  static filterMigrationFiles(files: string[], filePattern?: string, direction: 'up' | 'down' = 'up'): string[] {
     let filtered = files.filter(f => f.endsWith(`_${direction}.surql`));
     console.log(`Filtered files for ${direction}:`, filtered);
 
-    if (pattern) {
-      filtered = filtered.filter(f => this.matchesMigrationPattern(f, pattern));
+    if (filePattern) {
+      filtered = filtered.filter(f => this.matchesMigrationPattern(f, filePattern));
+      console.log(`Filtered files for pattern ${filePattern}:`, filtered);
     }
 
     return direction === 'down' ? filtered.reverse() : filtered.sort();

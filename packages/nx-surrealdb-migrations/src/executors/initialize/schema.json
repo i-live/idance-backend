@@ -41,6 +41,10 @@
       "type": ["string", "number"],
       "description": "Path to migrations subdirectory (e.g., '002_auth', '2', 'auth')"
     },
+    "file": {
+      "type": ["string", "number"],
+      "description": "Specific migration file to run (e.g., '0003_core_users', '3', 'core_users')"
+    },
     "initPath": {
       "type": "string",
       "description": "Base path for migrations",
