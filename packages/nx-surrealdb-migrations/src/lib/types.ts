@@ -7,15 +7,18 @@ export interface SurrealDBConfig {
 }
 
 export interface Migration {
-  id: string;
+  id?: string;
   path: string;
-  file: string;
+  filename: string;
   number: string;
   name: string;
   direction: string;
+  content: string;
+  namespace?: string;
+  database?: string;
   status: string;
   checksum: string;
-  applied_at?: string;
+  applied_at?: Date;
   applied_by?: string;
   execution_time_ms?: number;
 }

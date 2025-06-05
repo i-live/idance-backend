@@ -3,9 +3,20 @@ import { SurrealDBConfig, SurrealQueryResult } from './types';
 
 export class SurrealDBClient {
   private db: Surreal;
+  public username?: string;
+  public namespace?: string;
+  public database?: string;
 
   constructor() {
     this.db = new Surreal();
+  }
+
+  async create(table: string, data: Record<string, any>): Promise<void> {
+    try {
+      await this.db.create(table, data);
+    } catch (error) {
+      throw new Error(`Failed to create record: ${error.message}`);
+    }
   }
 
   async connect(config: SurrealDBConfig) {
@@ -28,15 +39,20 @@ export class SurrealDBClient {
         namespace: config.namespace,
         database: config.database,
       });
+
+      // Store connection details
+      this.username = config.username;
+      this.namespace = config.namespace;
+      this.database = config.database;
     } catch (error) {
       console.error('Connection error details:', error);
       throw new Error(`Failed to connect to SurrealDB: ${error.message}`);
     }
   }
 
-  async query(sql: string): Promise<SurrealQueryResult[]> {
+  async query(sql: string, params?: Record<string, any>): Promise<SurrealQueryResult[]> {
     try {
-      return await this.db.query(sql);
+      return await this.db.query(sql, params);
     } catch (error) {
       throw new Error(`Query execution failed: ${error.message}`);
     }

@@ -1,9 +1,11 @@
 import { ExecutorContext } from '@nx/devkit';
 import * as fs from 'fs/promises';
 import * as path from 'path';
+import * as crypto from 'crypto';
 import {
   SurrealDBClient,
   MigrationFileProcessor,
+  MigrationTracker,
   resolveProjectPath,
   loadEnvFile,
   replaceEnvVars
@@ -70,7 +72,10 @@ export default async function runExecutor(
   console.log('Looking for files in:', targetPath);
 
   const client = new SurrealDBClient();
+  const migrationTracker = new MigrationTracker(client);
+
   try {
+
     // Find all files in the target directory
     const allFiles = await fs.readdir(targetPath);
     console.log('Found files:', allFiles);
@@ -93,6 +98,8 @@ export default async function runExecutor(
       namespace: resolvedOptions.namespace,
       database: resolvedOptions.database
     });
+    // Initialize the migration history table
+    await migrationTracker.initialize();
 
     for (const file of files) {
       console.log(`Processing ${file}...`);
@@ -105,8 +112,53 @@ export default async function runExecutor(
         useTransactions: resolvedOptions.useTransactions ?? true
       });
 
+      // Extract migration number and name from file (assuming format like 001_init_migration.up.surql)
+      const fileParts = file.match(/^(\d+)_(.+)(up|down)\.surql$/);
+      if (!fileParts) {
+        throw new Error(`Invalid migration file name format: ${file}. Expected <number>_<name>.<up|down>.surql`);
+      }
+      const [, number, name, direction] = fileParts;
+
+      // Compute checksum of file content
+      const checksum = crypto.createHash('sha256').update(content).digest('hex');
+
       console.log(`Executing queries from ${file}`);
-      await client.query(processedContent);
+      let executionTimeMs: number | null = null;
+      try {
+        const startTime = performance.now();
+        await client.query(processedContent);
+        executionTimeMs = Math.round(performance.now() - startTime); // Round to nearest integer
+
+        // Record the migration in migration_history
+        await migrationTracker.addMigration({
+          number,
+          name,
+          direction: direction as 'up' | 'down',
+          filename: file,
+          path: targetPath,
+          content,
+          checksum,
+          status: 'success',
+          applied_by: process.env.USER || 'nx-plugin',
+          execution_time_ms: executionTimeMs // You can measure execution time if needed
+        });
+        console.log(`Recorded migration ${number}_${name} in migration_history`);
+      } catch (error) {
+        // Record failed migration
+        await migrationTracker.addMigration({
+          number,
+          name,
+          direction: direction as 'up' | 'down',
+          filename: file,
+          path: targetPath,
+          content,
+          checksum,
+          status: 'fail',
+          applied_by: process.env.USER || 'nx-plugin',
+          execution_time_ms: executionTimeMs
+        });
+        throw new Error(`Failed to execute migration ${file}: ${error.message}`);
+      }
     }
 
     return { success: true };

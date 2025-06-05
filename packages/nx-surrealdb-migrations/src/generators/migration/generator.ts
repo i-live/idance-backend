@@ -4,7 +4,7 @@ import {
   joinPathFragments,
   readProjectConfiguration
 } from '@nx/devkit';
-import { MigrationParser } from '../../lib/migration-parser';
+// import { MigrationParser } from '../../lib/migration-parser';
 
 export interface MigrationGeneratorSchema {
   name: string;
@@ -62,12 +62,12 @@ export async function migrationGenerator(
   tree.write(joinPathFragments(migrationsPath, downFileName), downContent);
 
   // Validate migrations can be parsed
-  try {
-    MigrationParser.parseUp(upContent, upFileName);
-    MigrationParser.parseDown(downContent, downFileName);
-  } catch (error) {
-    throw new Error(`Generated invalid migration files: ${error.message}`);
-  }
+  // try {
+  //   MigrationParser.parseUp(upContent, upFileName);
+  //   MigrationParser.parseDown(downContent, downFileName);
+  // } catch (error) {
+  //   throw new Error(`Generated invalid migration files: ${error.message}`);
+  // }
 
   await formatFiles(tree);
 }
