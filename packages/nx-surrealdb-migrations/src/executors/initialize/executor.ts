@@ -23,6 +23,7 @@ export interface InitializeExecutorSchema {
   envFile?: string;
   useTransactions?: boolean;
   initPath?: string;
+  schemaPath?: string;
 }
 
 export default async function runExecutor(
@@ -113,7 +114,7 @@ export default async function runExecutor(
       });
 
       // Extract migration number and name from file (assuming format like 001_init_migration.up.surql)
-      const fileParts = file.match(/^(\d+)_(.+)(up|down)\.surql$/);
+      const fileParts = file.match(/^(\d+)_(.+)_(up|down)\.surql$/);
       if (!fileParts) {
         throw new Error(`Invalid migration file name format: ${file}. Expected <number>_<name>.<up|down>.surql`);
       }
@@ -121,11 +122,12 @@ export default async function runExecutor(
 
       // Compute checksum of file content
       const checksum = crypto.createHash('sha256').update(content).digest('hex');
+      const startTime = performance.now();
 
       console.log(`Executing queries from ${file}`);
-      let executionTimeMs: number | null = null;
+      let executionTimeMs = 0;
+      const status: 'success' | 'fail' = 'success';
       try {
-        const startTime = performance.now();
         await client.query(processedContent);
         executionTimeMs = Math.round(performance.now() - startTime); // Round to nearest integer
 
@@ -138,8 +140,7 @@ export default async function runExecutor(
           path: targetPath,
           content,
           checksum,
-          status: 'success',
-          applied_by: process.env.USER || 'nx-plugin',
+          status,
           execution_time_ms: executionTimeMs // You can measure execution time if needed
         });
         console.log(`Recorded migration ${number}_${name} in migration_history`);
@@ -154,7 +155,6 @@ export default async function runExecutor(
           content,
           checksum,
           status: 'fail',
-          applied_by: process.env.USER || 'nx-plugin',
           execution_time_ms: executionTimeMs
         });
         throw new Error(`Failed to execute migration ${file}: ${error.message}`);

@@ -25,6 +25,11 @@
             "input": "packages/nx-surrealdb-migrations/src",
             "glob": "**/*/schema.json",
             "output": "src"
+          },
+          {
+            "input": "packages/nx-surrealdb-migrations/src/schema",
+            "glob": "*.surql",
+            "output": "src/schema"
           }
         ],
         "updateBuildableProjectDepsInPackageJson": true,

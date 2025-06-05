@@ -1,33 +1,42 @@
 import { Migration } from './types';
 import { SurrealDBClient } from './client';
+import * as fs from 'fs/promises';
+import * as path from 'path';
 
 export class MigrationTracker {
-  constructor(private client: SurrealDBClient) {}
+  constructor(
+    private client: SurrealDBClient,
+    private schemaPath?: string
+  ) {}
 
   async initialize(): Promise<void> {
-    const query = `
-      DEFINE TABLE IF NOT EXISTS migration_history SCHEMAFULL;
+    // Default schema path relative to the plugin
+    const defaultSchemaPath = path.join(__dirname, '../schema/system_migrations.surql');
+    const schemaFile = this.schemaPath || defaultSchemaPath;
 
-      DEFINE FIELD IF NOT EXISTS number ON migration_history TYPE string;
-      DEFINE FIELD IF NOT EXISTS name ON migration_history TYPE string;
-      DEFINE FIELD IF NOT EXISTS direction ON migration_history TYPE string ASSERT $value IN ['up', 'down'] DEFAULT 'up';
-      DEFINE FIELD IF NOT EXISTS filename ON migration_history TYPE string;
-      DEFINE FIELD IF NOT EXISTS path ON migration_history TYPE string;
-      DEFINE FIELD IF NOT EXISTS content ON migration_history TYPE string;
+    try {
+      // Read the schema file
+      const schemaQuery = await fs.readFile(schemaFile, 'utf8');
 
-      DEFINE FIELD IF NOT EXISTS namespace ON migration_history TYPE string DEFAULT session::ns();
-      DEFINE FIELD IF NOT EXISTS database ON migration_history TYPE string DEFAULT session::db();
+      // Basic validation to ensure required fields are defined
+      const requiredFields = ['number', 'name', 'direction', 'filename', 'path', 'content', 'status', 'applied_at'];
+      for (const field of requiredFields) {
+        if (!schemaQuery.includes(`DEFINE FIELD IF NOT EXISTS ${field} ON system_migrations`)) {
+          throw new Error(`Schema file ${schemaFile} is missing required field: ${field}`);
+        }
+      }
 
-      DEFINE FIELD IF NOT EXISTS checksum ON migration_history TYPE option<string>;
-      DEFINE FIELD IF NOT EXISTS status ON migration_history TYPE string ASSERT $value IN ['success', 'fail'] DEFAULT 'success';
-      DEFINE FIELD IF NOT EXISTS applied_at ON migration_history TYPE datetime DEFAULT time::now();
-      DEFINE FIELD IF NOT EXISTS applied_by ON migration_history TYPE option<string>;
-      DEFINE FIELD IF NOT EXISTS execution_time_ms ON migration_history TYPE option<int>;
-
-      DEFINE INDEX IF NOT EXISTS migration_history_applied_at ON migration_history FIELDS applied_at;
-    `;
-    await this.client.query(query);
+      // Execute the schema query
+      await this.client.query(schemaQuery);
+      console.log('Initialized system_migrations table');
+    } catch (error) {
+      if (error.code === 'ENOENT') {
+        throw new Error(`Schema file not found: ${schemaFile}`);
+      }
+      throw new Error(`Failed to initialize system_migrations table: ${error.message}`);
+    }
   }
+
 
   async addMigration(migration: Migration): Promise<void> {
     await this.initialize();
@@ -45,21 +54,22 @@ export class MigrationTracker {
       throw new Error('Invalid path format');
     }
 
-    await this.client.create("migration_history", {
+    await this.client.create("system_migrations", {
       number: migration.number,
       name: migration.name,
-      direction: migration.direction || 'up',
+      direction: migration.direction ?? 'up',
       filename: migration.filename,
       path: migration.path,
       content: migration.content,
       checksum: migration.checksum,
-      status: migration.status || 'success',
+      status: migration.status ?? 'success',
       applied_by: this.client.username,
-      execution_time_ms: migration.execution_time_ms || null
+      execution_time_ms: migration.execution_time_ms
     });
   }
 
-  async getMigrationStatus(direction: string, number: string, name: string, filename?: string): Promise<Migration | null> {
+  async getMigrationStatus(direction: string, number: string, name: string, filename?: string):
+  Promise<Migration | null> {
     if (!['up', 'down'].includes(direction)) {
       throw new Error("Direction must be 'up' or 'down'");
     }
@@ -72,7 +82,7 @@ export class MigrationTracker {
 
     const params: Record<string, string> = { direction, number, name };
     let query = `
-      SELECT * FROM migration_history 
+      SELECT * FROM system_migrations 
       WHERE direction = $direction 
       AND number = $number 
       AND name = $name
@@ -121,7 +131,7 @@ export class MigrationTracker {
     try {
       const result = await this.client.query(
         `
-        SELECT * FROM migration_history 
+        SELECT * FROM system_migrations 
         WHERE direction = $direction 
         AND path = $path
         ORDER BY number ASC
@@ -151,8 +161,8 @@ export class MigrationTracker {
   }
 
   async updateMigrationStatus(recordId: string, status: 'success' | 'fail'): Promise<void> {
-    if (!recordId.startsWith('migration_history:') || recordId.length < 18) {
-      throw new Error('Invalid record ID format. Expected migration_history:<uuid>');
+    if (!recordId.startsWith('system_migrations:') || recordId.length < 18) {
+      throw new Error('Invalid record ID format. Expected system_migrations:<uuid>');
     }
 
     try {
