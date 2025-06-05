@@ -4,7 +4,6 @@ import {
   joinPathFragments,
   readProjectConfiguration
 } from '@nx/devkit';
-import * as path from 'path';
 import { MigrationParser } from '../../lib/migration-parser';
 
 export interface MigrationGeneratorSchema {

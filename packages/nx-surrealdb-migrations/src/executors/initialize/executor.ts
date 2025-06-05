@@ -1,10 +1,13 @@
 import { ExecutorContext } from '@nx/devkit';
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import { SurrealDBClient } from '../../lib/client';
-import { MigrationFileProcessor } from '../../lib/migration-file';
-import { resolveProjectPath } from '../../lib/project';
-import { loadEnvFile, replaceEnvVars } from '../../lib/env';
+import {
+  SurrealDBClient,
+  MigrationFileProcessor,
+  resolveProjectPath,
+  loadEnvFile,
+  replaceEnvVars
+} from '../../lib';
 
 export interface InitializeExecutorSchema {
   url: string;
@@ -53,7 +56,10 @@ export default async function runExecutor(
 
   // If path is provided, resolve the subdirectory and validate it
   if (resolvedOptions.path) {
-    const subDir = await MigrationFileProcessor.findMatchingSubdirectory(basePath, resolvedOptions.path);
+    const subDir = await MigrationFileProcessor.findMatchingSubdirectory(
+      basePath,
+      resolvedOptions.path
+    );
     if (!subDir) {
       throw new Error(`No subdirectory found matching pattern: ${resolvedOptions.path}`);
     }
@@ -65,14 +71,6 @@ export default async function runExecutor(
 
   const client = new SurrealDBClient();
   try {
-    await client.connect({
-      url: resolvedOptions.url,
-      username: resolvedOptions.user,
-      password: resolvedOptions.pass,
-      namespace: resolvedOptions.namespace,
-      database: resolvedOptions.database
-    });
-
     // Find all files in the target directory
     const allFiles = await fs.readdir(targetPath);
     console.log('Found files:', allFiles);
@@ -87,6 +85,14 @@ export default async function runExecutor(
     }
 
     console.log(`Found ${files.length} initialization file(s)`);
+
+    await client.connect({
+      url: resolvedOptions.url,
+      username: resolvedOptions.user,
+      password: resolvedOptions.pass,
+      namespace: resolvedOptions.namespace,
+      database: resolvedOptions.database
+    });
 
     for (const file of files) {
       console.log(`Processing ${file}...`);

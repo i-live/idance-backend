@@ -8,7 +8,6 @@
 -- Admin roles must be assigned manually after user creation:
 -- UPDATE user SET role = 'admin' WHERE email = 'admin@yourapp.com';
 
-BEGIN TRANSACTION;
 -- ########################################################
 -- Authentication Helper Functions
 -- ########################################################
@@ -275,5 +274,3 @@ DEFINE FUNCTION fn::soft_delete_user($user_id: record<user>) {
     
     RETURN "User soft deleted successfully";
 };
-
-COMMIT TRANSACTION;
