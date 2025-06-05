@@ -8,12 +8,16 @@ export interface SurrealDBConfig {
 
 export interface Migration {
   id: string;
+  path: string;
+  file: string;
+  number: string;
   name: string;
-  filename: string;
-  up: string;
-  down?: string;
+  direction: string;
+  status: string;
   checksum: string;
   applied_at?: string;
+  applied_by?: string;
+  execution_time_ms?: number;
 }
 
 // Type for SurrealDB query response

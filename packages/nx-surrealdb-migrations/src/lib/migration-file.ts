@@ -1,5 +1,4 @@
 import * as fs from 'fs/promises';
-import * as path from 'path';
 import { replaceEnvVars } from './env';
 
 export interface MigrationContext {
@@ -121,17 +120,21 @@ export class MigrationFileProcessor {
     
     if (!hasNamespaceOperation && context.defaultNamespace) {
       statements.push(`USE NAMESPACE ${context.defaultNamespace};`);
+      console.log(`Using namespace: ${context.defaultNamespace}\n`)
     }
     if (!hasDatabaseOperation && context.defaultDatabase) {
       statements.push(`USE DATABASE ${context.defaultDatabase};`);
+      console.log(`Using database: ${context.defaultDatabase}\n`)
     }
 
     if (hasDDLOperation || !context.useTransactions || hasBeginTransaction || hasCommitTransaction) {
       statements.push(processed);
+      console.log(`No Transaction Block Added. \nDDL Operation: ${hasDDLOperation}`)
     } else {
       statements.push('BEGIN TRANSACTION;');
       statements.push(processed);
       statements.push('COMMIT TRANSACTION;');
+      console.log(`Added Transaction Block.\n`)
     }
 
     return statements.join('\n\n');
