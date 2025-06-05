@@ -139,7 +139,7 @@ export class MigrationTracker {
         { direction, path }
       );
       
-      return (result[0]?.result || []).map((m: any) => ({
+      return (result[0]?.result || []).map((m: Migration) => ({
         id: m.id,
         number: m.number,
         name: m.name,

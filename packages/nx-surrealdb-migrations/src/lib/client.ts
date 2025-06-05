@@ -11,9 +11,9 @@ export class SurrealDBClient {
     this.db = new Surreal();
   }
 
-  async create(table: string, data: Record<string, any>): Promise<void> {
+  async create(table: string, data: Record<string, unknown>): Promise<void> {
     try {
-      await this.db.create(table, data);
+      await this.db.create(table, data as Record<string, unknown>); // Cast to any if library expects it, or ensure library handles unknown
     } catch (error) {
       throw new Error(`Failed to create record: ${error.message}`);
     }
@@ -50,7 +50,7 @@ export class SurrealDBClient {
     }
   }
 
-  async query(sql: string, params?: Record<string, any>): Promise<SurrealQueryResult[]> {
+  async query(sql: string, params?: Record<string, unknown>): Promise<SurrealQueryResult[]> {
     try {
       return await this.db.query(sql, params);
     } catch (error) {
