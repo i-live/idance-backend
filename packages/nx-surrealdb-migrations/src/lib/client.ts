@@ -1,4 +1,4 @@
-import { Surreal } from 'surrealdb';
+import { RecordId, PreparedQuery, Surreal } from 'surrealdb';
 import { SurrealDBConfig, SurrealQueryResult } from './types';
 
 export class SurrealDBClient {
@@ -53,6 +53,23 @@ export class SurrealDBClient {
   async query(sql: string, params?: Record<string, unknown>): Promise<SurrealQueryResult[]> {
     try {
       return await this.db.query(sql, params);
+    } catch (error) {
+      throw new Error(`Query execution failed: ${error.message}`);
+    }
+  }
+
+
+  async prepared_query(sql: PreparedQuery): Promise<SurrealQueryResult[]> {
+    try {
+      return await this.db.query(sql);
+    } catch (error) {
+      throw new Error(`Query execution failed: ${error.message}`);
+    }
+  }
+
+  async select(sql: string): Promise<{ [x: string]: unknown; id: RecordId<string>; }[]> {
+    try {
+      return await this.db.select(sql);
     } catch (error) {
       throw new Error(`Query execution failed: ${error.message}`);
     }

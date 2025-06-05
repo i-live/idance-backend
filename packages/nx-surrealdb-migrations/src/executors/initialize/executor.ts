@@ -2,6 +2,7 @@ import { ExecutorContext } from '@nx/devkit';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as crypto from 'crypto';
+import { performance } from 'perf_hooks';
 import {
   SurrealDBClient,
   MigrationFileProcessor,
@@ -16,34 +17,31 @@ export default async function runExecutor(
   options: InitializeExecutorSchema,
   context: ExecutorContext
 ): Promise<{ success: boolean }> {
-  // Load environment variables from the specified envFile or default to .env
   loadEnvFile(context, options.envFile);
 
-  // Resolve options with environment variable interpolation
   const resolvedOptions = {
     url: options.url ? replaceEnvVars(options.url) : process.env.SURREALDB_URL,
     user: options.user ? replaceEnvVars(options.user) : process.env.SURREALDB_ROOT_USER,
     pass: options.pass ? replaceEnvVars(options.pass) : process.env.SURREALDB_ROOT_PASS,
-    namespace: options.namespace ? replaceEnvVars(options.namespace) : process.env.SURREALDB_NAMESPACE,
-    database: options.database ? replaceEnvVars(options.database) : process.env.SURREALDB_DATABASE,
+    namespace: options.namespace ? replaceEnvVars(options.namespace) : process.env.SURREALDB_NAMESPACE || 'default',
+    database: options.database ? replaceEnvVars(options.database) : process.env.SURREALDB_DATABASE || 'default',
     path: options.path != null ? String(replaceEnvVars(String(options.path))) : undefined,
     file: options.file != null ? String(replaceEnvVars(String(options.file))) : undefined,
     down: options.down || false,
     useTransactions: options.useTransactions ?? true,
-    initPath: options.initPath ? replaceEnvVars(options.initPath) : process.env.MIGRATIONS_PATH || 'database'
+    initPath: options.initPath ? replaceEnvVars(options.initPath) : process.env.MIGRATIONS_PATH || 'database',
+    schemaPath: options.schemaPath ? replaceEnvVars(options.schemaPath) : undefined,
+    force: options.force || false
   };
 
-  // Validate required options
   if (!resolvedOptions.url || !resolvedOptions.user || !resolvedOptions.pass) {
     throw new Error('Missing required configuration. Provide either through options or environment variables.');
   }
 
-  // Resolve base migrations directory
   const basePath = resolveProjectPath(context, resolvedOptions.initPath);
   console.log('Resolved basePath:', basePath);
   let targetPath = basePath;
 
-  // If path is provided, resolve the subdirectory and validate it
   if (resolvedOptions.path) {
     const subDir = await MigrationFileProcessor.findMatchingSubdirectory(
       basePath,
@@ -59,16 +57,25 @@ export default async function runExecutor(
   console.log('Looking for files in:', targetPath);
 
   const client = new SurrealDBClient();
-  const migrationTracker = new MigrationTracker(client);
+  const migrationTracker = new MigrationTracker(client, resolvedOptions.schemaPath);
 
   try {
+    await client.connect({
+      url: resolvedOptions.url,
+      username: resolvedOptions.user,
+      password: resolvedOptions.pass,
+      namespace: resolvedOptions.namespace,
+      database: resolvedOptions.database
+    });
+    console.log('Connected to SurrealDB');
 
-    // Find all files in the target directory
+    await migrationTracker.initialize();
+
     const allFiles = await fs.readdir(targetPath);
     console.log('Found files:', allFiles);
     const files = MigrationFileProcessor.filterMigrationFiles(
       allFiles,
-      resolvedOptions.file, // Pass file pattern
+      resolvedOptions.file,
       resolvedOptions.down ? 'down' : 'up'
     );
 
@@ -78,16 +85,7 @@ export default async function runExecutor(
 
     console.log(`Found ${files.length} initialization file(s)`);
 
-    await client.connect({
-      url: resolvedOptions.url,
-      username: resolvedOptions.user,
-      password: resolvedOptions.pass,
-      namespace: resolvedOptions.namespace,
-      database: resolvedOptions.database
-    });
-    // Initialize the migration history table
-    await migrationTracker.initialize();
-
+    let skippedCount = 0;
     for (const file of files) {
       console.log(`Processing ${file}...`);
       const filePath = path.join(targetPath, file);
@@ -99,25 +97,38 @@ export default async function runExecutor(
         useTransactions: resolvedOptions.useTransactions ?? true
       });
 
-      // Extract migration number and name from file (assuming format like 001_init_migration.up.surql)
       const fileParts = file.match(/^(\d+)_(.+)_(up|down)\.surql$/);
       if (!fileParts) {
-        throw new Error(`Invalid migration file name format: ${file}. Expected <number>_<name>.<up|down>.surql`);
+        throw new Error(`Invalid migration file name format: ${file}. Expected <number>_<name>_<up|down>.surql`);
       }
       const [, number, name, direction] = fileParts;
 
-      // Compute checksum of file content
+      // Check if migration can be applied
+      if (!resolvedOptions.force) {
+        const { canApply, reason } = await migrationTracker.canApplyMigration(
+          number, name,
+          direction as 'up' | 'down'
+        );
+        if (!canApply) {
+          console.warn(`WARNING: ${reason} Use --force to override.`);
+          skippedCount++;
+          continue;
+        }
+      }
+
       const checksum = crypto.createHash('sha256').update(content).digest('hex');
-      const startTime = performance.now();
 
       console.log(`Executing queries from ${file}`);
+      const startTime = performance.now();
       let executionTimeMs = 0;
-      const status: 'success' | 'fail' = 'success';
+      let status: 'success' | 'fail' = 'success';
+
       try {
         await client.query(processedContent);
-        executionTimeMs = Math.round(performance.now() - startTime); // Round to nearest integer
-
-        // Record the migration in migration_history
+        executionTimeMs = Math.round(performance.now() - startTime);
+      } catch (error) {
+        executionTimeMs = Math.round(performance.now() - startTime);
+        status = 'fail';
         await migrationTracker.addMigration({
           number,
           name,
@@ -125,26 +136,33 @@ export default async function runExecutor(
           filename: file,
           path: targetPath,
           content,
+          namespace: resolvedOptions.namespace,
+          database: resolvedOptions.database,
           checksum,
           status,
-          execution_time_ms: executionTimeMs // You can measure execution time if needed
-        });
-        console.log(`Recorded migration ${number}_${name} in migration_history`);
-      } catch (error) {
-        // Record failed migration
-        await migrationTracker.addMigration({
-          number,
-          name,
-          direction: direction as 'up' | 'down',
-          filename: file,
-          path: targetPath,
-          content,
-          checksum,
-          status: 'fail',
           execution_time_ms: executionTimeMs
         });
         throw new Error(`Failed to execute migration ${file}: ${error.message}`);
       }
+
+      await migrationTracker.addMigration({
+        number,
+        name,
+        direction: direction as 'up' | 'down',
+        filename: file,
+        path: targetPath,
+        content,
+        namespace: resolvedOptions.namespace,
+        database: resolvedOptions.database,
+        checksum,
+        status,
+        execution_time_ms: executionTimeMs
+      });
+      console.log(`Recorded migration ${number}_${name} in system_migrations (execution time: ${executionTimeMs}ms)`);
+    }
+
+    if (skippedCount > 0) {
+      console.log(`Skipped ${skippedCount} migration(s) due to state conflicts. Use --force to override.`);
     }
 
     return { success: true };

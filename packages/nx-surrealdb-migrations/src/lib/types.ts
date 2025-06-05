@@ -10,14 +10,14 @@ export interface Migration {
   id?: string;
   path: string;
   filename: string;
-  number: string;
-  name: string;
+  number?: string;
+  name?: string;
   direction: string;
-  content: string;
+  content?: string;
   namespace?: string;
   database?: string;
   status: string;
-  checksum: string;
+  checksum?: string;
   applied_at?: Date;
   applied_by?: string;
   execution_time_ms?: number;
@@ -44,4 +44,5 @@ export interface InitializeExecutorSchema {
   useTransactions?: boolean;
   initPath?: string;
   schemaPath?: string;
+  force?: boolean;
 }

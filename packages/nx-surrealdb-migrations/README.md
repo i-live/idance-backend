@@ -6,6 +6,7 @@ The Nx SurrealDB Migrations Plugin provides a seamless way to manage database mi
 
 - **Migration Management**: Apply `up` or `down` migrations using SurrealQL scripts organized in numbered subdirectories.
 - **Migration Tracking**: Stores migration history in a `system_migrations` table with fields like `number`, `name`, `direction`, `filename`, `path`, `content`, `namespace`, `database`, `checksum`, `status`, `applied_at`, `applied_by`, and `execution_time_ms`.
+- **State Enforcement**: Prevents re-running migrations in the same state (e.g., `up` when already `up`) with warnings, skippable via `--force`.
 - **Executor Support**: Includes an `initialize` executor to run migrations with configurable options (e.g., URL, namespace, path).
 - **Custom Schema**: Allows custom `system_migrations` table schemas via a `schemaPath` option.
 - **Checksum Validation**: Computes SHA-256 checksums for migration files to ensure integrity.
@@ -147,6 +148,16 @@ Use a custom schema:
 nx run database:initialize --path 1 --schemaPath libs/database/migrations/custom-migration.surql
 ```
 
+Force apply migrations regardless of state:
+```bash
+nx run database:initialize --path 1 --force
+```
+
+### Migration State Rules
+- **Up Migrations**: Can only be applied if the migration has never been run or is in a `down` state. Re-running an `up` migration is skipped with a warning unless `--force` is used.
+- **Down Migrations**: Can only be applied if the migration is in an `up` state. Running `down` on a non-existent or `down` migration is skipped with a warning unless `--force` is used.
+- **Warnings**: Skipped migrations log warnings (e.g., “Skipping migration 0001_authentication: already up. Use --force to override.”).
+
 ### Executor Options
 The `initialize` executor supports the following options (defined in `InitializeExecutorSchema`):
 - `url`: SurrealDB connection URL (required).
@@ -161,6 +172,7 @@ The `initialize` executor supports the following options (defined in `Initialize
 - `useTransactions`: Wrap queries in transactions (optional, defaults to `true`).
 - `initPath`: Base migrations directory (optional, defaults to `database`).
 - `schemaPath`: Custom schema file path for `system_migrations` (optional).
+- `force`: Bypass migration state checks (optional, defaults to `false`).
 
 Example `project.json` with all options:
 ```json
@@ -178,7 +190,8 @@ Example `project.json` with all options:
     "envFile": ".env",
     "useTransactions": true,
     "initPath": "libs/database/migrations",
-    "schemaPath": "libs/database/migrations/custom-migration.surql"
+    "schemaPath": "libs/database/migrations/custom-migration.surql",
+    "force": false
   }
 }
 ```
@@ -207,8 +220,8 @@ Fields include:
 ## Troubleshooting
 
 - **Error: Failed to create record: Found NULL for field `execution_time_ms`**:
-  - Ensure `executor.ts` measures `execution_time_ms` in both success and failure cases (fixed in version `5a12afae-9646-488b-84d9-b8509e5e6893`).
-  - Verify `types.ts` defines `execution_time_ms?: number | null` (version `acb9924f-dc33-445b-84c4-c6bc71865226`).
+  - Ensure `executor.ts` measures `execution_time_ms` in both success and failure cases (fixed in version `7f4e5f90-0f4b-4c6b-a8c8-5e3f6f3f3b3b`).
+  - Verify `types.ts` defines `execution_time_ms?: number | null` (version `7e0d0e80-0f4b-4a6b-a4c8-5e3f6f3f3b3b`).
 
 - **Error: Schema file not found**:
   - Confirm `schema/migration-history.surql` exists in `dist/packages/nx-surrealdb-migrations/src/schema/`.
@@ -218,12 +231,13 @@ Fields include:
   - Provide `url`, `user`, and `pass` in `project.json` or `.env`.
   - Example:
     ```bash
-    nx run database:initialize --url wss://your-surrealdb-instance --user root --pass your-database-password
+    nx run database:initialize --url wss://your-surrealdb-instance --user root --pass your-password
     ```
 
 - **No migrations applied**:
   - Ensure migration files follow the format `<number>_<name>.<up|down>.surql` (e.g., `0001_authentication_up.surql`).
   - Verify the `path` option matches a subdirectory (e.g., `--path 1` for `001_auth`).
+  - Check if migrations were skipped due to state conflicts (use `--force` to override).
 
 - **Verbose Output**:
   - Run with `--verbose` for detailed logs:
@@ -268,49 +282,12 @@ Contributions are welcome! To contribute:
 - **CLI Integration**: Provide a CLI for running migrations outside Nx (e.g., `nx-surrealdb-migrate`).
 
 ## License
-
 MIT License. See [LICENSE](LICENSE.md) for details.
 
 ## Support
-
 For issues, feature requests, or questions:
 - Open an issue on [GitHub](https://github.com/idance/nx-surrealdb-migrations/issues).
 - Contact the maintainers at [support@idance.com](mailto:support@idance.com).
 
 ---
-Built with ❤️ for the SurrealDB and Nx communities.
-</xArtifact>
-
-### Updates Made
-- **Package Name**: Changed `@your-org/nx-surrealdb-migrations` to `@idance/nx-surrealdb-migrations`.
-- **Repository URL**: Updated to `https://github.com/idance/nx-surrealdb-migrations` (please confirm or replace with your actual repository).
-- **Support Email**: Set to `support@idance.com` (replace with your actual email).
-- **Content**: Retained all features, setup, usage, troubleshooting, and roadmap details from the previous version.
-- **Versions**: Kept references to artifact versions for `executor.ts` (`5a12afae-9646-488b-84d9-b8509e5e6893`), `types.ts` (`acb9924f-dc33-432b-b791-c6b85e182226`), and `project.json` (`fbe0ef78-8b79-8791-d9ab-98b2b3beec4e94`) for accuracy.
-
-### Additional Notes
-- **Repository Confirmation**: If the GitHub URL isn’t correct (e.g., you use a different repo or host), update the `git clone` and issue links. For example, if it’s `gitlab.com/idance/nx-surrealdb-migrations`, replace all instances.
-- **Email**: If you don’t have a support email, you can remove the email line or use a personal email for now.
-- **Publishing**: If you plan to publish to npm, ensure the `package.json` in `packages/nx-surrealdb-migrations` has:
-  ```json
-  {
-    "name": "@idance/nx-surrealdb-migrations",
-    "version": "0.0.1",
-    "repository": {
-      "type": "git",
-      "url": "https://github.com/idance/nx-surrealdb-migrations.git"
-    }
-  }
-  ```
-  Run `nx build nx-surrealdb-migrations` and `npm publish dist/packages/nx-surrealdb-migrations` to publish.
-- **Schema.json**: Consider adding a `schema.json` for the `initialize` executor in `packages/nx-surrealdb-migrations/src/executors/initialize/` to enable Nx CLI validation. Example:
-  ```json
-  {
-    "$schema": "http://json-schema.org/draft-07/schema",
-    "title": "Initialize Executor Schema",
-    "type": "object",
-    "properties": ["url", "user"],
-    "required": ["url", "user", "pass"],
-    "additionalProperties": true
-  }
-  ```
+Built with ❤️ for the Nx and SurrealDB communities.

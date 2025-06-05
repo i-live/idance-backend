@@ -10,14 +10,6 @@
         "namespace": "${SURREALDB_NAMESPACE}",
         "database": "${SURREALDB_DATABASE}",
         "initPath": "database"
-      },
-      "configurations": {
-        "production": {
-          "envFile": ".env.production"
-        },
-        "development": {
-          "envFile": ".env"
-        }
       }
     }
   }

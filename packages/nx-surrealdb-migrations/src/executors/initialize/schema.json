@@ -37,6 +37,11 @@
       "description": "Wrap DML operations in transactions",
       "default": true
     },
+    "force": {
+      "type": "boolean",
+      "description": "force running migration",
+      "default": false
+    },
     "path": {
       "type": ["string", "number"],
       "description": "Path to migrations subdirectory (e.g., '002_auth', '2', 'auth')"

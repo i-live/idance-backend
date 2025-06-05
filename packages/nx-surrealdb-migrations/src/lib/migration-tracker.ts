@@ -2,6 +2,7 @@ import { Migration } from './types';
 import { SurrealDBClient } from './client';
 import * as fs from 'fs/promises';
 import * as path from 'path';
+import { PreparedQuery } from 'surrealdb';
 
 export class MigrationTracker {
   constructor(
@@ -37,6 +38,85 @@ export class MigrationTracker {
     }
   }
 
+
+  async canApplyMigration(
+    number: string,
+    name: string,
+    requestedDirection: 'up' | 'down'
+  ): Promise<{ canApply: boolean; reason?: string }> {
+    if (!['up', 'down'].includes(requestedDirection)) {
+      throw new Error("Requested direction must be 'up' or 'down'");
+    }
+    if (!number || !name) {
+      throw new Error('Number and name are required');
+    }
+
+    try {
+      const currentStatus = await this.getLatestMigrationStatus(number, name);
+      console.log('canApplyMigration - Current Status:', currentStatus);
+
+      if (!currentStatus) {
+        if (requestedDirection === 'up') {
+          return { canApply: true };
+        }
+        return {
+          canApply: false,
+          reason: `Migration ${number}_${name} has never been run; cannot apply 'down'.`
+        };
+      }
+
+      if (currentStatus.status === 'fail') {
+        if (requestedDirection === 'up') {
+          return { canApply: true };
+        }
+        return {
+          canApply: false,
+          reason: `Migration ${number}_${name} has failed previously; cannot apply 'down'.`
+        };
+      }
+
+      if (currentStatus.direction === 'up' && requestedDirection === 'up') {
+        return {
+          canApply: false,
+          reason: `Migration ${number}_${name} is already in 'up' state; cannot apply 'up' again.`
+        };
+      }
+
+      if (currentStatus.direction === 'down' && requestedDirection === 'down') {
+        return {
+          canApply: false,
+          reason: `Migration ${number}_${name} is already in 'down' state; cannot apply 'down' again.`
+        };
+      }
+
+      return { canApply: true };
+    } catch (error) {
+      throw new Error(`Failed to check migration applicability: ${error.message}`);
+    }
+  }
+
+
+  async getLatestMigrationStatus(number: string, name: string): Promise<Migration | null> {
+    if (!number || !name) {
+      throw new Error('Number and name are required');
+    }
+
+    const params: Record<string, string> = { number, name };
+    const query = `
+      SELECT path, status, applied_at, direction, filename
+      FROM system_migrations
+      WHERE number = $number AND name = $name
+      ORDER BY applied_at DESC
+      LIMIT 1
+    `;
+
+    try {
+      const result = await this.client.query(query, params); 
+      return result[0][0] ?? null;
+    } catch (error) {
+      throw new Error(`Failed to fetch migration status: ${error.message}`);
+    }
+  }
 
   async addMigration(migration: Migration): Promise<void> {
     await this.initialize();
@@ -83,13 +163,21 @@ export class MigrationTracker {
     const params: Record<string, string> = { direction, number, name };
     let query = `
       SELECT * FROM system_migrations 
-      WHERE direction = $direction 
-      AND number = $number 
+      WHERE number = $number 
       AND name = $name
+      ORDER BY applied_at DESC
+      LIMIT 1
     `;
     
     if (filename) {
-      query += ` AND filename = $filename`;
+      query = `
+        SELECT * FROM system_migrations 
+        WHERE number = $number 
+        AND name = $name 
+        AND filename = $filename
+        ORDER BY applied_at DESC
+        LIMIT 1
+      `;
       params.filename = filename;
     }
 
