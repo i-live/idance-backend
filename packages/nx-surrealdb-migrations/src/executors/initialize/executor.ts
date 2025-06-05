@@ -8,23 +8,9 @@ import {
   MigrationTracker,
   resolveProjectPath,
   loadEnvFile,
-  replaceEnvVars
+  replaceEnvVars,
+  InitializeExecutorSchema
 } from '../../lib';
-
-export interface InitializeExecutorSchema {
-  url: string;
-  user: string;
-  pass: string;
-  namespace?: string;
-  database?: string;
-  path?: string | number;
-  file?: string | number;
-  down?: boolean;
-  envFile?: string;
-  useTransactions?: boolean;
-  initPath?: string;
-  schemaPath?: string;
-}
 
 export default async function runExecutor(
   options: InitializeExecutorSchema,

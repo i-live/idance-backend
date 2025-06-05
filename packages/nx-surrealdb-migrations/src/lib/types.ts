@@ -29,3 +29,19 @@ export interface SurrealQueryResult {
   status?: string;
   [key: string]: any; // Allow additional properties
 }
+
+
+export interface InitializeExecutorSchema {
+  url: string;
+  user: string;
+  pass: string;
+  namespace?: string;
+  database?: string;
+  path?: string | number;
+  file?: string | number;
+  down?: boolean;
+  envFile?: string;
+  useTransactions?: boolean;
+  initPath?: string;
+  schemaPath?: string;
+}
