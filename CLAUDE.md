@@ -23,3 +23,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Database: SurrealDB with migration scripts in the database directory
 - For React components: prefer functional components with hooks
 - Authentication: use NextAuth for auth flows
+
+## Documentation Access
+- For up-to-date library documentation, use Context7 MCP tools
+- Always check current docs for Next.js, React, SurrealDB, NX, and other key dependencies
+- When encountering library-specific issues, fetch latest docs first
