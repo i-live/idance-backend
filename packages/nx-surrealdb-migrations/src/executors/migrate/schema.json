@@ -1,15 +1,82 @@
 {
   "$schema": "http://json-schema.org/schema",
-  "title": "Migrate Executor",
-  "description": "Run pending SurrealDB migrations",
+  "version": 2,
+  "title": "Migrate executor",
+  "description": "Apply pending migrations to SurrealDB with dependency resolution",
   "type": "object",
   "properties": {
-    "url": { "type": "string", "description": "SurrealDB URL" },
-    "namespace": { "type": "string", "description": "SurrealDB namespace" },
-    "database": { "type": "string", "description": "SurrealDB database" },
-    "username": { "type": "string", "description": "SurrealDB username" },
-    "password": { "type": "string", "description": "SurrealDB password" },
-    "migrationsDir": { "type": "string", "description": "Path to migrations", "default": "migrations" }
+    "url": {
+      "type": "string",
+      "description": "SurrealDB connection URL (e.g., ws://localhost:8000)",
+      "default": ""
+    },
+    "user": {
+      "type": "string",
+      "description": "SurrealDB username",
+      "default": ""
+    },
+    "pass": {
+      "type": "string",
+      "description": "SurrealDB password",
+      "default": ""
+    },
+    "namespace": {
+      "type": "string",
+      "description": "SurrealDB namespace",
+      "default": ""
+    },
+    "database": {
+      "type": "string",
+      "description": "SurrealDB database",
+      "default": ""
+    },
+    "module": {
+      "oneOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "number"
+        }
+      ],
+      "description": "Target specific module by name (e.g., 'auth'), number (e.g., 10), or full directory name (e.g., '010_auth')",
+      "default": ""
+    },
+    "envFile": {
+      "type": "string",
+      "description": "Path to environment file relative to workspace root",
+      "default": ""
+    },
+    "useTransactions": {
+      "type": "boolean",
+      "description": "Wrap migrations in database transactions",
+      "default": true
+    },
+    "initPath": {
+      "type": "string",
+      "description": "Path to migrations directory",
+      "default": "database"
+    },
+    "schemaPath": {
+      "type": "string",
+      "description": "Path to custom schema file",
+      "default": ""
+    },
+    "force": {
+      "type": "boolean",
+      "description": "Force apply migrations even if they appear to be already applied",
+      "default": false
+    },
+    "configPath": {
+      "type": "string",
+      "description": "Path to configuration file (config.json or config.yaml)",
+      "default": ""
+    },
+    "dryRun": {
+      "type": "boolean",
+      "description": "Show what migrations would be applied without executing them",
+      "default": false
+    }
   },
-  "required": ["url", "namespace", "database", "username", "password"]
+  "additionalProperties": false
 }
