@@ -1,27 +1,45 @@
 # Nx SurrealDB Migrations Plugin
 
-The Nx SurrealDB Migrations Plugin provides a seamless way to manage database migrations for [SurrealDB](https://surrealdb.com/) within an [Nx](https://nx.dev/) monorepo. It allows developers to apply, track, and rollback migrations using SurrealQL scripts, with support for namespaces, databases, and customizable schemas. Built for reliability and ease of use, this plugin integrates with Nx’s build system to streamline database management in modern TypeScript/JavaScript projects.
+A modern, dependency-aware migration management system for [SurrealDB](https://surrealdb.com/) within [Nx](https://nx.dev/) monorepos. Features a 3-executor architecture (`migrate`, `rollback`, `status`) with comprehensive dependency resolution, safety validation, and rich console visualization.
 
 ## Features
 
-- **Migration Management**: Apply `up` or `down` migrations using SurrealQL scripts organized in numbered subdirectories.
-- **Migration Tracking**: Stores migration history in a `system_migrations` table with fields like `number`, `name`, `direction`, `filename`, `path`, `content`, `namespace`, `database`, `checksum`, `status`, `applied_at`, `applied_by`, and `execution_time_ms`.
-- **State Enforcement**: Prevents re-running migrations in the same state (e.g., `up` when already `up`) with warnings, skippable via `--force`.
-- **Executor Support**: Includes an `initialize` executor to run migrations with configurable options (e.g., URL, namespace, path).
-- **Custom Schema**: Allows custom `system_migrations` table schemas via a `schemaPath` option.
-- **Checksum Validation**: Computes SHA-256 checksums for migration files to ensure integrity.
-- **Transaction Control**: Optionally wraps migrations in transactions for atomicity (configurable via `useTransactions`).
-- **Environment Variables**: Supports `.env` files and environment variable interpolation for configuration.
-- **Type Safety**: Centralized TypeScript interfaces in `lib/types.ts` for robust typing (e.g., `InitializeExecutorSchema`, `Migration`).
-- **Data Migration**: Automatically migrates data from legacy tables (`migration_history`, `system_migration_history`) to `system_migrations`.
-- **Flexible Path Resolution**: Supports migration subdirectories with numeric prefixes (e.g., `001_auth`) and file filtering.
+### 🚀 **3-Executor Architecture**
+- **`migrate`**: Apply pending migrations with dependency resolution
+- **`rollback`**: Safe rollback with dependency conflict detection  
+- **`status`**: Rich status visualization with dependency graphs
+
+### 🔄 **Dependency Management**
+- **Module Dependencies**: JSON/YAML configuration with explicit dependency declarations
+- **Topological Sorting**: Automatic execution order based on dependency graphs
+- **Circular Detection**: Prevents circular dependency configurations
+- **Safety Validation**: Blocks unsafe rollbacks that would break dependent modules
+
+### 📊 **Rich Visualization**
+- **ASCII Dependency Trees**: Beautiful console visualization of module relationships
+- **Status Indicators**: Clear up-to-date vs pending migration states
+- **JSON Output**: Machine-readable output for automation and CI/CD integration
+- **Detailed Mode**: Show specific pending migration files and metadata
+
+### 🛡️ **Safety & Reliability**
+- **Migration Tracking**: Complete history in `system_migrations` table with checksums and timing
+- **Rollback Safety**: Pre-validation prevents dependency conflicts
+- **Force Override**: Bypass safety checks when needed for emergency situations
+- **Dry-Run Mode**: Preview operations without executing changes
+- **Transaction Control**: Optional transaction wrapping for atomicity
+
+### 🎯 **Developer Experience**
+- **Module Targeting**: Reference modules by name (`auth`), number (`10`), or full path (`010_auth`)
+- **Environment Variables**: Full `.env` support with variable interpolation
+- **Rich Logging**: Emoji-enhanced console output with detailed execution statistics
+- **Error Handling**: Comprehensive error messages with actionable guidance
 
 ## Prerequisites
 
-- **Node.js**: Version 16 or higher.
-- **Nx**: Version 16 or higher (`npm install -g nx`).
-- **SurrealDB**: A running SurrealDB instance (local or cloud).
-- **TypeScript**: Recommended for type safety (included in Nx projects).
+- **Node.js**: Version 16 or higher
+- **Nx**: Version 16 or higher (`npm install -g nx`)
+- **SurrealDB**: A running SurrealDB instance (local or cloud)
+- **TypeScript**: Recommended for type safety (included in Nx projects)
 
 ## Installation
 
@@ -31,266 +49,455 @@ The Nx SurrealDB Migrations Plugin provides a seamless way to manage database mi
    ```
 
 2. **Verify Installation**:
-   Ensure the plugin is listed in `package.json` and available in `nx list`.
    ```bash
    nx list @idance/nx-surrealdb-migrations
    ```
 
-3. **Set Up a Project**:
-   If you don’t have an Nx project, create one:
-   ```bash
-   npx create-nx-workspace@latest my-workspace
-   cd my-workspace
-   ```
+## Quick Start
 
-## Setup
+### 1. Create a Database Project
 
-1. **Create a Database Project**:
-   Generate a new project in your Nx workspace to manage migrations:
-   ```bash
-   nx generate @nx/js:library database --directory=libs/database --bundler=none
-   ```
-
-2. **Configure the Executor**:
-   Add the `initialize` executor to your project’s `project.json` (e.g., `libs/database/project.json`):
-   ```json
-   {
-     "name": "database",
-     "sourceRoot": "libs/database/src",
-     "projectType": "library",
-     "targets": {
-       "initialize": {
-         "executor": "@idance/nx-surrealdb-migrations:initialize",
-         "options": {
-           "url": "wss://your-surrealdb-instance",
-           "user": "root",
-           "pass": "your-password",
-           "namespace": "idance",
-           "database": "local",
-           "initPath": "libs/database/migrations",
-           "useTransactions": true
-         }
-       }
-     }
-   }
-   ```
-
-3. **Set Up Environment Variables**:
-   Create a `.env` file in your workspace root to store sensitive configuration:
-   ```env
-   SURREALDB_URL=wss://your-surrealdb-instance
-   SURREALDB_ROOT_USER=root
-   SURREALDB_ROOT_PASS=your-password
-   SURREALDB_NAMESPACE=idance
-   SURREALDB_DATABASE=local
-   MIGRATIONS_PATH=libs/database/migrations
-   ```
-   Specify the `.env` file in `project.json`:
-   ```json
-   "initialize": {
-     "options": {
-       "envFile": ".env"
-     }
-   }
-   ```
-
-4. **Create Migration Files**:
-   Organize migrations in numbered subdirectories under `libs/database/migrations` (or your `initPath`). Example:
-   ```
-   libs/database/migrations/
-   ├── 000_admin/
-   │   ├── 0000_db_server_namespaces_up.surql
-   │   ├── 0000_db_server_namespaces_down.surql
-   ├── 010_auth/
-   │   ├── 0001_authentication_up.surql
-   │   ├── 0001_authentication_down.surql
-   │   ├── 0002_core_users_up.surql
-   │   ├── 0002_core_users_down.surql
-   ├── 020_schema/
-   │   ├── 0001_tables_up.surql
-   │   ├── 0001_tables_down.surql
-   ```
-   Example `0001_authentication_up.surql`:
-   ```surql
-   DEFINE TABLE users SCHEMAFULL;
-   DEFINE FIELD email ON users TYPE string;
-   DEFINE FIELD password ON users TYPE string;
-   ```
-
-5. **Custom Schema (Optional)**:
-   To customize the `system_migrations` table, create a schema file (e.g., `libs/database/migrations/custom-migration.surql`) and specify it in `project.json`:
-   ```json
-   "initialize": {
-     "options": {
-       "schemaPath": "libs/database/migrations/custom-migration.surql"
-     }
-   }
-   ```
-   Ensure the custom schema includes required fields: `number`, `name`, `direction`, `filename`, `path`, `content`, `status`, `applied_at`.
-
-## Usage
-
-### Run Migrations
-Apply migrations for a specific module (e.g., `010_auth`):
 ```bash
-nx run database:initialize --module 10
+# Generate a new database project
+nx g @nx/node:application database --bundler=webpack --framework=none
+
+# Or add to existing project by updating project.json
 ```
 
-Apply a specific file within a module:
-```bash
-nx run database:initialize --module 10 --file 0001_authentication
-```
+### 2. Configure Project Targets
 
-Run `down` migrations (rollback):
-```bash
-nx run database:initialize --module 10 --down
-```
+Update your `database/project.json`:
 
-Use a custom schema:
-```bash
-nx run database:initialize --module 10 --schemaPath libs/database/migrations/custom-migration.surql
-```
-
-Force apply migrations regardless of state:
-```bash
-nx run database:initialize --module 10 --force
-```
-
-### Migration State Rules
-- **Up Migrations**: Can only be applied if the migration has never been run or is in a `down` state. Re-running an `up` migration is skipped with a warning unless `--force` is used.
-- **Down Migrations**: Can only be applied if the migration is in an `up` state. Running `down` on a non-existent or `down` migration is skipped with a warning unless `--force` is used.
-- **Warnings**: Skipped migrations log warnings (e.g., “Skipping migration 0001_authentication: already up. Use --force to override.”).
-
-### Executor Options
-The `initialize` executor supports the following options (defined in `InitializeExecutorSchema`):
-- `url`: SurrealDB connection URL (required).
-- `user`: Username (required).
-- `pass`: Password (required).
-- `namespace`: Namespace (optional, defaults to `default`).
-- `database`: Database (optional, defaults to `default`).
-- `module`: Migration module pattern (e.g., `10` for `010_auth`, optional).
-- `file`: Specific migration file pattern (e.g., `0001_authentication`, optional).
-- `down`: Run down migrations (optional, defaults to `false`).
-- `envFile`: Path to `.env` file (optional).
-- `useTransactions`: Wrap queries in transactions (optional, defaults to `true`).
-- `initPath`: Base migrations directory (optional, defaults to `database`).
-- `schemaPath`: Custom schema file path for `system_migrations` (optional).
-- `force`: Bypass migration state checks (optional, defaults to `false`).
-
-Example `project.json` with all options:
 ```json
-"initialize": {
-  "executor": "@idance/nx-surrealdb-migrations:initialize",
-  "options": {
-    "url": "${SURREALDB_URL}",
-    "user": "${SURREALDB_ROOT_USER}",
-    "pass": "${SURREALDB_ROOT_PASS}",
-    "namespace": "idance",
-    "database": "local",
-    "module": "1",
-    "file": "0001_authentication",
-    "down": false,
-    "envFile": ".env",
-    "useTransactions": true,
-    "initPath": "libs/database/migrations",
-    "schemaPath": "libs/database/migrations/custom-migration.surql",
-    "force": false
+{
+  "name": "database",
+  "targets": {
+    "migrate": {
+      "executor": "@idance/nx-surrealdb-migrations:migrate",
+      "options": {
+        "url": "${SURREALDB_URL}",
+        "user": "${SURREALDB_ROOT_USER}",
+        "pass": "${SURREALDB_ROOT_PASS}",
+        "namespace": "${SURREALDB_NAMESPACE}",
+        "database": "${SURREALDB_DATABASE}",
+        "initPath": "database"
+      }
+    },
+    "rollback": {
+      "executor": "@idance/nx-surrealdb-migrations:rollback",
+      "options": {
+        "url": "${SURREALDB_URL}",
+        "user": "${SURREALDB_ROOT_USER}",
+        "pass": "${SURREALDB_ROOT_PASS}",
+        "namespace": "${SURREALDB_NAMESPACE}",
+        "database": "${SURREALDB_DATABASE}",
+        "initPath": "database"
+      }
+    },
+    "status": {
+      "executor": "@idance/nx-surrealdb-migrations:status",
+      "options": {
+        "url": "${SURREALDB_URL}",
+        "user": "${SURREALDB_ROOT_USER}",
+        "pass": "${SURREALDB_ROOT_PASS}",
+        "namespace": "${SURREALDB_NAMESPACE}",
+        "database": "${SURREALDB_DATABASE}",
+        "initPath": "database"
+      }
+    }
   }
 }
 ```
 
-### View Migration History
-Query the `system_migrations` table in SurrealDB to view applied migrations:
-```surql
-SELECT * FROM system_migrations ORDER BY applied_at DESC;
+### 3. Set Up Environment Variables
+
+Create `.env` in your workspace root:
+
+```bash
+# SurrealDB Connection
+SURREALDB_URL=ws://localhost:8000
+SURREALDB_ROOT_USER=root
+SURREALDB_ROOT_PASS=root
+SURREALDB_NAMESPACE=myapp
+SURREALDB_DATABASE=main
 ```
 
-Fields include:
-- `number`: Migration number (e.g., `0001`).
-- `name`: Migration name (e.g., `authentication`).
-- `direction`: `up` or `down`.
-- `filename`: Migration file name (e.g., `0001_authentication_up.surql`).
-- `path`: File path.
-- `content`: Migration script content.
-- `namespace`: Namespace (e.g., `idance`).
-- `database`: Database (e.g., `local`).
-- `checksum`: SHA-256 checksum of the file content.
-- `status`: `success` or `fail`.
-- `applied_at`: Timestamp of application.
-- `applied_by`: User who applied the migration (e.g., `root`).
-- `execution_time_ms`: Execution time in milliseconds.
+### 4. Create Module Configuration
+
+Create `database/config.json`:
+
+```json
+{
+  "modules": {
+    "000_admin": {
+      "name": "System Administration",
+      "description": "Core system setup and administrative functions",
+      "depends": []
+    },
+    "010_auth": {
+      "name": "Authentication & Users", 
+      "description": "User authentication and authorization system",
+      "depends": ["000_admin"]
+    },
+    "020_schema": {
+      "name": "Application Schema",
+      "description": "Core application data models and relationships", 
+      "depends": ["010_auth"]
+    }
+  },
+  "settings": {
+    "configFormat": "json",
+    "useTransactions": true,
+    "defaultNamespace": "myapp",
+    "defaultDatabase": "main"
+  }
+}
+```
+
+### 5. Create Migration Directory Structure
+
+```
+database/
+├── 000_admin/
+│   ├── 0001_setup_up.surql
+│   └── 0001_setup_down.surql
+├── 010_auth/
+│   ├── 0001_users_up.surql
+│   ├── 0001_users_down.surql
+│   ├── 0002_sessions_up.surql
+│   └── 0002_sessions_down.surql
+├── 020_schema/
+│   └── ...
+└── config.json
+```
+
+## Usage
+
+### Generate New Migrations
+
+```bash
+# Generate migration in existing module
+nx g @idance/nx-surrealdb-migrations:migration create-users --project database --module auth
+
+# Generate migration with new module creation  
+nx g @idance/nx-surrealdb-migrations:migration setup-notifications --project database --module notifications --createModule
+```
+
+### Apply Migrations
+
+```bash
+# Apply all pending migrations
+nx run database:migrate
+
+# Apply migrations for specific module
+nx run database:migrate --module auth
+nx run database:migrate --module 10
+
+# Dry run to see what would be applied
+nx run database:migrate --dryRun
+
+# Force apply even if already applied
+nx run database:migrate --force
+```
+
+### Check Status
+
+```bash
+# Show overall migration status
+nx run database:status
+
+# Show status for specific module
+nx run database:status --module auth
+
+# Show detailed information with file names
+nx run database:status --detailed
+
+# Output as JSON for automation
+nx run database:status --json
+```
+
+### Rollback Migrations
+
+```bash
+# Rollback specific module (with safety validation)
+nx run database:rollback --module auth
+
+# Dry run to see what would be rolled back
+nx run database:rollback --module auth --dryRun
+
+# Force rollback (bypass safety checks)
+nx run database:rollback --module auth --force
+
+# Rollback specific number of steps
+nx run database:rollback --module auth --steps 2
+```
+
+## Configuration
+
+### Module Dependencies
+
+The `config.json` file defines module dependencies:
+
+```json
+{
+  "modules": {
+    "000_admin": {
+      "name": "System Administration",
+      "depends": []
+    },
+    "010_auth": {
+      "name": "Authentication",
+      "depends": ["000_admin"]
+    },
+    "020_messaging": {
+      "name": "Messaging System", 
+      "depends": ["010_auth"]
+    },
+    "030_notifications": {
+      "name": "Notifications",
+      "depends": ["010_auth", "020_messaging"]
+    }
+  }
+}
+```
+
+### Executor Options
+
+#### Common Options (all executors)
+- `url`: SurrealDB connection URL
+- `user`: SurrealDB username  
+- `pass`: SurrealDB password
+- `namespace`: SurrealDB namespace
+- `database`: SurrealDB database
+- `module`: Target specific module (string or number)
+- `envFile`: Path to environment file
+- `initPath`: Path to migrations directory (default: "database")
+- `configPath`: Path to config file (default: auto-detected)
+
+#### Migrate-specific Options
+- `dryRun`: Preview migrations without applying
+- `force`: Apply migrations even if already applied
+- `useTransactions`: Wrap migrations in transactions (default: true)
+
+#### Rollback-specific Options  
+- `dryRun`: Preview rollbacks without applying
+- `force`: Bypass safety validation checks
+- `steps`: Number of migration steps to rollback (default: 1)
+
+#### Status-specific Options
+- `detailed`: Show detailed migration file information
+- `json`: Output as JSON instead of human-readable format
+
+## Migration File Format
+
+### Up Migration (`*_up.surql`)
+```sql
+-- Create users table
+DEFINE TABLE IF NOT EXISTS users SCHEMAFULL;
+DEFINE FIELD IF NOT EXISTS email ON users TYPE string;
+DEFINE FIELD IF NOT EXISTS password ON users TYPE string;
+DEFINE INDEX IF NOT EXISTS email_idx ON users FIELDS email UNIQUE;
+```
+
+### Down Migration (`*_down.surql`)
+```sql
+-- Remove users table
+REMOVE INDEX IF EXISTS email_idx ON users;
+REMOVE TABLE IF EXISTS users;
+```
+
+## Module Structure
+
+### Gapped Numbering
+Use gapped numbering (000, 010, 020, 030) to allow insertion of new modules:
+
+```
+000_admin     # System administration
+010_auth      # Authentication  
+020_schema    # Core schema
+030_messaging # Messaging system
+040_reporting # Reporting (can be inserted later)
+```
+
+### Module Reference Patterns
+All these patterns work for module targeting:
+
+- By number: `--module 10` → `010_auth`
+- By name: `--module auth` → `010_auth`  
+- By full path: `--module 010_auth` → `010_auth`
+- Legacy support: `--module 0` → `000_admin`
+
+## Console Output Examples
+
+### Status Command
+```
+📊 Checking migration status...
+
+📈 Migration Status Summary
+   Total Applied: 8
+   Total Pending: 2
+   🔄 2 migration(s) pending
+
+📋 Module Details:
+
+   ✅ 000_admin [UP-TO-DATE]
+      Applied: 3 migration(s)
+      Last Applied: 2024-01-15T10:30:00.000Z
+
+   🔄 010_auth [PENDING]
+      Applied: 2 migration(s)
+      Pending: 1 migration(s)
+      Dependencies: 000_admin
+
+   ✅ 020_schema [UP-TO-DATE]
+      Applied: 3 migration(s)
+      Dependencies: 010_auth
+
+🌐 Dependency Graph:
+   000_admin (root)
+   └─ 010_auth
+      └─ 020_schema
+```
+
+### Migrate Command  
+```
+🚀 Starting migration execution...
+✅ Migration completed successfully!
+   Files processed: 3
+   Files skipped: 0
+   Execution time: 1,247ms
+
+📊 Migration Details:
+   ✅ 000_admin/0001_setup_up.surql
+   ✅ 010_auth/0001_users_up.surql
+   ✅ 010_auth/0002_sessions_up.surql
+```
+
+### Rollback Safety Validation
+```
+🔍 Validating rollback safety...
+❌ Rollback validation failed!
+   Blocked by dependencies:
+   • 020_schema
+   • 030_messaging
+   Warnings:
+   • Module 010_auth has active dependents
+
+💡 Use --force to bypass safety checks
+```
+
+## Best Practices
+
+### 1. **Module Organization**
+- Use descriptive module names that reflect functional areas
+- Keep modules focused on single concerns
+- Use gapped numbering to allow future insertions
+
+### 2. **Migration Writing**
+- Always write corresponding down migrations
+- Use `IF NOT EXISTS` and `IF EXISTS` for idempotent operations
+- Test migrations in development before applying to production
+
+### 3. **Dependency Management**
+- Clearly define module dependencies in config.json
+- Avoid circular dependencies
+- Keep dependency chains shallow when possible
+
+### 4. **Safety Practices**
+- Use dry-run mode to preview changes
+- Validate rollback safety before applying
+- Use force flag sparingly and with caution
+- Test migration paths in development environments
+
+### 5. **Environment Management**
+- Use environment variables for all connection details
+- Never commit credentials to version control
+- Use different databases for different environments
 
 ## Troubleshooting
 
-- **Error: Failed to create record: Found NULL for field `execution_time_ms`**:
-  - Ensure `executor.ts` measures `execution_time_ms` in both success and failure cases (fixed in version `7f4e5f90-0f4b-4c6b-a8c8-5e3f6f3f3b3b`).
-  - Verify `types.ts` defines `execution_time_ms?: number | null` (version `7e0d0e80-0f4b-4a6b-a4c8-5e3f6f3f3b3b`).
+### Common Issues
 
-- **Error: Schema file not found**:
-  - Confirm `schema/migration-history.surql` exists in `dist/packages/nx-surrealdb-migrations/src/schema/`.
-  - Check `project.json` copies the schema file (version `fbe0ef78-8b79-481d-afa7-98a2b34eec94`).
+#### 1. **Connection Errors**
+```bash
+# Verify SurrealDB is running
+surreal start --log trace --user root --pass root memory
 
-- **Error: Missing required configuration**:
-  - Provide `url`, `user`, and `pass` in `project.json` or `.env`.
-  - Example:
-    ```bash
-    nx run database:initialize --url wss://your-surrealdb-instance --user root --pass your-password
-    ```
+# Check environment variables
+echo $SURREALDB_URL
+```
 
-- **No migrations applied**:
-  - Ensure migration files follow the format `<number>_<name>.<up|down>.surql` (e.g., `0001_authentication_up.surql`).
-  - Verify the `module` option matches a migration module (e.g., `--module 10` for `010_auth`).
-  - Check if migrations were skipped due to state conflicts (use `--force` to override).
+#### 2. **Module Not Found**
+```bash
+# List available modules
+nx run database:status
 
-- **Verbose Output**:
-  - Run with `--verbose` for detailed logs:
-    ```bash
-    nx run database:initialize --module 10 --verbose
-    ```
+# Check module naming (case sensitive)
+ls database/
+```
+
+#### 3. **Dependency Conflicts**
+```bash
+# Check dependency graph
+nx run database:status --detailed
+
+# Validate rollback safety
+nx run database:rollback --module mymodule --dryRun
+```
+
+#### 4. **Migration State Issues**
+```bash
+# Check current state
+nx run database:status --module mymodule --detailed
+
+# Force apply if needed (use with caution)
+nx run database:migrate --module mymodule --force
+```
+
+## Migration from Initialize Executor
+
+If you're upgrading from the legacy `initialize` executor:
+
+### 1. **Update project.json**
+Replace `initialize` target with new executors (see Quick Start)
+
+### 2. **Create config.json**
+Add module dependency configuration
+
+### 3. **Test New Commands**
+```bash
+# Old command
+nx run database:initialize --module auth
+
+# New command
+nx run database:migrate --module auth
+```
+
+### 4. **Verify Functionality**
+```bash
+# Check status
+nx run database:status
+
+# Test rollback
+nx run database:rollback --module auth --dryRun
+```
+
+The `initialize` executor remains available but is deprecated. It will be removed in a future version.
 
 ## Contributing
 
-Contributions are welcome! To contribute:
-
-1. **Fork the Repository**:
-   ```bash
-   git clone https://github.com/idance/nx-surrealdb-migrations.git
-   cd nx-surrealdb-migrations
-   ```
-
-2. **Install Dependencies**:
-   ```bash
-   npm install
-   ```
-
-3. **Make Changes**:
-   - Update code in `packages/nx-surrealdb-migrations/src/`.
-   - Add tests in `packages/nx-surrealdb-migrations/__tests__/`.
-
-4. **Test Locally**:
-   ```bash
-   nx test nx-surrealdb-migrations
-   nx build nx-surrealdb-migrations
-   ```
-
-5. **Submit a Pull Request**:
-   - Push changes to your fork and open a PR against the main branch.
-
-## Roadmap
-
-- **Rollback Executor**: Add a `rollback` executor to undo migrations by steps or specific files.
-- **Migration Generator**: Create a generator to scaffold migration files and subdirectories.
-- **Validation Checks**: Add pre-migration validation for checksum mismatches or duplicate migrations.
-- **Multi-Database Support**: Allow migrations across multiple namespaces/databases in a single run.
-- **CLI Integration**: Provide a CLI for running migrations outside Nx (e.g., `nx-surrealdb-migrate`).
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes with tests
+4. Ensure all tests pass: `nx test nx-surrealdb-migrations`
+5. Submit a pull request
 
 ## License
-MIT License. See [LICENSE](LICENSE.md) for details.
+
+MIT License - see LICENSE file for details.
 
 ## Support
-For issues, feature requests, or questions:
-- Open an issue on [GitHub](https://github.com/idance/nx-surrealdb-migrations/issues).
-- Contact the maintainers at [support@idance.com](mailto:support@idance.com).
 
----
-Built with ❤️ for the Nx and SurrealDB communities.
+- [GitHub Issues](https://github.com/your-org/nx-surrealdb-migrations/issues)
+- [Documentation](https://docs.your-domain.com/nx-surrealdb-migrations)
+- [SurrealDB Community](https://surrealdb.com/community)
