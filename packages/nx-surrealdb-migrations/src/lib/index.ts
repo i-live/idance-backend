@@ -6,3 +6,4 @@ export * from './project';
 export * from './migration-file';
 export * from './config-loader';
 export * from './dependency-resolver';
+export * from './migration-engine';

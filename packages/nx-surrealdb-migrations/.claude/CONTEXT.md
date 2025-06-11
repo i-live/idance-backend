@@ -171,6 +171,9 @@ nx test nx-surrealdb-migrations --testPathPattern=migration-file.spec.ts
 # Run all tests (no longer need --skip-nx-cache)
 nx test nx-surrealdb-migrations
 
+# Run single test file
+nx test nx-surrealdb-migrations --testPathPattern=migration-engine.spec.ts
+
 # Generate migration in existing module
 nx g @idance/nx-surrealdb-migrations:migration create-users --project database --module auth
 
@@ -179,4 +182,6 @@ nx g @idance/nx-surrealdb-migrations:migration setup-notifications --project dat
 
 # Test current functionality
 nx run database:initialize --module 10
+
+# IMPORTANT: Always use 'nx test' not 'pnpm test' for consistency with NX workspace
 ```

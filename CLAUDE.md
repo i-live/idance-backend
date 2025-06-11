@@ -37,6 +37,8 @@ Always include usage updates in responses showing:
 - Estimated API costs if using pay-per-token (AWS Bedrock, Anthropic API)
 - Token usage breakdown (input/output tokens when relevant)
 
+**User Plan:** Claude Max Pro ($100/month) - includes higher usage limits and priority access
+
 ## Development Workflow
 - Commit each major implementation milestone with descriptive messages
 - Use conventional commit format: feat/fix/refactor/docs followed by scope
