@@ -42,6 +42,10 @@ Always include usage updates in responses showing:
 - Use conventional commit format: feat/fix/refactor/docs followed by scope
 - Regular commits allow testing and rollback at each phase
 - Example: "feat(migrations): add dependency resolution system"
+- Update DEVELOPMENT_PLAN.md checkboxes as tasks are completed
+- Maintain .claude/CONTEXT.md with current state and decisions
+- Use TodoWrite tool to track work-in-progress items
+- Document test patterns following NX community standards
 
 ## File Organization
 - Place package-specific files in their respective package directories (packages/package-name/)

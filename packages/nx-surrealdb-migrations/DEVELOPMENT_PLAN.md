@@ -23,14 +23,16 @@ Refactor nx-surrealdb-migrations plugin to support 3-executor architecture with 
 
 ## Step 1: Foundation & Cleanup 📋
 
-### Step 1.1: Update numbering to gapped format
+### Step 1.1: Update numbering to gapped format ✅
 **Tasks:**
-- [ ] Rename `001_auth` → `010_auth` 
-- [ ] Rename `002_schema` → `020_schema`
-- [ ] Update any hardcoded references
-- [ ] **Test:** Verify existing module reference logic works with new numbering
-- [ ] **Auto-test:** Create test for `findMatchingSubdirectory` with gapped numbers
-- [ ] **Commit:** `refactor(migrations): migrate to gapped numbering (010, 020, 030)`
+- [x] Rename `001_auth` → `010_auth` 
+- [x] Rename `002_schema` → `020_schema`
+- [x] Update any hardcoded references
+- [x] **Test:** Verify existing module reference logic works with new numbering
+- [x] **Auto-test:** Create test for `findMatchingSubdirectory` with gapped numbers
+- [x] **Commit:** `refactor(migrations): migrate to gapped numbering (010, 020, 030)`
+
+**Completed:** Commit `cbdb1e3`
 
 ### Step 1.2: Clean unused code
 **Tasks:**
