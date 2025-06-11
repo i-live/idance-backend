@@ -60,18 +60,3 @@ export interface SurrealQueryResult {
 }
 
 
-export interface InitializeExecutorSchema {
-  url: string;
-  user: string;
-  pass: string;
-  namespace?: string;
-  database?: string;
-  module?: string | number;
-  file?: string | number;
-  down?: boolean;
-  envFile?: string;
-  useTransactions?: boolean;
-  initPath?: string;
-  schemaPath?: string;
-  force?: boolean;
-}

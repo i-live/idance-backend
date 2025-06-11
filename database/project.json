@@ -33,20 +33,6 @@
         "database": "${SURREALDB_DATABASE}",
         "initPath": "database"
       }
-    },
-    "initialize": {
-      "executor": "@idance/nx-surrealdb-migrations:initialize",
-      "options": {
-        "url": "${SURREALDB_URL}",
-        "user": "${SURREALDB_ROOT_USER}",
-        "pass": "${SURREALDB_ROOT_PASS}",
-        "namespace": "${SURREALDB_NAMESPACE}",
-        "database": "${SURREALDB_DATABASE}",
-        "initPath": "database"
-      },
-      "metadata": {
-        "deprecated": "Use 'migrate' executor instead. This executor will be removed in a future version."
-      }
     }
   }
 }

@@ -1,0 +1,195 @@
+import { createTreeWithEmptyWorkspace } from '@nx/devkit/testing';
+import { Tree, readProjectConfiguration } from '@nx/devkit';
+import * as fs from 'fs';
+import * as path from 'path';
+
+import generator from './generator';
+import { ExportModuleGeneratorSchema } from './generator';
+
+// Mock filesystem operations
+jest.mock('fs');
+jest.mock('child_process');
+
+const mockFs = fs as jest.Mocked<typeof fs>;
+
+describe('export-module generator', () => {
+  let tree: Tree;
+  const options: ExportModuleGeneratorSchema = { 
+    module: '010_auth',
+    outputPath: 'test-exports',
+    version: '1.0.0'
+  };
+
+  beforeEach(() => {
+    tree = createTreeWithEmptyWorkspace();
+    
+    // Mock filesystem operations
+    mockFs.existsSync.mockImplementation((filePath: string) => {
+      if (filePath.includes('database')) return true;
+      if (filePath.includes('010_auth')) return true;
+      if (filePath.includes('config.json')) return true;
+      return false;
+    });
+    
+    mockFs.readdirSync.mockImplementation((dirPath: string) => {
+      if (dirPath.includes('database')) {
+        return ['000_admin', '010_auth', '020_schema'] as any;
+      }
+      if (dirPath.includes('010_auth')) {
+        return ['0001_authentication_up.surql', '0001_authentication_down.surql'] as any;
+      }
+      return [] as any;
+    });
+    
+    mockFs.statSync.mockImplementation(() => ({
+      isDirectory: () => true,
+      isFile: () => true,
+    } as any));
+    
+    mockFs.readFileSync.mockImplementation((filePath: string) => {
+      if (filePath.includes('config.json')) {
+        return JSON.stringify({
+          modules: {
+            '010_auth': {
+              name: 'Authentication',
+              description: 'User authentication system',
+              depends: ['000_admin']
+            }
+          }
+        });
+      }
+      if (filePath.includes('.surql')) {
+        return 'DEFINE TABLE users;';
+      }
+      return '';
+    });
+  });
+
+  afterEach(() => {
+    jest.resetAllMocks();
+  });
+
+  it('should export module with default options', async () => {
+    await generator(tree, options);
+    
+    // Check that package.json was created
+    const packageJsonPath = 'test-exports/010_auth/package.json';
+    expect(tree.exists(packageJsonPath)).toBeTruthy();
+    
+    const packageJson = JSON.parse(tree.read(packageJsonPath, 'utf-8'));
+    expect(packageJson.name).toBe('@migrations/010_auth');
+    expect(packageJson.version).toBe('1.0.0');
+    expect(packageJson.metadata.moduleName).toBe('010_auth');
+  });
+
+  it('should create README.md with module information', async () => {
+    await generator(tree, options);
+    
+    const readmePath = 'test-exports/010_auth/README.md';
+    expect(tree.exists(readmePath)).toBeTruthy();
+    
+    const readme = tree.read(readmePath, 'utf-8');
+    expect(readme).toContain('# Migration Module: 010_auth');
+    expect(readme).toContain('Authentication');
+    expect(readme).toContain('0001_authentication_up.surql');
+  });
+
+  it('should create module configuration file', async () => {
+    const optionsWithConfig = { ...options, includeConfig: true };
+    await generator(tree, optionsWithConfig);
+    
+    const configPath = 'test-exports/010_auth/module.config.json';
+    expect(tree.exists(configPath)).toBeTruthy();
+    
+    const config = JSON.parse(tree.read(configPath, 'utf-8'));
+    expect(config['010_auth']).toBeDefined();
+    expect(config['010_auth'].name).toBe('Authentication');
+  });
+
+  it('should create import script', async () => {
+    await generator(tree, options);
+    
+    const scriptPath = 'test-exports/010_auth/import.sh';
+    expect(tree.exists(scriptPath)).toBeTruthy();
+    
+    const script = tree.read(scriptPath, 'utf-8');
+    expect(script).toContain('#!/bin/bash');
+    expect(script).toContain('010_auth');
+    expect(script).toContain('mkdir -p');
+  });
+
+  it('should copy migration files', async () => {
+    await generator(tree, options);
+    
+    const migrationPath = 'test-exports/010_auth/migrations/0001_authentication_up.surql';
+    expect(tree.exists(migrationPath)).toBeTruthy();
+    
+    const content = tree.read(migrationPath, 'utf-8');
+    expect(content).toBe('DEFINE TABLE users;');
+  });
+
+  it('should handle module by number', async () => {
+    const numericOptions = { ...options, module: 10 };
+    await generator(tree, numericOptions);
+    
+    const packageJsonPath = 'test-exports/010_auth/package.json';
+    expect(tree.exists(packageJsonPath)).toBeTruthy();
+  });
+
+  it('should handle module by name', async () => {
+    const nameOptions = { ...options, module: 'auth' };
+    await generator(tree, nameOptions);
+    
+    const packageJsonPath = 'test-exports/010_auth/package.json';
+    expect(tree.exists(packageJsonPath)).toBeTruthy();
+  });
+
+  it('should handle missing module configuration gracefully', async () => {
+    mockFs.existsSync.mockImplementation((filePath: string) => {
+      if (filePath.includes('config.json')) return false;
+      if (filePath.includes('database')) return true;
+      if (filePath.includes('010_auth')) return true;
+      return false;
+    });
+
+    await generator(tree, options);
+    
+    const packageJsonPath = 'test-exports/010_auth/package.json';
+    expect(tree.exists(packageJsonPath)).toBeTruthy();
+    
+    const packageJson = JSON.parse(tree.read(packageJsonPath, 'utf-8'));
+    expect(packageJson.description).toContain('Migration module: 010_auth');
+  });
+
+  it('should throw error for non-existent module', async () => {
+    mockFs.readdirSync.mockImplementation((dirPath: string) => {
+      if (dirPath.includes('database')) {
+        return ['000_admin', '020_schema'] as any; // Missing 010_auth
+      }
+      return [] as any;
+    });
+
+    const invalidOptions = { ...options, module: '999_nonexistent' };
+    
+    await expect(generator(tree, invalidOptions)).rejects.toThrow(
+      "Module '999_nonexistent' not found"
+    );
+  });
+
+  it('should handle custom output path', async () => {
+    const customOptions = { ...options, outputPath: 'custom/exports' };
+    await generator(tree, customOptions);
+    
+    const packageJsonPath = 'custom/exports/010_auth/package.json';
+    expect(tree.exists(packageJsonPath)).toBeTruthy();
+  });
+
+  it('should include dependencies in package metadata', async () => {
+    await generator(tree, options);
+    
+    const packageJsonPath = 'test-exports/010_auth/package.json';
+    const packageJson = JSON.parse(tree.read(packageJsonPath, 'utf-8'));
+    
+    expect(packageJson.dependencies).toEqual(['000_admin']);
+  });
+});

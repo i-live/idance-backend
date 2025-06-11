@@ -14,11 +14,6 @@
       "implementation": "../../../dist/packages/nx-surrealdb-migrations/src/executors/status/executor.js",
       "schema": "../../../dist/packages/nx-surrealdb-migrations/src/executors/status/schema.json",
       "description": "Show migration status and dependency information for SurrealDB"
-    },
-    "initialize": {
-      "implementation": "../../../dist/packages/nx-surrealdb-migrations/src/executors/initialize/executor.js",
-      "schema": "../../../dist/packages/nx-surrealdb-migrations/src/executors/initialize/schema.json",
-      "description": "Initialize SurrealDB migrations (deprecated: use 'migrate' instead)"
     }
   }
 }
