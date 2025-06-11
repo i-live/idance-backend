@@ -12,6 +12,9 @@
       "dependsOn": ["^build"],
       "outputs": ["{projectRoot}/dist"]
     },
+    "test": {
+      "cache": false
+    },
     "@nx/js:tsc": {
       "cache": true,
       "dependsOn": ["^build"],

@@ -42,6 +42,7 @@
     "test": {
       "executor": "@nx/jest:jest",
       "outputs": ["{workspaceRoot}/coverage/{projectRoot}"],
+      "cache": false,
       "options": {
         "jestConfig": "packages/nx-surrealdb-migrations/jest.config.ts"
       }

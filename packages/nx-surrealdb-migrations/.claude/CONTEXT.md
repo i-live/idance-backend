@@ -150,8 +150,13 @@ mockFs.readdir.mockResolvedValue([...]);
 
 ## Known Issues
 
-- NX cache error when running tests (use `--skip-nx-cache`) - RESOLVED
-- Jest heap memory issues with large test suites - RESOLVED
+- ✅ NX cache error when running tests - RESOLVED
+  - Root cause: NX Cloud cache bug where `cacheError` property was undefined
+  - Solution: Disabled caching for test targets globally and per-project
+  - Added `"cache": false` to test target defaults in nx.json
+  - Tests now run reliably without `--skip-nx-cache` flag
+  
+- ✅ Jest heap memory issues with large test suites - RESOLVED
   - Fixed by removing excessive console.log statements
   - Optimized Jest configuration with worker limits
   - Replaced problematic test with simplified version
@@ -160,14 +165,17 @@ mockFs.readdir.mockResolvedValue([...]);
 ## Development Commands
 
 ```bash
-# Run specific test
+# Run specific test (cache issues resolved)
 nx test nx-surrealdb-migrations --testPathPattern=migration-file.spec.ts
 
-# Run without cache
-nx test nx-surrealdb-migrations --skip-nx-cache
+# Run all tests (no longer need --skip-nx-cache)
+nx test nx-surrealdb-migrations
 
-# Generate migration
-nx g @idance/nx-surrealdb-migrations:migration create-users --module auth
+# Generate migration in existing module
+nx g @idance/nx-surrealdb-migrations:migration create-users --project database --module auth
+
+# Generate migration with new module creation
+nx g @idance/nx-surrealdb-migrations:migration setup-notifications --project database --module notifications --createModule
 
 # Test current functionality
 nx run database:initialize --module 10
