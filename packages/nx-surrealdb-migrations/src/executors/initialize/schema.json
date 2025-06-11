@@ -42,9 +42,9 @@
       "description": "force running migration",
       "default": false
     },
-    "path": {
+    "module": {
       "type": ["string", "number"],
-      "description": "Path to migrations subdirectory (e.g., '002_auth', '2', 'auth')"
+      "description": "Migration module to target (e.g., '010_auth', '10', 'auth')"
     },
     "file": {
       "type": ["string", "number"],

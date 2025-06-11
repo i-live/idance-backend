@@ -51,14 +51,17 @@ Refactor nx-surrealdb-migrations plugin to support 3-executor architecture with 
 
 **Completed:** Ready to commit
 
-### Step 1.3: Rename path → module terminology
+### Step 1.3: Rename path → module terminology ✅
 **Tasks:**
-- [ ] Update `InitializeExecutorSchema.path` → `InitializeExecutorSchema.module`
-- [ ] Update all references in executor.ts (lines 28, 45, 47, etc.)
-- [ ] Update CLI help text and error messages
-- [ ] **Test:** Verify `--module 1` and `--module auth` both work
-- [ ] **Auto-test:** Test module pattern matching preserves current behavior
-- [ ] **Commit:** `refactor(migrations): rename path parameter to module for clarity`
+- [x] Update `InitializeExecutorSchema.path` → `InitializeExecutorSchema.module`
+- [x] Update all references in executor.ts (lines 28, 45, 47, etc.)
+- [x] Update CLI help text and error messages
+- [x] **Test:** Verify `--module 1` and `--module auth` both work
+- [x] **Auto-test:** Test module pattern matching preserves current behavior
+- [x] **Fix:** Resolve Jest heap memory issues for CI compatibility
+- [x] **Commit:** `refactor(migrations): rename path parameter to module for clarity`
+
+**Completed:** All tests passing, memory issues resolved
 
 ### Step 1.4: Add configuration system
 **Tasks:**

@@ -25,7 +25,7 @@ export default async function runExecutor(
     pass: options.pass ? replaceEnvVars(options.pass) : process.env.SURREALDB_ROOT_PASS,
     namespace: options.namespace ? replaceEnvVars(options.namespace) : process.env.SURREALDB_NAMESPACE || 'default',
     database: options.database ? replaceEnvVars(options.database) : process.env.SURREALDB_DATABASE || 'default',
-    path: options.path != null ? String(replaceEnvVars(String(options.path))) : undefined,
+    module: options.module != null ? String(replaceEnvVars(String(options.module))) : undefined,
     file: options.file != null ? String(replaceEnvVars(String(options.file))) : undefined,
     down: options.down || false,
     useTransactions: options.useTransactions ?? true,
@@ -42,13 +42,13 @@ export default async function runExecutor(
   console.log('Resolved basePath:', basePath);
   let targetPath = basePath;
 
-  if (resolvedOptions.path) {
+  if (resolvedOptions.module) {
     const subDir = await MigrationFileProcessor.findMatchingSubdirectory(
       basePath,
-      resolvedOptions.path
+      resolvedOptions.module
     );
     if (!subDir) {
-      throw new Error(`No subdirectory found matching pattern: ${resolvedOptions.path}`);
+      throw new Error(`No subdirectory found matching pattern: ${resolvedOptions.module}`);
     }
     targetPath = path.join(basePath, subDir);
     console.log('Resolved targetPath:', targetPath);

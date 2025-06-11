@@ -28,25 +28,25 @@ export class MigrationFileProcessor {
     try {
       const subDirs = await fs.readdir(basePath, { withFileTypes: true });
       const directories = subDirs.filter(d => d.isDirectory()).map(d => d.name);
-      console.log('Subdirectories in', basePath, ':', directories);
+      // console.log('Subdirectories in', basePath, ':', directories);
 
       const normalizedPattern = pattern.trim().toLowerCase();
       // Convert to normalized number (remove leading zeros but keep at least one digit)
       const patternAsNumber = parseInt(normalizedPattern, 10);
       const normalizedPatternNumber = isNaN(patternAsNumber) ? null : patternAsNumber.toString();
-      console.log('Normalized pattern:', normalizedPattern, 'as number:', normalizedPatternNumber);
+      // console.log('Normalized pattern:', normalizedPattern, 'as number:', normalizedPatternNumber);
 
       for (const dirName of directories) {
         const normalizedDirName = dirName.toLowerCase();
         const match = normalizedDirName.match(this.SUBDIR_PATTERN);
         if (!match) {
-          console.log(`Directory ${dirName} does not match SUBDIR_PATTERN`);
+          // console.log(`Directory ${dirName} does not match SUBDIR_PATTERN`);
           continue;
         }
 
         const [, number, name] = match;
         const normalizedNumber = parseInt(number, 10).toString();
-        console.log(`Processing directory: ${dirName}, number: ${number}, normalizedNumber: ${normalizedNumber}, name: ${name}`);
+        // console.log(`Processing directory: ${dirName}, number: ${number}, normalizedNumber: ${normalizedNumber}, name: ${name}`);
 
         // Match by full directory name, number, name, or number_name
         if (
@@ -56,11 +56,11 @@ export class MigrationFileProcessor {
           normalizedPattern === `${normalizedNumber}_${name.toLowerCase()}` ||
           normalizedPattern === `${number}_${name.toLowerCase()}`
         ) {
-          console.log(`Matched subdirectory: ${dirName} for pattern: ${pattern}`);
+          // console.log(`Matched subdirectory: ${dirName} for pattern: ${pattern}`);
           return dirName;
         }
       }
-      console.log(`No subdirectory matched for pattern: ${pattern}`);
+      // console.log(`No subdirectory matched for pattern: ${pattern}`);
       return null;
     } catch (error) {
       console.error(`Error reading directory ${basePath}:`, error);
@@ -101,11 +101,11 @@ export class MigrationFileProcessor {
 
   static filterMigrationFiles(files: string[], filePattern?: string, direction: 'up' | 'down' = 'up'): string[] {
     let filtered = files.filter(f => f.endsWith(`_${direction}.surql`));
-    console.log(`Filtered files for ${direction}:`, filtered);
+    // console.log(`Filtered files for ${direction}:`, filtered);
 
     if (filePattern) {
       filtered = filtered.filter(f => this.matchesMigrationPattern(f, filePattern));
-      console.log(`Filtered files for pattern ${filePattern}:`, filtered);
+      // console.log(`Filtered files for pattern ${filePattern}:`, filtered);
     }
 
     return direction === 'down' ? filtered.reverse() : filtered.sort();
@@ -131,21 +131,21 @@ export class MigrationFileProcessor {
     
     if (!hasNamespaceOperation && context.defaultNamespace) {
       statements.push(`USE NAMESPACE ${context.defaultNamespace};`);
-      console.log(`Using namespace: ${context.defaultNamespace}\n`)
+      // console.log(`Using namespace: ${context.defaultNamespace}\n`)
     }
     if (!hasDatabaseOperation && context.defaultDatabase) {
       statements.push(`USE DATABASE ${context.defaultDatabase};`);
-      console.log(`Using database: ${context.defaultDatabase}\n`)
+      // console.log(`Using database: ${context.defaultDatabase}\n`)
     }
 
     if (hasDDLOperation || !context.useTransactions || hasBeginTransaction || hasCommitTransaction) {
       statements.push(processed);
-      console.log(`No Transaction Block Added. \nDDL Operation: ${hasDDLOperation}`)
+      // console.log(`No Transaction Block Added. \nDDL Operation: ${hasDDLOperation}`);
     } else {
       statements.push('BEGIN TRANSACTION;');
       statements.push(processed);
       statements.push('COMMIT TRANSACTION;');
-      console.log(`Added Transaction Block.\n`)
+      // console.log(`Added Transaction Block.\n`);
     }
 
     return statements.join('\n\n');

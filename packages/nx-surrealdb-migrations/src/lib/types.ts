@@ -66,7 +66,7 @@ export interface InitializeExecutorSchema {
   pass: string;
   namespace?: string;
   database?: string;
-  path?: string | number;
+  module?: string | number;
   file?: string | number;
   down?: boolean;
   envFile?: string;
