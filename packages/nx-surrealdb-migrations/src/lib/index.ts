@@ -5,3 +5,4 @@ export * from './types';
 export * from './env';
 export * from './project';
 export * from './migration-file';
+export * from './module-loader';

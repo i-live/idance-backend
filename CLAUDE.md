@@ -28,3 +28,24 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - For up-to-date library documentation, use Context7 MCP tools
 - Always check current docs for Next.js, React, SurrealDB, NX, and other key dependencies
 - When encountering library-specific issues, fetch latest docs first
+
+## Usage Tracking
+Always include usage updates in responses showing:
+- Current usage percentage of plan limit
+- Time remaining until 5-hour auto-reset
+- Alert when approaching limits
+- Estimated API costs if using pay-per-token (AWS Bedrock, Anthropic API)
+- Token usage breakdown (input/output tokens when relevant)
+
+## Development Workflow
+- Commit each major implementation milestone with descriptive messages
+- Use conventional commit format: feat/fix/refactor/docs followed by scope
+- Regular commits allow testing and rollback at each phase
+- Example: "feat(migrations): add dependency resolution system"
+
+## File Organization
+- Place package-specific files in their respective package directories (packages/package-name/)
+- Never add package-specific code/docs to monorepo root
+- Use package-local documentation: packages/package-name/CONTEXT.md, DEVELOPMENT_PLAN.md
+- Claude-specific files: Use .claude/ folder in package directory for context files
+- Always check latest documentation using Context7 MCP tools before implementation

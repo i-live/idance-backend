@@ -19,6 +19,11 @@
       "implementation": "../../../dist/packages/nx-surrealdb-migrations/src/executors/status/executor.js",
       "schema": "../../../dist/packages/nx-surrealdb-migrations/src/executors/status/schema.json",
       "description": "Check migration status"
+    },
+    "migrate-app": {
+      "implementation": "../../../dist/packages/nx-surrealdb-migrations/src/executors/migrate-app/executor.js",
+      "schema": "../../../dist/packages/nx-surrealdb-migrations/src/executors/migrate-app/schema.json",
+      "description": "Migrate database for a specific application using module dependencies"
     }
   }
 }

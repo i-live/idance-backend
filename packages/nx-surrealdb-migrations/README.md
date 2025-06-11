@@ -98,12 +98,15 @@ The Nx SurrealDB Migrations Plugin provides a seamless way to manage database mi
    Organize migrations in numbered subdirectories under `libs/database/migrations` (or your `initPath`). Example:
    ```
    libs/database/migrations/
-   ├── 001_auth/
+   ├── 000_admin/
+   │   ├── 0000_db_server_namespaces_up.surql
+   │   ├── 0000_db_server_namespaces_down.surql
+   ├── 010_auth/
    │   ├── 0001_authentication_up.surql
    │   ├── 0001_authentication_down.surql
    │   ├── 0002_core_users_up.surql
    │   ├── 0002_core_users_down.surql
-   ├── 002_schema/
+   ├── 020_schema/
    │   ├── 0001_tables_up.surql
    │   ├── 0001_tables_down.surql
    ```
@@ -128,29 +131,29 @@ The Nx SurrealDB Migrations Plugin provides a seamless way to manage database mi
 ## Usage
 
 ### Run Migrations
-Apply migrations for a specific subdirectory (e.g., `001_auth`):
+Apply migrations for a specific subdirectory (e.g., `010_auth`):
 ```bash
-nx run database:initialize --path 1
+nx run database:initialize --path 10
 ```
 
 Apply a specific file within a subdirectory:
 ```bash
-nx run database:initialize --path 1 --file 0001_authentication
+nx run database:initialize --path 10 --file 0001_authentication
 ```
 
 Run `down` migrations (rollback):
 ```bash
-nx run database:initialize --path 1 --down
+nx run database:initialize --path 10 --down
 ```
 
 Use a custom schema:
 ```bash
-nx run database:initialize --path 1 --schemaPath libs/database/migrations/custom-migration.surql
+nx run database:initialize --path 10 --schemaPath libs/database/migrations/custom-migration.surql
 ```
 
 Force apply migrations regardless of state:
 ```bash
-nx run database:initialize --path 1 --force
+nx run database:initialize --path 10 --force
 ```
 
 ### Migration State Rules
@@ -165,7 +168,7 @@ The `initialize` executor supports the following options (defined in `Initialize
 - `pass`: Password (required).
 - `namespace`: Namespace (optional, defaults to `default`).
 - `database`: Database (optional, defaults to `default`).
-- `path`: Migration subdirectory pattern (e.g., `1` for `001_auth`, optional).
+- `path`: Migration subdirectory pattern (e.g., `10` for `010_auth`, optional).
 - `file`: Specific migration file pattern (e.g., `0001_authentication`, optional).
 - `down`: Run down migrations (optional, defaults to `false`).
 - `envFile`: Path to `.env` file (optional).
@@ -236,13 +239,13 @@ Fields include:
 
 - **No migrations applied**:
   - Ensure migration files follow the format `<number>_<name>.<up|down>.surql` (e.g., `0001_authentication_up.surql`).
-  - Verify the `path` option matches a subdirectory (e.g., `--path 1` for `001_auth`).
+  - Verify the `path` option matches a subdirectory (e.g., `--path 10` for `010_auth`).
   - Check if migrations were skipped due to state conflicts (use `--force` to override).
 
 - **Verbose Output**:
   - Run with `--verbose` for detailed logs:
     ```bash
-    nx run database:initialize --path 1 --verbose
+    nx run database:initialize --path 10 --verbose
     ```
 
 ## Contributing

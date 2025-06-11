@@ -6,6 +6,35 @@ export interface SurrealDBConfig {
   password?: string;
 }
 
+export interface ModuleConfig {
+  name: string;
+  description: string;
+  version: string;
+  dependencies: string[];
+  migrations: ModuleMigration[];
+  tags: string[];
+  environments: string[];
+}
+
+export interface ModuleMigration {
+  id: string;
+  description: string;
+  timestamp: string;
+}
+
+export interface ApplicationConfig {
+  name: string;
+  description: string;
+  modules: string[];
+  customMigrations: string[];
+  environment: {
+    [env: string]: {
+      database: string;
+      namespace: string;
+    };
+  };
+}
+
 export interface Migration {
   id?: string;
   path: string;

@@ -30,6 +30,26 @@
   "defaultBase": "main",
   "nxCloudId": "683d0ce209e9a67b1f62f68a",
   "plugins": [
-    "@idance/nx-surrealdb-migrations"
+    "@idance/nx-surrealdb-migrations",
+    {
+      "plugin": "@nx/eslint/plugin",
+      "options": {
+        "targetName": "eslint:lint"
+      }
+    },
+    {
+      "plugin": "@nx/vite/plugin",
+      "options": {
+        "buildTargetName": "build",
+        "testTargetName": "vite:test",
+        "serveTargetName": "serve",
+        "devTargetName": "dev",
+        "previewTargetName": "preview",
+        "serveStaticTargetName": "serve-static",
+        "typecheckTargetName": "typecheck",
+        "buildDepsTargetName": "build-deps",
+        "watchDepsTargetName": "watch-deps"
+      }
+    }
   ]
 }

@@ -30,8 +30,11 @@ export class MigrationFileProcessor {
       const directories = subDirs.filter(d => d.isDirectory()).map(d => d.name);
       console.log('Subdirectories in', basePath, ':', directories);
 
-      const normalizedPattern = pattern.trim().toLowerCase().replace(/^0+/, '');
-      console.log('Normalized pattern:', normalizedPattern);
+      const normalizedPattern = pattern.trim().toLowerCase();
+      // Convert to normalized number (remove leading zeros but keep at least one digit)
+      const patternAsNumber = parseInt(normalizedPattern, 10);
+      const normalizedPatternNumber = isNaN(patternAsNumber) ? null : patternAsNumber.toString();
+      console.log('Normalized pattern:', normalizedPattern, 'as number:', normalizedPatternNumber);
 
       for (const dirName of directories) {
         const normalizedDirName = dirName.toLowerCase();
@@ -48,7 +51,7 @@ export class MigrationFileProcessor {
         // Match by full directory name, number, name, or number_name
         if (
           normalizedDirName === normalizedPattern ||
-          normalizedPattern === normalizedNumber ||
+          (normalizedPatternNumber !== null && normalizedPatternNumber === normalizedNumber) ||
           normalizedPattern === name.toLowerCase() ||
           normalizedPattern === `${normalizedNumber}_${name.toLowerCase()}` ||
           normalizedPattern === `${number}_${name.toLowerCase()}`
@@ -106,6 +109,14 @@ export class MigrationFileProcessor {
     }
 
     return direction === 'down' ? filtered.reverse() : filtered.sort();
+  }
+
+  static async readFileContent(filePath: string): Promise<string> {
+    try {
+      return await fs.readFile(filePath, 'utf-8');
+    } catch (error) {
+      throw new Error(`Failed to read file ${filePath}: ${error.message}`);
+    }
   }
 
   static processContent(content: string, context: MigrationContext): string {
