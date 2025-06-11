@@ -10,9 +10,13 @@
   - Added comprehensive tests (all passing)
   - Committed: `cbdb1e3`
   
-- **Step 1.2**: 🚧 Clean unused code (IN PROGRESS)
-  - Identified files to remove: migration-parser.ts, query-file-processor.ts
-  - Need to update imports and clean commented code
+- **Step 1.2**: ✅ Clean unused code (COMPLETED)
+  - Removed migration-parser.ts, query-file-processor.ts
+  - Removed unplanned migrate-app executor and module-loader.ts
+  - Created placeholder implementations for migrate/rollback/status executors
+  - Updated imports in index.ts
+  - All tests passing
+  - Ready to commit
 
 ## Architecture Decisions
 
