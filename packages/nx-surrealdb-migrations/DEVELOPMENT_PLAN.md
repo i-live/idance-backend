@@ -77,15 +77,19 @@ Refactor nx-surrealdb-migrations plugin to support 3-executor architecture with 
 
 **Completed:** ConfigLoader + DependencyResolver with 38 tests, all passing
 
-### Step 1.5: Update migration generator  
+### Step 1.5: Update migration generator ✅
 **Tasks:**
-- [ ] Replace timestamp with sequential numbering in generator
-- [ ] Add `--module` option to target specific modules
-- [ ] Auto-create module directories with gapped numbering (030, 040, etc.)
-- [ ] Update generator templates and file naming
-- [ ] **Test:** Generate migrations in existing and new modules
-- [ ] **Auto-test:** Test generator creates proper file structure
-- [ ] **Commit:** `feat(generators): update migration generator for modular structure`
+- [x] Replace timestamp with sequential numbering in generator
+- [x] Add `--module` option to target specific modules
+- [x] Auto-create module directories with gapped numbering (030, 040, etc.)
+- [x] Update generator templates and file naming
+- [x] Add module auto-discovery and validation logic
+- [x] Add `--createModule` flag for new module creation
+- [x] **Test:** Generate migrations in existing and new modules
+- [x] **Auto-test:** Test generator creates proper file structure (5 tests)
+- [x] **Commit:** `feat(generators): update migration generator for modular structure`
+
+**Completed:** Sequential numbering, module targeting, auto-discovery with 5 tests
 
 ### Step 1.6: Create context documentation
 **Tasks:**
