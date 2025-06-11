@@ -4,3 +4,5 @@ export * from './types';
 export * from './env';
 export * from './project';
 export * from './migration-file';
+export * from './config-loader';
+export * from './dependency-resolver';

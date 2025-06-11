@@ -63,14 +63,19 @@ Refactor nx-surrealdb-migrations plugin to support 3-executor architecture with 
 
 **Completed:** All tests passing, memory issues resolved
 
-### Step 1.4: Add configuration system
+### Step 1.4: Add configuration system ✅
 **Tasks:**
-- [ ] Create `src/lib/config-loader.ts` with JSON/YAML support
-- [ ] Create `database/config.json` structure with dependencies
-- [ ] Add validation for config format
-- [ ] **Test:** Load config and validate dependency structure
-- [ ] **Auto-test:** Unit tests for config loading (valid/invalid JSON/YAML)
-- [ ] **Commit:** `feat(migrations): add config system with dependency management`
+- [x] Create `src/lib/config-loader.ts` with JSON/YAML support
+- [x] Create `database/config.json` structure with dependencies
+- [x] Add validation for config format
+- [x] Create `src/lib/dependency-resolver.ts` for topological sorting
+- [x] Add circular dependency detection
+- [x] **Test:** Load config and validate dependency structure
+- [x] **Auto-test:** Unit tests for config loading (valid/invalid JSON/YAML)
+- [x] **Auto-test:** Unit tests for dependency resolution (20 tests)
+- [x] **Commit:** `feat(migrations): add config system with dependency management`
+
+**Completed:** ConfigLoader + DependencyResolver with 38 tests, all passing
 
 ### Step 1.5: Update migration generator  
 **Tasks:**

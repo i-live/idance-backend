@@ -25,6 +25,16 @@
   - Updated README.md examples to use --module
   - Fixed Jest heap memory issues for CI compatibility
   - All tests passing (12/12)
+  - Committed: `3280fdd`
+
+- **Step 1.4**: ✅ Add configuration system (COMPLETED)
+  - Created ConfigLoader with JSON/YAML support
+  - Added comprehensive validation for config format
+  - Created DependencyResolver with topological sorting
+  - Added circular dependency detection
+  - Created sample config.json in database directory
+  - Added 38 comprehensive tests (18 config + 20 dependency)
+  - All tests passing (50/50)
   - Committed: TBD
 
 ## Architecture Decisions
