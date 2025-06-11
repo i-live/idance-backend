@@ -102,15 +102,17 @@ Refactor nx-surrealdb-migrations plugin to support 3-executor architecture with 
 
 ## Step 2: Migration Engine ⚙️
 
-### Step 2.1: Create dependency resolver
+### Step 2.1: Create dependency resolver ✅
 **Tasks:**
-- [ ] Create `src/lib/dependency-resolver.ts`
-- [ ] Implement config file parsing (JSON/YAML)
-- [ ] Add topological sort for execution order
-- [ ] Add circular dependency detection
-- [ ] **Test:** Test dependency resolution with sample config
-- [ ] **Auto-test:** Unit tests for topological sort and circular detection
-- [ ] **Commit:** `feat(migrations): add dependency resolution system`
+- [x] Create `src/lib/dependency-resolver.ts` (completed in Step 1.4)
+- [x] Implement config file parsing (JSON/YAML)
+- [x] Add topological sort for execution order
+- [x] Add circular dependency detection
+- [x] **Test:** Test dependency resolution with sample config
+- [x] **Auto-test:** Unit tests for topological sort and circular detection
+- [x] **Commit:** `feat(migrations): add dependency resolution system`
+
+**Completed:** Already completed in Step 1.4 as part of configuration system
 
 ### Step 2.2: Create migration engine
 **Tasks:**
