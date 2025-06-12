@@ -32,7 +32,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ### 1. **Create Shared Utilities Before Writing Duplicate Code**
 - **Identify Patterns**: Before implementing functionality, check if similar code exists
 - **Abstract Early**: When you see the same pattern twice, create a shared utility
-- **Central Libraries**: Place shared utilities in `/src/lib/` directories
+- **Central Libraries**: Place shared utilities in the appropriate shared directory for the codebase:
+  - **Analyze Existing Structure**: Look for existing utility/lib directories in the codebase
+  - **Follow Conventions**: Use the same patterns as existing shared code
+  - **Common Locations**: 
+    - NX plugins: `/src/lib/` directories
+    - React apps: `/src/utils/`, `/src/lib/`, or `/src/shared/`
+    - Node.js: `/lib/`, `/utils/`, or `/src/common/`
+    - Monorepos: Shared packages or workspace-level utilities
+  - **When in Doubt**: Create a `/utils/` or `/lib/` directory following the project's naming conventions
 - **Example**: TreeUtils library for NX Tree API operations
 
 ### 2. **Shared Library Guidelines**
