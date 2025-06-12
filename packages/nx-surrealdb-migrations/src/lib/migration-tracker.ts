@@ -52,8 +52,7 @@ export class MigrationTracker {
 
     try {
       const currentStatus = await this.getLatestMigrationStatus(number, name);
-      console.log('canApplyMigration - Current Status:', currentStatus);
-
+      
       if (!currentStatus) {
         if (requestedDirection === 'up') {
           return { canApply: true };

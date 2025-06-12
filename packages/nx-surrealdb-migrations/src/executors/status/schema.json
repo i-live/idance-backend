@@ -71,6 +71,11 @@
       "type": "boolean",
       "description": "Output status information in JSON format",
       "default": false
+    },
+    "debug": {
+      "type": "boolean",
+      "description": "Show debug information about migration records and database queries",
+      "default": false
     }
   },
   "additionalProperties": false

@@ -9,6 +9,7 @@ import { DependencyResolver } from './dependency-resolver';
 import { MigrationFileUtils, type MigrationFile, type MigrationContext } from './migration-file-utils';
 import { replaceEnvVars, loadEnvFile } from './env';
 import { resolveProjectPath } from './project';
+import { Debug } from './debug';
 
 export interface MigrationEngineOptions {
   url: string;
@@ -22,6 +23,7 @@ export interface MigrationEngineOptions {
   schemaPath?: string;
   force?: boolean;
   configPath?: string;
+  debug?: boolean;
 }
 
 export interface MigrationExecutionContext {
@@ -42,6 +44,7 @@ export interface ResolvedMigrationOptions {
   schemaPath?: string;
   force: boolean;
   configPath?: string;
+  debug?: boolean;
 }
 
 
@@ -65,6 +68,7 @@ export interface MigrationFileResult {
 export class MigrationEngine {
   private context: MigrationExecutionContext | null = null;
   private options: MigrationEngineOptions | null = null;
+  private debug = Debug.scope('migration-engine');
 
   constructor(private projectContext?: any) {}
 
@@ -76,6 +80,9 @@ export class MigrationEngine {
   async initialize(options: MigrationEngineOptions): Promise<void> {
     // Store options for later use
     this.options = options;
+    
+    // Enable debug mode if requested
+    Debug.setEnabled(!!options.debug);
     
     // Load environment variables
     if (this.projectContext && options.envFile) {
@@ -93,7 +100,8 @@ export class MigrationEngine {
       initPath: options.initPath ? replaceEnvVars(options.initPath) : process.env.MIGRATIONS_PATH || 'database',
       schemaPath: options.schemaPath ? replaceEnvVars(options.schemaPath) : undefined,
       force: options.force || false,
-      configPath: options.configPath
+      configPath: options.configPath,
+      debug: options.debug || false
     };
 
     if (!resolvedOptions.url || !resolvedOptions.user || !resolvedOptions.pass) {
@@ -587,11 +595,17 @@ export class MigrationEngine {
       : this.context.options.initPath;
     const modulePath = path.join(basePath, moduleId);
     
+    this.debug.log(`Checking applied migrations for module ${moduleId} at path: ${modulePath}`);
+    
     try {
       // Get applied up migrations for this module
       const upMigrations = await tracker.getMigrationsByDirectionAndPath('up', modulePath);
-      return upMigrations
-        .filter(m => m.status === 'success')
+      this.debug.log(`Found ${upMigrations.length} up migrations for ${moduleId}`);
+      
+      const successfulMigrations = upMigrations.filter(m => m.status === 'success');
+      this.debug.log(`${successfulMigrations.length} successful migrations for ${moduleId}`);
+      
+      return successfulMigrations
         .map(migration => ({
           number: migration.number || '',
           name: migration.name || '',

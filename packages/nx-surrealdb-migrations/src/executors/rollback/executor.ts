@@ -1,5 +1,6 @@
 import { ExecutorContext, logger } from '@nx/devkit';
 import { MigrationEngine } from '../../lib/migration-engine';
+import { Debug } from '../../lib/debug';
 
 export interface RollbackExecutorSchema {
   url?: string;
@@ -16,6 +17,7 @@ export interface RollbackExecutorSchema {
   configPath?: string;
   dryRun?: boolean;
   steps?: number;
+  debug?: boolean;
 }
 
 export default async function runExecutor(
@@ -23,6 +25,10 @@ export default async function runExecutor(
   context: ExecutorContext
 ): Promise<{ success: boolean }> {
   const engine = new MigrationEngine(context);
+  const debug = Debug.scope('rollback-executor');
+
+  // Enable debug mode if requested
+  Debug.setEnabled(!!options.debug);
 
   try {
     // Initialize migration engine
@@ -37,11 +43,13 @@ export default async function runExecutor(
       initPath: options.initPath || 'database',
       schemaPath: options.schemaPath,
       force: options.force || false,
-      configPath: options.configPath
+      configPath: options.configPath,
+      debug: options.debug
     });
 
     // Determine target modules
     const targetModules = options.module ? [String(options.module)] : undefined;
+    debug.log(`Target modules: ${targetModules ? targetModules.join(', ') : 'all'}`);
 
     // First, validate rollback safety unless force is enabled
     if (!options.force && targetModules) {

@@ -81,6 +81,11 @@
       "type": "number",
       "description": "Number of migration steps to rollback (default: 1, use 0 for all)",
       "default": 1
+    },
+    "debug": {
+      "type": "boolean",
+      "description": "Enable debug logging for troubleshooting",
+      "default": false
     }
   },
   "additionalProperties": false

@@ -1,5 +1,6 @@
 import { ExecutorContext, logger } from '@nx/devkit';
 import { MigrationEngine } from '../../lib/migration-engine';
+import { Debug } from '../../lib/debug';
 
 export interface StatusExecutorSchema {
   url?: string;
@@ -14,6 +15,7 @@ export interface StatusExecutorSchema {
   configPath?: string;
   detailed?: boolean;
   json?: boolean;
+  debug?: boolean;
 }
 
 interface StatusOutput {
@@ -37,6 +39,10 @@ export default async function runExecutor(
   context: ExecutorContext
 ): Promise<{ success: boolean }> {
   const engine = new MigrationEngine(context);
+  const debug = Debug.scope('status-executor');
+
+  // Enable debug mode if requested
+  Debug.setEnabled(!!options.debug);
 
   try {
     // Initialize migration engine
@@ -51,7 +57,8 @@ export default async function runExecutor(
       initPath: options.initPath || 'database',
       schemaPath: options.schemaPath,
       force: false, // Not applicable for status
-      configPath: options.configPath
+      configPath: options.configPath,
+      debug: options.debug
     });
 
     // Determine target modules
@@ -59,6 +66,29 @@ export default async function runExecutor(
 
     // Get migration status
     logger.info('📊 Checking migration status...');
+    
+    // Debug: Check raw migration records
+    const client = (engine as any).context?.client;
+    const tracker = (engine as any).context?.tracker;
+    if (client && tracker) {
+      try {
+        const allMigrations = await client.query('SELECT * FROM system_migrations');
+        debug.log(`Total records in system_migrations: ${allMigrations.length}`);
+        if (allMigrations.length > 0) {
+          debug.log('Sample migration records:');
+          allMigrations.slice(0, 3).forEach((m: any) => {
+            debug.log(`   - ${m.path}/${m.filename} | ${m.direction} | ${m.status} | ${m.applied_at}`);
+          });
+        }
+        
+        // Check unique paths
+        const uniquePaths = await client.query('SELECT path, count() as count FROM system_migrations GROUP BY path');
+        debug.data('Migration paths', uniquePaths);
+      } catch (e) {
+        debug.error('Error checking raw migrations:', e);
+      }
+    }
+    
     const status = await engine.getMigrationStatus(targetModules);
 
     if (options.json) {

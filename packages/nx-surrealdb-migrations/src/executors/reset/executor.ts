@@ -2,6 +2,7 @@ import { ExecutorContext } from '@nx/devkit';
 import { SurrealDBClient } from '../../lib/client';
 import { loadEnvFile, replaceEnvVars } from '../../lib/env';
 import { resolveProjectPath } from '../../lib/project';
+import { Debug } from '../../lib/debug';
 
 export interface ResetExecutorSchema {
   url: string;
@@ -12,12 +13,18 @@ export interface ResetExecutorSchema {
   envFile?: string;
   confirm?: boolean;
   dryRun?: boolean;
+  debug?: boolean;
 }
 
 export default async function runExecutor(
   options: ResetExecutorSchema,
   context: ExecutorContext
 ): Promise<{ success: boolean }> {
+  const debug = Debug.scope('reset-executor');
+
+  // Enable debug mode if requested
+  Debug.setEnabled(!!options.debug);
+
   try {
     console.log('🗑️  Migration Tracking Reset');
     console.log('');
@@ -35,6 +42,14 @@ export default async function runExecutor(
       namespace: replaceEnvVars(options.namespace),
       database: replaceEnvVars(options.database),
     };
+
+    debug.log('Connecting to database...');
+    debug.data('Connection options', {
+      url: connectionOptions.url,
+      username: connectionOptions.username,
+      namespace: connectionOptions.namespace,
+      database: connectionOptions.database
+    });
 
     // Create database client
     const client = new SurrealDBClient();

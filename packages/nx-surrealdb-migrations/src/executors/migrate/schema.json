@@ -76,6 +76,11 @@
       "type": "boolean",
       "description": "Show what migrations would be applied without executing them",
       "default": false
+    },
+    "debug": {
+      "type": "boolean",
+      "description": "Enable debug logging for troubleshooting",
+      "default": false
     }
   },
   "additionalProperties": false
