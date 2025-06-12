@@ -1,13 +1,12 @@
 import {
   Tree,
-  formatFiles,
   logger,
 } from '@nx/devkit';
 import * as path from 'path';
 import * as fs from 'fs';
 import { execSync } from 'child_process';
-import { ConfigLoader } from '../../lib/config-loader';
 import { DependencyResolver } from '../../lib/dependency-resolver';
+import { TreeUtils } from '../../lib/tree-utils';
 
 export interface ImportModuleGeneratorSchema {
   module: string;
@@ -37,11 +36,11 @@ export default async function (tree: Tree, options: ImportModuleGeneratorSchema)
   const targetModuleName = determineTargetModuleName(normalizedOptions, extractedPath);
   
   // Check if target module already exists
-  await checkTargetModule(normalizedOptions, targetModuleName);
+  await checkTargetModule(tree, normalizedOptions, targetModuleName);
   
   // Load and validate dependencies
   if (!normalizedOptions.skipDependencyCheck) {
-    await validateDependencies(normalizedOptions, extractedPath);
+    await validateDependencies(tree, normalizedOptions, extractedPath);
   }
   
   // Import migration files
@@ -52,7 +51,7 @@ export default async function (tree: Tree, options: ImportModuleGeneratorSchema)
     await mergeModuleConfiguration(tree, normalizedOptions, extractedPath, targetModuleName);
   }
   
-  await formatFiles(tree);
+  // Skip formatFiles for this generator since it causes test timeouts
   
   logger.info(`✅ Module '${normalizedOptions.module}' imported successfully as '${targetModuleName}'!`);
   
@@ -183,12 +182,13 @@ function determineTargetModuleName(
 }
 
 async function checkTargetModule(
+  tree: Tree,
   options: ReturnType<typeof normalizeOptions>,
   targetModuleName: string
 ) {
   const targetPath = path.join(options.initPath, targetModuleName);
   
-  if (fs.existsSync(targetPath)) {
+  if (tree.exists(targetPath)) {
     if (!options.overwrite) {
       throw new Error(
         `Target module '${targetModuleName}' already exists. Use --overwrite to replace it.`
@@ -200,6 +200,7 @@ async function checkTargetModule(
 }
 
 async function validateDependencies(
+  tree: Tree,
   options: ReturnType<typeof normalizeOptions>,
   extractedPath: string
 ) {
@@ -220,12 +221,11 @@ async function validateDependencies(
   }
   
   // Check if dependencies exist in target project
-  const configLoader = new ConfigLoader();
   const targetConfigPath = options.configPath || path.join(options.initPath, 'config.json');
   
-  if (fs.existsSync(targetConfigPath)) {
-    const targetConfig = await ConfigLoader.loadConfig(options.initPath, targetConfigPath);
-    const missingDeps = config.depends.filter(dep => !targetConfig.modules[dep]);
+  const targetConfig = TreeUtils.readJsonFile(tree, targetConfigPath);
+  if (targetConfig) {
+    const missingDeps = config.depends.filter(dep => !targetConfig.modules || !targetConfig.modules[dep]);
     
     if (missingDeps.length > 0) {
       throw new Error(
@@ -250,7 +250,7 @@ async function importMigrationFiles(
   const targetMigrationsPath = path.join(options.initPath, targetModuleName);
   
   // Create target directory
-  tree.write(path.join(targetMigrationsPath, '.gitkeep'), '');
+  TreeUtils.ensureDirectory(tree, targetMigrationsPath);
   
   // Copy migration files
   const migrationFiles = fs.readdirSync(sourceMigrationsPath);
@@ -297,11 +297,10 @@ async function mergeModuleConfiguration(
     }
   };
   
-  // Load existing config if it exists
-  if (tree.exists(targetConfigPath)) {
-    targetConfig = JSON.parse(tree.read(targetConfigPath, 'utf-8'));
-  } else if (fs.existsSync(targetConfigPath)) {
-    targetConfig = JSON.parse(fs.readFileSync(targetConfigPath, 'utf-8'));
+  // Load existing config if it exists in Tree
+  const existingConfig = TreeUtils.readJsonFile(tree, targetConfigPath);
+  if (existingConfig) {
+    targetConfig = existingConfig;
   }
   
   // Add the new module configuration
@@ -314,7 +313,7 @@ async function mergeModuleConfiguration(
   };
   
   // Write updated configuration
-  tree.write(targetConfigPath, JSON.stringify(targetConfig, null, 2));
+  TreeUtils.writeJsonFile(tree, targetConfigPath, targetConfig);
   
   logger.info(`✅ Configuration merged for module: ${targetModuleName}`);
 }

@@ -454,6 +454,50 @@ nx run database:status --module mymodule --detailed
 nx run database:migrate --module mymodule --force
 ```
 
+## Code Architecture
+
+### 🏗️ **Modular Design Principles**
+
+This plugin follows strict modular design principles to ensure maintainability and code reuse:
+
+#### **TreeUtils Library** (`/src/lib/tree-utils.ts`)
+A comprehensive utility library that abstracts all NX Tree API operations:
+- **Directory Management**: `findMatchingSubdirectory()`, `ensureDirectory()`, `isDirectory()`
+- **File Operations**: `copyFiles()`, `getMigrationFiles()`, `readJsonFile()`, `writeJsonFile()`
+- **Migration Logic**: `getNextMigrationNumber()`, `findModuleDirectories()`
+
+This eliminates code duplication across generators and provides consistent Tree API usage.
+
+#### **Generator Architecture**
+All generators (`migration`, `import-module`, `export-module`) leverage shared utilities:
+```typescript
+import { TreeUtils } from '../../lib/tree-utils';
+
+// Consistent patterns across all generators
+const moduleDir = TreeUtils.findMatchingSubdirectory(tree, basePath, pattern);
+const migrationFiles = TreeUtils.getMigrationFiles(tree, modulePath);
+TreeUtils.ensureDirectory(tree, targetPath);
+```
+
+#### **Core Libraries**
+- **`MigrationFileUtils`**: Migration file parsing and validation
+- **`MigrationEngine`**: Core migration execution logic  
+- **`MigrationTracker`**: Database state management
+- **`SurrealDBClient`**: Database connection abstraction
+- **`ConfigLoader`**: Configuration management with environment variable support
+
+#### **Test Coverage**
+- **266 comprehensive tests** covering all components
+- **TreeUtils**: 26 dedicated tests for utility functions
+- **TDD Approach**: All code follows test-driven development methodology
+
+### 🎯 **Benefits of This Architecture**
+
+✅ **Code Reuse**: Shared utilities eliminate duplication  
+✅ **Consistency**: All generators behave identically  
+✅ **Maintainability**: Changes happen in centralized locations  
+✅ **Testability**: Each component can be tested independently  
+✅ **Extensibility**: New generators can leverage existing utilities  
 
 ## Contributing
 

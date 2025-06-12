@@ -6,7 +6,7 @@ import * as path from 'path';
 import generator from './generator';
 import { ImportModuleGeneratorSchema } from './generator';
 
-// Mock filesystem operations
+// Mock filesystem operations (only for external package handling)
 jest.mock('fs');
 jest.mock('child_process');
 
@@ -23,30 +23,40 @@ describe('import-module generator', () => {
   beforeEach(() => {
     tree = createTreeWithEmptyWorkspace();
     
-    // Mock filesystem operations
+    // Set up workspace files in Tree (instead of mocking)
+    tree.write('database/config.json', JSON.stringify({
+      modules: {
+        '000_admin': {
+          name: 'Admin',
+          depends: []
+        }
+      }
+    }));
+    
+    // Mock external package filesystem operations only
     mockFs.existsSync.mockImplementation((filePath: string) => {
+      // Only mock the external package path
       if (filePath.includes('/tmp/auth-package')) return true;
-      if (filePath.includes('package.json')) return true;
-      if (filePath.includes('module.config.json')) return true;
-      if (filePath.includes('migrations')) return true;
-      if (filePath.includes('database')) return true;
+      if (filePath.includes('/tmp/auth-package/package.json')) return true;
+      if (filePath.includes('/tmp/auth-package/module.config.json')) return true;
+      if (filePath.includes('/tmp/auth-package/migrations')) return true;
       return false;
     });
     
     mockFs.statSync.mockImplementation((filePath: string) => ({
-      isDirectory: () => filePath.includes('/tmp/auth-package'),
-      isFile: () => !filePath.includes('/tmp/auth-package'),
+      isDirectory: () => filePath.includes('/tmp/auth-package') && !filePath.includes('.'),
+      isFile: () => filePath.includes('.'),
     } as any));
     
     mockFs.readdirSync.mockImplementation((dirPath: string) => {
-      if (dirPath.includes('migrations')) {
+      if (dirPath.includes('/tmp/auth-package/migrations')) {
         return ['0001_authentication_up.surql', '0001_authentication_down.surql'] as any;
       }
       return [] as any;
     });
     
     mockFs.readFileSync.mockImplementation((filePath: string) => {
-      if (filePath.includes('package.json')) {
+      if (filePath.includes('/tmp/auth-package/package.json')) {
         return JSON.stringify({
           name: '@migrations/010_auth',
           version: '1.0.0',
@@ -59,7 +69,7 @@ describe('import-module generator', () => {
           }
         });
       }
-      if (filePath.includes('module.config.json')) {
+      if (filePath.includes('/tmp/auth-package/module.config.json')) {
         return JSON.stringify({
           '010_auth': {
             name: 'Authentication',
@@ -68,18 +78,8 @@ describe('import-module generator', () => {
           }
         });
       }
-      if (filePath.includes('.surql')) {
+      if (filePath.includes('/tmp/auth-package/migrations/') && filePath.includes('.surql')) {
         return 'DEFINE TABLE users;';
-      }
-      if (filePath.includes('config.json')) {
-        return JSON.stringify({
-          modules: {
-            '000_admin': {
-              name: 'Admin',
-              depends: []
-            }
-          }
-        });
       }
       return '';
     });
@@ -104,12 +104,7 @@ describe('import-module generator', () => {
   });
 
   it('should merge module configuration', async () => {
-    tree.write('database/config.json', JSON.stringify({
-      modules: {
-        '000_admin': { name: 'Admin', depends: [] }
-      }
-    }));
-    
+    // The config is already set up in beforeEach
     await generator(tree, { ...options, mergeConfig: true });
     
     const configPath = 'database/config.json';
@@ -122,6 +117,9 @@ describe('import-module generator', () => {
   });
 
   it('should create new configuration if none exists', async () => {
+    // Remove the existing config to test creation
+    tree.delete('database/config.json');
+    
     await generator(tree, { ...options, mergeConfig: true });
     
     const configPath = 'database/config.json';
@@ -149,28 +147,12 @@ describe('import-module generator', () => {
   });
 
   it('should validate dependencies', async () => {
-    // Mock missing dependency
-    mockFs.readFileSync.mockImplementation((filePath: string) => {
-      if (filePath.includes('config.json') && filePath.includes('database')) {
-        return JSON.stringify({
-          modules: {
-            // Missing 000_admin dependency
-          }
-        });
+    // Update Tree to have missing dependency
+    tree.write('database/config.json', JSON.stringify({
+      modules: {
+        // Missing 000_admin dependency
       }
-      // Return default mocks for other files
-      if (filePath.includes('package.json')) {
-        return JSON.stringify({
-          metadata: { moduleName: '010_auth' }
-        });
-      }
-      if (filePath.includes('module.config.json')) {
-        return JSON.stringify({
-          '010_auth': { depends: ['000_admin'] }
-        });
-      }
-      return '';
-    });
+    }));
 
     await expect(generator(tree, options)).rejects.toThrow(
       'Missing dependencies: 000_admin'
@@ -178,22 +160,8 @@ describe('import-module generator', () => {
   });
 
   it('should skip dependency validation when requested', async () => {
-    mockFs.readFileSync.mockImplementation((filePath: string) => {
-      if (filePath.includes('config.json') && filePath.includes('database')) {
-        return JSON.stringify({ modules: {} }); // Empty config
-      }
-      if (filePath.includes('package.json')) {
-        return JSON.stringify({
-          metadata: { moduleName: '010_auth' }
-        });
-      }
-      if (filePath.includes('module.config.json')) {
-        return JSON.stringify({
-          '010_auth': { depends: ['000_admin'] }
-        });
-      }
-      return '';
-    });
+    // Update Tree to have empty config (missing dependencies)
+    tree.write('database/config.json', JSON.stringify({ modules: {} }));
 
     const skipOptions = { ...options, skipDependencyCheck: true };
     await generator(tree, skipOptions);
@@ -203,13 +171,8 @@ describe('import-module generator', () => {
   });
 
   it('should throw error if module already exists without overwrite', async () => {
-    // Mock existing target directory
-    mockFs.existsSync.mockImplementation((filePath: string) => {
-      if (filePath.includes('database/010_auth')) return true;
-      return filePath.includes('/tmp/auth-package') || 
-             filePath.includes('package.json') ||
-             filePath.includes('migrations');
-    });
+    // Create existing module in Tree
+    tree.write('database/010_auth/existing-file.surql', 'existing content');
 
     await expect(generator(tree, options)).rejects.toThrow(
       "Target module '010_auth' already exists"
@@ -217,13 +180,8 @@ describe('import-module generator', () => {
   });
 
   it('should overwrite existing module when requested', async () => {
-    // Mock existing target directory
-    mockFs.existsSync.mockImplementation((filePath: string) => {
-      if (filePath.includes('database/010_auth')) return true;
-      return filePath.includes('/tmp/auth-package') || 
-             filePath.includes('package.json') ||
-             filePath.includes('migrations');
-    });
+    // Create existing module in Tree
+    tree.write('database/010_auth/existing-file.surql', 'existing content');
 
     const overwriteOptions = { ...options, overwrite: true };
     await generator(tree, overwriteOptions);
@@ -254,20 +212,32 @@ describe('import-module generator', () => {
   });
 
   it('should handle module without dependencies', async () => {
+    // Override mock for the external package's module.config.json to have no dependencies
     mockFs.readFileSync.mockImplementation((filePath: string) => {
-      if (filePath.includes('module.config.json')) {
+      if (filePath.includes('/tmp/auth-package/module.config.json')) {
         return JSON.stringify({
           '010_auth': {
             name: 'Authentication',
+            description: 'User authentication system',
             depends: [] // No dependencies
           }
         });
       }
-      // Return default mocks for other files
-      if (filePath.includes('package.json')) {
+      if (filePath.includes('/tmp/auth-package/package.json')) {
         return JSON.stringify({
-          metadata: { moduleName: '010_auth' }
+          name: '@migrations/010_auth',
+          version: '1.0.0',
+          description: 'Authentication module',
+          metadata: {
+            moduleName: '010_auth',
+            originalName: 'Authentication',
+            exportedAt: '2024-01-01T00:00:00.000Z',
+            exportedBy: '@idance/nx-surrealdb-migrations',
+          }
         });
+      }
+      if (filePath.includes('/tmp/auth-package/migrations/') && filePath.includes('.surql')) {
+        return 'DEFINE TABLE users;';
       }
       return '';
     });

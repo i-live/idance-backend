@@ -26,6 +26,48 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - For React components: prefer functional components with hooks
 - Authentication: use NextAuth for auth flows
 
+## Code Organization & Reuse - MANDATORY
+**ALWAYS prioritize modular design and code reuse:**
+
+### 1. **Create Shared Utilities Before Writing Duplicate Code**
+- **Identify Patterns**: Before implementing functionality, check if similar code exists
+- **Abstract Early**: When you see the same pattern twice, create a shared utility
+- **Central Libraries**: Place shared utilities in `/src/lib/` directories
+- **Example**: TreeUtils library for NX Tree API operations
+
+### 2. **Shared Library Guidelines**
+- **Comprehensive Testing**: Every shared utility must have complete test coverage
+- **Clear Documentation**: Document all public methods with examples
+- **Single Responsibility**: Each utility should have a clear, focused purpose
+- **Error Handling**: Centralize error handling patterns in utilities
+- **Type Safety**: Use TypeScript generics for flexible, type-safe utilities
+
+### 3. **Refactoring for Reuse**
+- **Look for Duplication**: Actively search for code patterns that repeat
+- **Extract Utilities**: Move duplicated logic to shared libraries
+- **Update All Usages**: Ensure all existing code uses the new utilities
+- **Maintain Tests**: Keep all tests passing during refactoring
+
+### 4. **Examples of Good Abstractions**
+```typescript
+// ❌ BAD: Duplicated Tree operations across files
+if (tree.exists(modulePath)) {
+  const files = tree.children(modulePath);
+  const sqlFiles = files.filter(f => f.endsWith('.surql'));
+}
+
+// ✅ GOOD: Shared utility for common operations
+import { TreeUtils } from '../../lib/tree-utils';
+const migrationFiles = TreeUtils.getMigrationFiles(tree, modulePath);
+```
+
+### 5. **Benefits of This Approach**
+- **DRY Principle**: Don't Repeat Yourself - write code once, use everywhere
+- **Consistency**: All components behave identically using shared logic
+- **Maintainability**: Updates happen in one place, benefit all users
+- **Testing**: Centralized testing of core functionality
+- **Extensibility**: New features can leverage existing utilities
+
 ## Documentation Access
 - For up-to-date library documentation, use Context7 MCP tools
 - Always check current docs for Next.js, React, SurrealDB, NX, and other key dependencies
@@ -42,6 +84,37 @@ Always include usage updates in responses showing:
 **User Plan:** Claude Max Pro ($100/month) - includes higher usage limits and priority access
 
 ## Development Workflow
+
+### Test-Driven Development (TDD) - MANDATORY
+**ALWAYS follow TDD methodology:**
+1. **Write Tests First**: Before implementing any feature, write comprehensive tests that define the expected behavior
+2. **Red Phase**: Run tests to confirm they fail (proving they test the right thing)
+3. **Green Phase**: Write minimal code to make tests pass
+4. **Refactor Phase**: Improve code quality while keeping tests green
+5. **Repeat**: For each new feature or bug fix
+
+### TDD Implementation Guidelines
+- **Never write production code without a failing test first**
+- Write the simplest test that could possibly fail
+- Write only enough production code to make the failing test pass
+- Refactor both test and production code to improve design
+- Each test should test one specific behavior
+- Use descriptive test names that explain the expected behavior
+- Mock external dependencies and filesystem operations in tests
+- Prefer integration tests for NX generators and executors
+
+### Test Quality Standards
+- **All tests must pass before committing any code**
+- **No timeouts in tests** - if a test times out, investigate the root cause:
+  - Check for infinite loops or blocking operations
+  - Verify mocks are properly configured
+  - Use debug logging to identify bottlenecks
+  - Consider if the code under test is doing too much
+- Use debug messages and logging to understand test failures
+- Test edge cases and error conditions
+- Ensure tests are deterministic and isolated
+
+### Commit Standards
 - Commit each major implementation milestone with descriptive messages
 - Use conventional commit format: feat/fix/refactor/docs followed by scope
 - Regular commits allow testing and rollback at each phase

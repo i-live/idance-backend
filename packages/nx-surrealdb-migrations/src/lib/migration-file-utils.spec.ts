@@ -231,15 +231,15 @@ describe('MigrationFileUtils', () => {
       expect(result).toBe('000_admin');
     });
 
-    it('should fill gaps in numbering', async () => {
+    it('should generate next number after highest existing', async () => {
       const existingModules = [
         { moduleId: '000_admin' },
-        { moduleId: '020_schema' } // gap at 010
+        { moduleId: '020_schema' } // highest is 020
       ];
 
       const result = MigrationFileUtils.generateModuleId('auth', existingModules);
       
-      expect(result).toBe('010_auth');
+      expect(result).toBe('030_auth'); // next after 020
     });
 
     it('should normalize module names', async () => {
@@ -256,8 +256,8 @@ describe('MigrationFileUtils', () => {
 
       const result = MigrationFileUtils.generateModuleId('new', existingModules);
       
-      // The algorithm fills gaps starting from 0, so it returns 000
-      expect(result).toBe('000_new');
+      // The algorithm finds next after highest (15), so returns 25
+      expect(result).toBe('025_new');
     });
   });
 

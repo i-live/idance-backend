@@ -39,6 +39,22 @@ describe('export-module generator', () => {
   beforeEach(() => {
     tree = createTreeWithEmptyWorkspace();
     
+    // Setup Tree with necessary files and directories
+    tree.write('database/.gitkeep', '');
+    tree.write('database/config.json', JSON.stringify({
+      modules: {
+        '010_auth': {
+          name: 'Authentication',
+          description: 'User authentication system',
+          depends: ['000_admin']
+        }
+      }
+    }));
+    
+    // Create migration files in Tree
+    tree.write('database/010_auth/0001_authentication_up.surql', 'DEFINE TABLE users;');
+    tree.write('database/010_auth/0001_authentication_down.surql', 'DROP TABLE users;');
+    
     // Mock MigrationEngine
     (MigrationEngine.findMatchingSubdirectory as jest.Mock).mockResolvedValue('010_auth');
     
@@ -56,30 +72,11 @@ describe('export-module generator', () => {
     // Mock execSync for tar/zip creation
     (execSync as jest.Mock).mockImplementation(() => {});
     
-    // Mock filesystem operations
+    // Mock filesystem operations for config loading
     mockFs.existsSync.mockImplementation((filePath: string) => {
-      // Handle both relative and absolute paths
-      const normalizedPath = filePath.replace(/^.*\//, '');
-      if (normalizedPath === 'database' || filePath.endsWith('/database')) return true;
-      if (normalizedPath.includes('010_auth')) return true;
-      if (normalizedPath.includes('config.json')) return true;
+      if (filePath.includes('config.json')) return true;
       return false;
     });
-    
-    mockFs.readdirSync.mockImplementation((dirPath: string) => {
-      if (dirPath.includes('database')) {
-        return ['000_admin', '010_auth', '020_schema'] as any;
-      }
-      if (dirPath.includes('010_auth')) {
-        return ['0001_authentication_up.surql', '0001_authentication_down.surql'] as any;
-      }
-      return [] as any;
-    });
-    
-    mockFs.statSync.mockImplementation(() => ({
-      isDirectory: () => true,
-      isFile: () => true,
-    } as any));
     
     mockFs.readFileSync.mockImplementation((filePath: string) => {
       if (filePath.includes('config.json')) {
@@ -92,9 +89,6 @@ describe('export-module generator', () => {
             }
           }
         });
-      }
-      if (filePath.includes('.surql')) {
-        return 'DEFINE TABLE users;';
       }
       return '';
     });
@@ -200,16 +194,15 @@ describe('export-module generator', () => {
   });
 
   it('should throw error for non-existent module', async () => {
-    mockFs.readdirSync.mockImplementation((dirPath: string) => {
-      if (dirPath.includes('database')) {
-        return ['000_admin', '020_schema'] as any; // Missing 010_auth
-      }
-      return [] as any;
-    });
+    // Create a fresh tree without the 010_auth module
+    const testTree = createTreeWithEmptyWorkspace();
+    testTree.write('database/.gitkeep', '');
+    testTree.write('database/000_admin/0001_setup_up.surql', 'DEFINE NAMESPACE test;');
+    testTree.write('database/020_schema/0001_schema_up.surql', 'DEFINE TABLE test;');
 
     const invalidOptions = { ...options, module: '999_nonexistent' };
     
-    await expect(generator(tree, invalidOptions)).rejects.toThrow(
+    await expect(generator(testTree, invalidOptions)).rejects.toThrow(
       "Module '999_nonexistent' not found"
     );
   });

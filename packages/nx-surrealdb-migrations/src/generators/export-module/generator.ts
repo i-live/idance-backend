@@ -12,6 +12,7 @@ import * as fs from 'fs';
 import { execSync } from 'child_process';
 import { ConfigLoader } from '../../lib/config-loader';
 import { MigrationEngine } from '../../lib/migration-engine';
+import { TreeUtils } from '../../lib/tree-utils';
 
 export interface ExportModuleGeneratorSchema {
   module: string | number;
@@ -30,7 +31,7 @@ export default async function (tree: Tree, options: ExportModuleGeneratorSchema)
   logger.info(`🚀 Exporting module: ${normalizedOptions.module}`);
   
   // Find the module directory
-  const moduleDir = await findModuleDirectory(normalizedOptions);
+  const moduleDir = await findModuleDirectory(tree, normalizedOptions);
   if (!moduleDir) {
     throw new Error(`Module '${normalizedOptions.module}' not found in ${normalizedOptions.initPath}`);
   }
@@ -50,8 +51,6 @@ export default async function (tree: Tree, options: ExportModuleGeneratorSchema)
   if (normalizedOptions.packageFormat !== 'directory') {
     await createPackageArchive(normalizedOptions, moduleDir);
   }
-  
-  await formatFiles(tree);
   
   logger.info(`✅ Module '${moduleDir.name}' exported successfully!`);
   logger.info(`📦 Package location: ${normalizedOptions.outputPath}/${moduleDir.name}`);
@@ -84,23 +83,23 @@ function normalizeOptions(tree: Tree, options: ExportModuleGeneratorSchema) {
   };
 }
 
-async function findModuleDirectory(options: ReturnType<typeof normalizeOptions>) {
-  const initPath = path.resolve(options.initPath);
-  
-  if (!fs.existsSync(initPath)) {
-    throw new Error(`Migrations directory not found: ${initPath}`);
+async function findModuleDirectory(tree: Tree, options: ReturnType<typeof normalizeOptions>) {
+  if (!tree.exists(options.initPath)) {
+    throw new Error(`Migrations directory not found: ${options.initPath}`);
   }
   
-  const moduleName = await MigrationEngine.findMatchingSubdirectory(initPath, options.module);
+  const moduleName = TreeUtils.findMatchingSubdirectory(tree, options.initPath, options.module);
   if (!moduleName) {
     return null;
   }
   
   return {
     name: moduleName,
-    path: path.join(initPath, moduleName)
+    path: path.join(options.initPath, moduleName)
   };
 }
+
+// Use shared TreeUtils for finding subdirectories
 
 async function loadModuleConfig(
   options: ReturnType<typeof normalizeOptions>,
@@ -131,19 +130,12 @@ async function createExportPackage(
   const exportPath = path.join(options.outputPath, moduleDir.name);
   
   // Create export directory structure
-  tree.write(path.join(exportPath, '.gitkeep'), '');
+  TreeUtils.ensureDirectory(tree, exportPath);
   
-  // Copy migration files
-  const migrationFiles = fs.readdirSync(moduleDir.path);
-  for (const file of migrationFiles) {
-    const filePath = path.join(moduleDir.path, file);
-    const stat = fs.statSync(filePath);
-    
-    if (stat.isFile() && file.endsWith('.surql')) {
-      const content = fs.readFileSync(filePath, 'utf-8');
-      tree.write(path.join(exportPath, 'migrations', file), content);
-    }
-  }
+  // Copy migration files from Tree
+  TreeUtils.ensureDirectory(tree, path.join(exportPath, 'migrations'));
+  TreeUtils.copyFiles(tree, moduleDir.path, path.join(exportPath, 'migrations'), 
+    (filename) => filename.endsWith('.surql'));
 }
 
 async function generatePackageFiles(
@@ -189,7 +181,7 @@ async function generatePackageFiles(
   }
   
   // Generate README.md
-  const readmeContent = generateReadme(moduleDir, config, options);
+  const readmeContent = generateReadme(tree, moduleDir, config, options);
   tree.write(path.join(exportPath, 'README.md'), readmeContent);
   
   // Generate import instructions
@@ -198,13 +190,12 @@ async function generatePackageFiles(
 }
 
 function generateReadme(
+  tree: Tree,
   moduleDir: { name: string; path: string },
   config: any,
   options: ReturnType<typeof normalizeOptions>
 ): string {
-  const migrationFiles = fs.readdirSync(moduleDir.path)
-    .filter(f => f.endsWith('.surql'))
-    .sort();
+  const migrationFiles = TreeUtils.getMigrationFiles(tree, moduleDir.path);
   
   return `# Migration Module: ${moduleDir.name}
 

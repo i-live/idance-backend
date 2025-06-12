@@ -5,6 +5,7 @@ import {
   readProjectConfiguration
 } from '@nx/devkit';
 import { MigrationFileUtils } from '../../lib/migration-file-utils';
+import { TreeUtils } from '../../lib/tree-utils';
 
 export interface MigrationGeneratorSchema {
   name: string;
@@ -57,7 +58,7 @@ async function resolveModuleInfo(
     // Try to find existing module
     const existingModule = await findExistingModule(tree, migrationsPath, String(modulePattern));
     if (existingModule) {
-      const nextNumber = await MigrationFileUtils.getNextMigrationNumber(existingModule.modulePath);
+      const nextNumber = getNextMigrationNumberFromTree(tree, existingModule.modulePath);
       return {
         moduleId: existingModule.moduleId,
         modulePath: existingModule.modulePath,
@@ -82,12 +83,16 @@ async function resolveModuleInfo(
   
   // Use the highest numbered module
   const lastModule = existingModules[existingModules.length - 1];
-  const nextNumber = await MigrationFileUtils.getNextMigrationNumber(lastModule.modulePath);
+  const nextNumber = getNextMigrationNumberFromTree(tree, lastModule.modulePath);
   return {
     moduleId: lastModule.moduleId,
     modulePath: lastModule.modulePath,
     nextMigrationNumber: nextNumber
   };
+}
+
+function getNextMigrationNumberFromTree(tree: Tree, modulePath: string): string {
+  return TreeUtils.getNextMigrationNumber(tree, modulePath);
 }
 
 async function findExistingModule(
@@ -126,27 +131,8 @@ async function discoverExistingModules(
   tree: Tree,
   migrationsPath: string
 ): Promise<{ moduleId: string; modulePath: string }[]> {
-  const modules: { moduleId: string; modulePath: string }[] = [];
-  
-  if (!tree.exists(migrationsPath)) {
-    return modules;
-  }
-  
-  const children = tree.children(migrationsPath);
-  for (const child of children) {
-    const fullPath = joinPathFragments(migrationsPath, child);
-    if (tree.isFile(fullPath)) continue;
-    
-    // Check if it matches module pattern XXX_name
-    if (/^\d{1,4}_/.test(child)) {
-      modules.push({
-        moduleId: child,
-        modulePath: fullPath
-      });
-    }
-  }
-  
-  return modules.sort((a, b) => a.moduleId.localeCompare(b.moduleId));
+  return TreeUtils.findModuleDirectories(tree, migrationsPath)
+    .map(({ name, path }) => ({ moduleId: name, modulePath: path }));
 }
 
 async function createNewModule(
@@ -170,9 +156,7 @@ async function createNewModule(
   const modulePath = joinPathFragments(migrationsPath, moduleId);
   
   // Create the module directory
-  if (!tree.exists(modulePath)) {
-    tree.write(joinPathFragments(modulePath, '.gitkeep'), '');
-  }
+  TreeUtils.ensureDirectory(tree, modulePath);
   
   return {
     moduleId,

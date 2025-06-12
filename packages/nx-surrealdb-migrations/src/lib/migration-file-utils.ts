@@ -125,18 +125,17 @@ export class MigrationFileUtils {
     const existingNumbers = existingModules
       .map(m => {
         const match = m.moduleId.match(this.SUBDIR_PATTERN);
-        return match ? parseInt(match[1], 10) : 0;
+        return match ? parseInt(match[1], 10) : -1;
       })
+      .filter(n => n >= 0)
       .sort((a, b) => a - b);
 
     // Use gapped numbering: 000, 010, 020, 030, etc.
+    // Find the next number after the highest existing number
     let nextNumber = 0;
-    for (const num of existingNumbers) {
-      if (num === nextNumber) {
-        nextNumber += 10;
-      } else {
-        break;
-      }
+    if (existingNumbers.length > 0) {
+      const highestNumber = existingNumbers[existingNumbers.length - 1];
+      nextNumber = highestNumber + 10;
     }
 
     const normalizedName = name.toLowerCase().replace(/[^a-z0-9]/g, '_');
