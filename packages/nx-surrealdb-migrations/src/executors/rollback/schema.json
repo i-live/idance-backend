@@ -1,15 +1,87 @@
 {
   "$schema": "http://json-schema.org/schema",
-  "title": "Rollback Executor",
-  "description": "Rollback the last SurrealDB migration",
+  "version": 2,
+  "title": "Rollback executor",
+  "description": "Rollback applied migrations from SurrealDB with dependency safety checks",
   "type": "object",
   "properties": {
-    "url": { "type": "string", "description": "SurrealDB URL" },
-    "namespace": { "type": "string", "description": "SurrealDB namespace" },
-    "database": { "type": "string", "description": "SurrealDB database" },
-    "username": { "type": "string", "description": "SurrealDB username" },
-    "password": { "type": "string", "description": "SurrealDB password" },
-    "migrationsDir": { "type": "string", "description": "Path to migrations", "default": "migrations" }
+    "url": {
+      "type": "string",
+      "description": "SurrealDB connection URL (e.g., ws://localhost:8000)",
+      "default": ""
+    },
+    "user": {
+      "type": "string",
+      "description": "SurrealDB username",
+      "default": ""
+    },
+    "pass": {
+      "type": "string",
+      "description": "SurrealDB password",
+      "default": ""
+    },
+    "namespace": {
+      "type": "string",
+      "description": "SurrealDB namespace",
+      "default": ""
+    },
+    "database": {
+      "type": "string",
+      "description": "SurrealDB database",
+      "default": ""
+    },
+    "module": {
+      "oneOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "number"
+        }
+      ],
+      "description": "Target specific module by name (e.g., 'auth'), number (e.g., 10), or full directory name (e.g., '010_auth')",
+      "default": ""
+    },
+    "envFile": {
+      "type": "string",
+      "description": "Path to environment file relative to workspace root",
+      "default": ""
+    },
+    "useTransactions": {
+      "type": "boolean",
+      "description": "Wrap rollbacks in database transactions",
+      "default": true
+    },
+    "initPath": {
+      "type": "string",
+      "description": "Path to migrations directory",
+      "default": "database"
+    },
+    "schemaPath": {
+      "type": "string",
+      "description": "Path to custom schema file",
+      "default": ""
+    },
+    "force": {
+      "type": "boolean",
+      "description": "Force rollback even if safety checks fail (bypass dependency validation)",
+      "default": false
+    },
+    "configPath": {
+      "type": "string",
+      "description": "Path to configuration file (config.json or config.yaml)",
+      "default": ""
+    },
+    "dryRun": {
+      "type": "boolean",
+      "description": "Show what rollbacks would be applied without executing them",
+      "default": false
+    },
+    "steps": {
+      "type": "number",
+      "description": "Number of migration steps to rollback (default: 1, use 0 for all)",
+      "default": 1
+    }
   },
-  "required": ["url", "namespace", "database", "username", "password"]
+  "additionalProperties": false
 }

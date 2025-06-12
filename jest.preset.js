@@ -7,5 +7,7 @@ module.exports = {
   transform: {
     '^.+\\.(ts|mjs|js)$': ['ts-jest', { tsconfig: '<rootDir>/tsconfig.base.json' }]
   },
-  resolver: '@nx/jest/plugins/resolver'
+  resolver: '@nx/jest/plugins/resolver',
+  maxWorkers: 2,
+  workerIdleMemoryLimit: '512MB'
 };

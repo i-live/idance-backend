@@ -21,7 +21,11 @@
       ],
       "@idance/types": ["packages/types/src/index.ts"],
       "@idance/ui": ["packages/ui/src/index.ts"],
-      "@idance/utils": ["packages/utils/src/index.ts"]
+      "@idance/utils": ["packages/utils/src/index.ts"],
+      "db-admin": ["database/modules/admin/src/index.ts"],
+      "db-auth": ["database/modules/auth/src/index.ts"],
+      "db-communications": ["database/modules/communications/src/index.ts"],
+      "db-content": ["database/modules/content/src/index.ts"]
     }
   },
   "exclude": ["node_modules", "tmp"]

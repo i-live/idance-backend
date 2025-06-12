@@ -1,40 +1,16 @@
 import { createTreeWithEmptyWorkspace } from '@nx/devkit/testing';
 import { Tree } from '@nx/devkit';
-import migrationGenerator from './generator';
+import { migrationGenerator } from './generator';
 
-// Mock url and path modules to handle ESM compatibility
-jest.mock('url', () => {
-  const actualUrl = jest.requireActual('url');
-  return {
-    ...actualUrl,
-    fileURLToPath: jest.fn().mockReturnValue('/mock/path')
-  };
-});
-
-jest.mock('path', () => {
-  const actualPath = jest.requireActual('path');
-  return {
-    ...actualPath,
-    dirname: jest.fn().mockReturnValue('/mock/dir')
-  };
-});
-
-describe('migration generator', () => {
+// Simple test for modular migration generator
+describe('migration generator - modular', () => {
   let tree: Tree;
-  let timestamp: string;
 
   beforeEach(() => {
     tree = createTreeWithEmptyWorkspace();
-    timestamp = '20250603161244';
-    jest.useFakeTimers().setSystemTime(new Date('2025-06-03T18:12:44.042Z'));
   });
 
-  afterEach(() => {
-    jest.useRealTimers();
-    jest.clearAllMocks();
-  });
-
-  it('should generate migration files', async () => {
+  it('should generate migration files in new module', async () => {
     tree.write('database/project.json', JSON.stringify({
       name: 'database',
       root: 'database'
@@ -45,15 +21,69 @@ describe('migration generator', () => {
       project: 'database'
     });
 
-    const upFile = `database/migrations/${timestamp}__create-user-table__up.surql`;
-    const downFile = `database/migrations/${timestamp}__create-user-table__down.surql`;
+    // Should create 000_admin module with migration files
+    expect(tree.exists('database/migrations/000_admin')).toBe(true);
+    
+    const moduleFiles = tree.children('database/migrations/000_admin');
+    const migrationFiles = moduleFiles.filter(f => f.endsWith('.surql'));
+    
+    expect(migrationFiles.length).toBe(2);
+    expect(migrationFiles.some(f => f.includes('create_user_table') && f.includes('up'))).toBe(true);
+    expect(migrationFiles.some(f => f.includes('create_user_table') && f.includes('down'))).toBe(true);
+    
+    // Check file naming follows XXXX_name_direction.surql pattern
+    expect(migrationFiles.some(f => f.match(/^0001_create_user_table_up\.surql$/))).toBe(true);
+    expect(migrationFiles.some(f => f.match(/^0001_create_user_table_down\.surql$/))).toBe(true);
+  });
 
-    expect(tree.exists(upFile)).toBeTruthy();
-    expect(tree.exists(downFile)).toBeTruthy();
+  it('should generate migration in existing module', async () => {
+    tree.write('database/project.json', JSON.stringify({
+      name: 'database',
+      root: 'database'
+    }));
+    
+    // Create existing module with existing migration
+    tree.write('database/migrations/010_auth/0001_authentication_up.surql', '-- existing migration');
+    tree.write('database/migrations/010_auth/0001_authentication_down.surql', '-- existing migration');
 
-    const upContent = tree.read(upFile, 'utf-8');
-    expect(upContent).toContain('Migration: create-user-table');
-    expect(upContent).toContain('Created at:');
+    await migrationGenerator(tree, {
+      name: 'add-user-roles',
+      project: 'database',
+      module: '010_auth'
+    });
+
+    const moduleFiles = tree.children('database/migrations/010_auth');
+    const migrationFiles = moduleFiles.filter(f => f.endsWith('.surql'));
+    
+    expect(migrationFiles.length).toBe(4); // 2 existing + 2 new
+    expect(migrationFiles.some(f => f.includes('0002_add_user_roles_up'))).toBe(true);
+    expect(migrationFiles.some(f => f.includes('0002_add_user_roles_down'))).toBe(true);
+  });
+
+  it('should create new module when specified', async () => {
+    tree.write('database/project.json', JSON.stringify({
+      name: 'database',
+      root: 'database'
+    }));
+    
+    // Create existing module to test numbering
+    tree.write('database/migrations/010_auth/.gitkeep', '');
+
+    await migrationGenerator(tree, {
+      name: 'create-schema',
+      project: 'database',
+      module: 'schema',
+      createModule: true
+    });
+
+    // Should create 020_schema module (next available gapped number)
+    expect(tree.exists('database/migrations/020_schema')).toBe(true);
+    
+    const moduleFiles = tree.children('database/migrations/020_schema');
+    const migrationFiles = moduleFiles.filter(f => f.endsWith('.surql'));
+    
+    expect(migrationFiles.length).toBe(2);
+    expect(migrationFiles.some(f => f.includes('0001_create_schema_up'))).toBe(true);
   });
 
   it('should throw error without name', async () => {
@@ -63,30 +93,16 @@ describe('migration generator', () => {
     })).rejects.toThrow('The "name" property is required');
   });
 
-  it('should use custom migrations directory', async () => {
+  it('should throw error for non-existent module without createModule', async () => {
     tree.write('database/project.json', JSON.stringify({
       name: 'database',
       root: 'database'
     }));
 
-    await migrationGenerator(tree, {
-      name: 'test',
+    await expect(migrationGenerator(tree, {
+      name: 'test-migration',
       project: 'database',
-      migrationsDir: 'custom-migrations'
-    });
-
-    const files = tree.children('database/custom-migrations');
-    expect(files.length).toEqual(2);
-    
-    // More specific file matching
-    const expectedPattern = new RegExp(`^${timestamp}_____test___(up|down)\\.surql$`);
-    expect(files.every(file => expectedPattern.test(file))).toBeTruthy();
-    
-    // Verify file contents to ensure proper generation
-    const upFile = files.find(f => f.endsWith('up.surql'));
-    const downFile = files.find(f => f.endsWith('down.surql'));
-    
-    expect(upFile).toBeDefined();
-    expect(downFile).toBeDefined();
+      module: 'nonexistent'
+    })).rejects.toThrow('Module \'nonexistent\' not found');
   });
 });

@@ -1,24 +1,24 @@
 {
   "executors": {
-    "initialize": {
-      "implementation": "../../../dist/packages/nx-surrealdb-migrations/src/executors/initialize/executor.js",
-      "schema": "../../../dist/packages/nx-surrealdb-migrations/src/executors/initialize/schema.json",
-      "description": "Initialize SurrealDB migrations"
-    },
     "migrate": {
       "implementation": "../../../dist/packages/nx-surrealdb-migrations/src/executors/migrate/executor.js",
       "schema": "../../../dist/packages/nx-surrealdb-migrations/src/executors/migrate/schema.json",
-      "description": "Run pending SurrealDB migrations"
+      "description": "Apply pending migrations to SurrealDB with dependency resolution"
     },
     "rollback": {
       "implementation": "../../../dist/packages/nx-surrealdb-migrations/src/executors/rollback/executor.js",
       "schema": "../../../dist/packages/nx-surrealdb-migrations/src/executors/rollback/schema.json",
-      "description": "Rollback the last SurrealDB migration"
+      "description": "Rollback applied migrations from SurrealDB with dependency safety checks"
     },
     "status": {
       "implementation": "../../../dist/packages/nx-surrealdb-migrations/src/executors/status/executor.js",
       "schema": "../../../dist/packages/nx-surrealdb-migrations/src/executors/status/schema.json",
-      "description": "Check migration status"
+      "description": "Show migration status and dependency information for SurrealDB"
+    },
+    "reset": {
+      "implementation": "../../../dist/packages/nx-surrealdb-migrations/src/executors/reset/executor.js",
+      "schema": "../../../dist/packages/nx-surrealdb-migrations/src/executors/reset/schema.json",
+      "description": "Reset migration tracking table and clear all migration history"
     }
   }
 }

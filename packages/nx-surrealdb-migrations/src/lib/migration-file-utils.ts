@@ -1,5 +1,17 @@
 import * as fs from 'fs/promises';
+import * as path from 'path';
 import { replaceEnvVars } from './env';
+
+export interface MigrationFile {
+  number: string;
+  name: string;
+  direction: 'up' | 'down';
+  filename: string;
+  filePath: string;
+  moduleId: string;
+  content: string;
+  checksum: string;
+}
 
 export interface MigrationContext {
   defaultNamespace?: string;
@@ -7,15 +19,7 @@ export interface MigrationContext {
   useTransactions?: boolean;
 }
 
-export interface MigrationFile {
-  number: string;
-  name: string;
-  direction: 'up' | 'down';
-  fullPath: string;
-  content: string;
-}
-
-export class MigrationFileProcessor {
+export class MigrationFileUtils {
   private static readonly MIGRATION_PATTERN = /^(\d{4})_(.+?)_(up|down)\.surql$/;
   private static readonly SUBDIR_PATTERN = /^(\d{1,4})_(.+)$/;
   private static readonly NAMESPACE_OPERATIONS = /(?:DEFINE|USE|REMOVE)\s+NAMESPACE/i;
@@ -28,54 +32,132 @@ export class MigrationFileProcessor {
     try {
       const subDirs = await fs.readdir(basePath, { withFileTypes: true });
       const directories = subDirs.filter(d => d.isDirectory()).map(d => d.name);
-      console.log('Subdirectories in', basePath, ':', directories);
 
-      const normalizedPattern = pattern.trim().toLowerCase().replace(/^0+/, '');
-      console.log('Normalized pattern:', normalizedPattern);
+      const normalizedPattern = pattern.trim().toLowerCase();
+      const patternAsNumber = parseInt(normalizedPattern, 10);
+      const normalizedPatternNumber = isNaN(patternAsNumber) ? null : patternAsNumber.toString();
 
       for (const dirName of directories) {
         const normalizedDirName = dirName.toLowerCase();
         const match = normalizedDirName.match(this.SUBDIR_PATTERN);
-        if (!match) {
-          console.log(`Directory ${dirName} does not match SUBDIR_PATTERN`);
-          continue;
-        }
+        if (!match) continue;
 
         const [, number, name] = match;
         const normalizedNumber = parseInt(number, 10).toString();
-        console.log(`Processing directory: ${dirName}, number: ${number}, normalizedNumber: ${normalizedNumber}, name: ${name}`);
 
-        // Match by full directory name, number, name, or number_name
         if (
           normalizedDirName === normalizedPattern ||
-          normalizedPattern === normalizedNumber ||
+          (normalizedPatternNumber !== null && normalizedPatternNumber === normalizedNumber) ||
           normalizedPattern === name.toLowerCase() ||
           normalizedPattern === `${normalizedNumber}_${name.toLowerCase()}` ||
           normalizedPattern === `${number}_${name.toLowerCase()}`
         ) {
-          console.log(`Matched subdirectory: ${dirName} for pattern: ${pattern}`);
           return dirName;
         }
       }
-      console.log(`No subdirectory matched for pattern: ${pattern}`);
       return null;
     } catch (error) {
-      console.error(`Error reading directory ${basePath}:`, error);
       throw new Error(`Failed to read subdirectories in ${basePath}: ${error.message}`);
     }
   }
 
-  static parseMigrationFile(filename: string, basePath?: string): MigrationFile | null {
+  static async discoverModules(basePath: string): Promise<Array<{ moduleId: string; modulePath: string }>> {
+    try {
+      const subDirs = await fs.readdir(basePath, { withFileTypes: true });
+      const modules: Array<{ moduleId: string; modulePath: string }> = [];
+
+      for (const dirent of subDirs) {
+        if (dirent.isDirectory() && this.SUBDIR_PATTERN.test(dirent.name)) {
+          modules.push({
+            moduleId: dirent.name,
+            modulePath: path.join(basePath, dirent.name)
+          });
+        }
+      }
+
+      // Sort by module number
+      return modules.sort((a, b) => {
+        const aMatch = a.moduleId.match(this.SUBDIR_PATTERN);
+        const bMatch = b.moduleId.match(this.SUBDIR_PATTERN);
+        if (!aMatch || !bMatch) return 0;
+        return parseInt(aMatch[1], 10) - parseInt(bMatch[1], 10);
+      });
+    } catch (error) {
+      if (error.code === 'ENOENT') {
+        return [];
+      }
+      throw new Error(`Failed to discover modules in ${basePath}: ${error.message}`);
+    }
+  }
+
+  static async getNextMigrationNumber(modulePath: string): Promise<string> {
+    try {
+      const files = await fs.readdir(modulePath);
+      const migrationFiles = files.filter(f => this.MIGRATION_PATTERN.test(f));
+      
+      if (migrationFiles.length === 0) {
+        return '0001';
+      }
+
+      // Find the highest migration number
+      let maxNumber = 0;
+      for (const file of migrationFiles) {
+        const match = file.match(this.MIGRATION_PATTERN);
+        if (match) {
+          const number = parseInt(match[1], 10);
+          if (number > maxNumber) {
+            maxNumber = number;
+          }
+        }
+      }
+
+      return String(maxNumber + 1).padStart(4, '0');
+    } catch (error) {
+      if (error.code === 'ENOENT') {
+        return '0001';
+      }
+      throw new Error(`Failed to get next migration number for ${modulePath}: ${error.message}`);
+    }
+  }
+
+  static generateModuleId(name: string, existingModules: Array<{ moduleId: string }>): string {
+    // Find the next available module number with gapped numbering
+    const existingNumbers = existingModules
+      .map(m => {
+        const match = m.moduleId.match(this.SUBDIR_PATTERN);
+        return match ? parseInt(match[1], 10) : -1;
+      })
+      .filter(n => n >= 0)
+      .sort((a, b) => a - b);
+
+    // Use gapped numbering: 000, 010, 020, 030, etc.
+    // Find the next number after the highest existing number
+    let nextNumber = 0;
+    if (existingNumbers.length > 0) {
+      const highestNumber = existingNumbers[existingNumbers.length - 1];
+      nextNumber = highestNumber + 10;
+    }
+
+    const normalizedName = name.toLowerCase().replace(/[^a-z0-9]/g, '_');
+    return `${String(nextNumber).padStart(3, '0')}_${normalizedName}`;
+  }
+
+  static parseMigrationFile(filename: string, basePath?: string, moduleId?: string): MigrationFile | null {
     const match = filename.match(this.MIGRATION_PATTERN);
     if (!match) return null;
 
     const [, number, name, direction] = match;
+    const filePath = basePath ? path.join(basePath, filename) : filename;
+    
     return {
       number,
       name,
       direction: direction as 'up' | 'down',
-      fullPath: basePath ? `${basePath}/${filename}` : filename,
-      content: ''
+      filename,
+      filePath,
+      moduleId: moduleId || '',
+      content: '',
+      checksum: ''
     };
   }
 
@@ -98,11 +180,9 @@ export class MigrationFileProcessor {
 
   static filterMigrationFiles(files: string[], filePattern?: string, direction: 'up' | 'down' = 'up'): string[] {
     let filtered = files.filter(f => f.endsWith(`_${direction}.surql`));
-    console.log(`Filtered files for ${direction}:`, filtered);
 
     if (filePattern) {
       filtered = filtered.filter(f => this.matchesMigrationPattern(f, filePattern));
-      console.log(`Filtered files for pattern ${filePattern}:`, filtered);
     }
 
     return direction === 'down' ? filtered.reverse() : filtered.sort();
@@ -120,21 +200,17 @@ export class MigrationFileProcessor {
     
     if (!hasNamespaceOperation && context.defaultNamespace) {
       statements.push(`USE NAMESPACE ${context.defaultNamespace};`);
-      console.log(`Using namespace: ${context.defaultNamespace}\n`)
     }
     if (!hasDatabaseOperation && context.defaultDatabase) {
       statements.push(`USE DATABASE ${context.defaultDatabase};`);
-      console.log(`Using database: ${context.defaultDatabase}\n`)
     }
 
     if (hasDDLOperation || !context.useTransactions || hasBeginTransaction || hasCommitTransaction) {
       statements.push(processed);
-      console.log(`No Transaction Block Added. \nDDL Operation: ${hasDDLOperation}`)
     } else {
       statements.push('BEGIN TRANSACTION;');
       statements.push(processed);
       statements.push('COMMIT TRANSACTION;');
-      console.log(`Added Transaction Block.\n`)
     }
 
     return statements.join('\n\n');

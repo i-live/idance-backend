@@ -1,16 +1,106 @@
-# Enhanced Database Migrations v3.0
+# Modular Database Migrations v4.0
 
-This directory contains the enhanced database schema and migration system for the iDance platform using SurrealDB with comprehensive migration tracking, rollback support, and dynamic discovery.
+This directory contains a modular migration system designed for the iDance NX monorepo. The system supports:
+
+- **Module-based organization** with dependency management
+- **Application-specific deployments** using only required modules  
+- **Environment-specific configurations** (dev/staging/prod)
+- **NX integration** for dependency tracking and build optimization
+- **Legacy simple structure support** for existing projects
 
 ## 🚀 Quick Start
 
+### New Modular Approach
+```bash
+# Migrate backoffice app for development
+nx run nx-surrealdb-migrations:migrate-app --app=backoffice --environment=dev
+
+# Migrate mobile app for production
+nx run nx-surrealdb-migrations:migrate-app --app=mobile --environment=prod
+
+# Check application configuration
+cat database/applications/backoffice/app.json
+```
+
+### Legacy Simple Approach
 ```bash
 # Run all migrations (from project root)
 pnpm db:migrate
 
-# Or from database directory
+# Or from database directory  
 ./scripts/run-migration.sh
 ```
+
+## 📁 New Modular Structure
+
+```
+database/
+├── modules/              # Core migration modules (NX libraries)
+│   ├── admin/           # System setup, environments
+│   ├── auth/            # Authentication core (used by ALL apps)
+│   ├── communications/  # Messaging, notifications
+│   └── content/         # Content management
+├── applications/        # App-specific migrations
+│   ├── backoffice/     # Admin-specific schema
+│   ├── user-sites/     # User site specific  
+│   └── mobile/         # Mobile app specific
+└── seeds/              # Environment-specific data
+    ├── dev/
+    ├── staging/
+    └── prod/
+```
+
+## 🔗 Module Dependencies
+
+The system automatically resolves dependencies:
+- `admin` → No dependencies (foundation)
+- `auth` → Depends on `admin`
+- `communications` → Depends on `admin`, `auth`
+- `content` → Depends on `admin`, `auth`
+
+### Application Configurations
+
+Each application declares which modules it needs:
+
+**backoffice** (admin dashboard):
+- Uses: `admin`, `auth`, `content`, `communications`
+- All features available
+
+**user-sites** (public sites):  
+- Uses: `admin`, `auth`, `content`
+- No messaging features
+
+**mobile** (mobile app):
+- Uses: `admin`, `auth`, `communications`  
+- No content management
+
+## ✅ Benefits vs. Simple Directory Structure
+
+**Advantages:**
+- **Dependency safety**: Ensures auth tables exist before communications
+- **Module reusability**: Auth module used across all apps
+- **Partial deployments**: Mobile app doesn't get content migrations
+- **NX integration**: Leverages existing monorepo tooling
+- **Version tracking**: Each module has clear version history
+
+**Trade-offs:**
+- **Learning curve**: Developers need to understand module structure
+- **File organization**: More files to navigate than flat structure
+- **Configuration overhead**: Module and app configs required
+
+### When to Use Modular vs. Simple
+
+**Use modular approach when:**
+- Multiple applications with different feature sets
+- Need controlled partial deployments
+- Team is comfortable with NX libraries
+- Long-term maintainability is priority
+
+**Use simple directory approach when:**
+- Single application or very similar apps
+- All apps always use all features
+- Team prefers simplicity over modularity
+- Rapid prototyping phase
 
 ## 🔧 Enhanced Features
 

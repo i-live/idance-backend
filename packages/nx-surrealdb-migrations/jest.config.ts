@@ -3,6 +3,8 @@ export default {
   displayName: 'nx-surrealdb-migrations',
   preset: '../../jest.preset.js',
   testEnvironment: 'node',
+  maxWorkers: 1,
+  workerIdleMemoryLimit: '1024MB',
   transform: {
     '^.+\\.[tj]s$': ['ts-jest', {
       tsconfig: '<rootDir>/tsconfig.spec.json',

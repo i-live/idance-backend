@@ -6,6 +6,7 @@
     "build": {
       "executor": "@nx/js:tsc",
       "outputs": ["{options.outputPath}"],
+      "cache": false,
       "options": {
         "outputPath": "dist/packages/nx-surrealdb-migrations",
         "main": "packages/nx-surrealdb-migrations/src/index.ts",
@@ -28,12 +29,21 @@
           },
           {
             "input": "packages/nx-surrealdb-migrations/src/schema",
-            "glob": "*.surql",
+            "glob": "**/*",
             "output": "src/schema"
           }
         ],
         "updateBuildableProjectDepsInPackageJson": true,
         "buildableProjectDepsInPackageJsonType": "dependencies"
+      },
+      "configurations": {
+        "production": {}
+      }
+    },
+    "copy-schema": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "mkdir -p dist/packages/nx-surrealdb-migrations/src/schema && cp packages/nx-surrealdb-migrations/src/schema/system_migrations.surql dist/packages/nx-surrealdb-migrations/src/schema/"
       }
     },
     "lint": {
@@ -42,6 +52,7 @@
     "test": {
       "executor": "@nx/jest:jest",
       "outputs": ["{workspaceRoot}/coverage/{projectRoot}"],
+      "cache": false,
       "options": {
         "jestConfig": "packages/nx-surrealdb-migrations/jest.config.ts"
       }
