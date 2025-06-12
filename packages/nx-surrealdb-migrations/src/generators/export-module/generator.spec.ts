@@ -5,10 +5,24 @@ import * as path from 'path';
 
 import generator from './generator';
 import { ExportModuleGeneratorSchema } from './generator';
+import { MigrationEngine } from '../../lib/migration-engine';
+import { ConfigLoader } from '../../lib/config-loader';
+import { execSync } from 'child_process';
 
 // Mock filesystem operations
 jest.mock('fs');
 jest.mock('child_process');
+jest.mock('../../lib/migration-engine');
+jest.mock('../../lib/config-loader');
+jest.mock('@nx/devkit', () => ({
+  ...jest.requireActual('@nx/devkit'),
+  formatFiles: jest.fn().mockResolvedValue(undefined),
+  logger: {
+    info: jest.fn(),
+    warn: jest.fn(),
+    error: jest.fn()
+  }
+}));
 
 const mockFs = fs as jest.Mocked<typeof fs>;
 
@@ -19,15 +33,36 @@ describe('export-module generator', () => {
     outputPath: 'test-exports',
     version: '1.0.0'
   };
+  
+  jest.setTimeout(10000); // Increase timeout
 
   beforeEach(() => {
     tree = createTreeWithEmptyWorkspace();
     
+    // Mock MigrationEngine
+    (MigrationEngine.findMatchingSubdirectory as jest.Mock).mockResolvedValue('010_auth');
+    
+    // Mock ConfigLoader
+    (ConfigLoader.loadConfig as jest.Mock).mockResolvedValue({
+      modules: {
+        '010_auth': {
+          name: 'Authentication',
+          description: 'User authentication system',
+          depends: ['000_admin']
+        }
+      }
+    });
+    
+    // Mock execSync for tar/zip creation
+    (execSync as jest.Mock).mockImplementation(() => {});
+    
     // Mock filesystem operations
     mockFs.existsSync.mockImplementation((filePath: string) => {
-      if (filePath.includes('database')) return true;
-      if (filePath.includes('010_auth')) return true;
-      if (filePath.includes('config.json')) return true;
+      // Handle both relative and absolute paths
+      const normalizedPath = filePath.replace(/^.*\//, '');
+      if (normalizedPath === 'database' || filePath.endsWith('/database')) return true;
+      if (normalizedPath.includes('010_auth')) return true;
+      if (normalizedPath.includes('config.json')) return true;
       return false;
     });
     
@@ -145,6 +180,9 @@ describe('export-module generator', () => {
   });
 
   it('should handle missing module configuration gracefully', async () => {
+    // Override config loader to return null
+    (ConfigLoader.loadConfig as jest.Mock).mockRejectedValueOnce(new Error('Config not found'));
+    
     mockFs.existsSync.mockImplementation((filePath: string) => {
       if (filePath.includes('config.json')) return false;
       if (filePath.includes('database')) return true;

@@ -2,7 +2,6 @@ import { Migration } from './types';
 import { SurrealDBClient } from './client';
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import { PreparedQuery } from 'surrealdb';
 
 export class MigrationTracker {
   constructor(

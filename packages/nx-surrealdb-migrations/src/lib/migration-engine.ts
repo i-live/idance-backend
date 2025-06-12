@@ -6,135 +6,9 @@ import { SurrealDBClient } from './client';
 import { MigrationTracker } from './migration-tracker';
 import { ConfigLoader } from './config-loader';
 import { DependencyResolver } from './dependency-resolver';
+import { MigrationFileUtils, type MigrationFile, type MigrationContext } from './migration-file-utils';
 import { replaceEnvVars, loadEnvFile } from './env';
 import { resolveProjectPath } from './project';
-
-// Migration file processing utilities (consolidated from migration-file.ts)
-interface MigrationContext {
-  defaultNamespace?: string;
-  defaultDatabase?: string;
-  useTransactions?: boolean;
-}
-
-interface MigrationFile {
-  number: string;
-  name: string;
-  direction: 'up' | 'down';
-  fullPath: string;
-  content: string;
-}
-
-class MigrationFileUtils {
-  private static readonly MIGRATION_PATTERN = /^(\d{4})_(.+?)_(up|down)\.surql$/;
-  private static readonly SUBDIR_PATTERN = /^(\d{1,4})_(.+)$/;
-  private static readonly NAMESPACE_OPERATIONS = /(?:DEFINE|USE|REMOVE)\s+NAMESPACE/i;
-  private static readonly DATABASE_OPERATIONS = /(?:DEFINE|USE|REMOVE)\s+DATABASE/i;
-  private static readonly DDL_OPERATIONS = /^\s*(DEFINE|REMOVE)\s+(NAMESPACE|DATABASE|TABLE|FIELD|INDEX|FUNCTION)/im;
-  private static readonly TRANSACTION_BEGIN = /BEGIN\s+TRANSACTION/i;
-  private static readonly TRANSACTION_COMMIT = /COMMIT\s+TRANSACTION/i;
-
-  static async findMatchingSubdirectory(basePath: string, pattern: string): Promise<string | null> {
-    try {
-      const subDirs = await fs.readdir(basePath, { withFileTypes: true });
-      const directories = subDirs.filter(d => d.isDirectory()).map(d => d.name);
-
-      const normalizedPattern = pattern.trim().toLowerCase();
-      const patternAsNumber = parseInt(normalizedPattern, 10);
-      const normalizedPatternNumber = isNaN(patternAsNumber) ? null : patternAsNumber.toString();
-
-      for (const dirName of directories) {
-        const normalizedDirName = dirName.toLowerCase();
-        const match = normalizedDirName.match(this.SUBDIR_PATTERN);
-        if (!match) continue;
-
-        const [, number, name] = match;
-        const normalizedNumber = parseInt(number, 10).toString();
-
-        if (
-          normalizedDirName === normalizedPattern ||
-          (normalizedPatternNumber !== null && normalizedPatternNumber === normalizedNumber) ||
-          normalizedPattern === name.toLowerCase() ||
-          normalizedPattern === `${normalizedNumber}_${name.toLowerCase()}` ||
-          normalizedPattern === `${number}_${name.toLowerCase()}`
-        ) {
-          return dirName;
-        }
-      }
-      return null;
-    } catch (error) {
-      throw new Error(`Failed to read subdirectories in ${basePath}: ${error.message}`);
-    }
-  }
-
-  static parseMigrationFile(filename: string, basePath?: string): MigrationFile | null {
-    const match = filename.match(this.MIGRATION_PATTERN);
-    if (!match) return null;
-
-    const [, number, name, direction] = match;
-    return {
-      number,
-      name,
-      direction: direction as 'up' | 'down',
-      fullPath: basePath ? `${basePath}/${filename}` : filename,
-      content: ''
-    };
-  }
-
-  static matchesMigrationPattern(filename: string, pattern: string): boolean {
-    const migration = this.parseMigrationFile(filename);
-    if (!migration) return false;
-
-    const normalizedPattern = pattern.trim().toLowerCase().replace(/^0+/, '');
-    const normalizedNumber = parseInt(migration.number, 10).toString();
-
-    return (
-      filename.toLowerCase() === pattern.toLowerCase() ||
-      filename.toLowerCase() === `${pattern.toLowerCase()}.surql` ||
-      normalizedPattern === normalizedNumber ||
-      normalizedPattern === migration.name.toLowerCase() ||
-      normalizedPattern === `${normalizedNumber}_${migration.name.toLowerCase()}` ||
-      normalizedPattern === `${migration.number}_${migration.name.toLowerCase()}`
-    );
-  }
-
-  static filterMigrationFiles(files: string[], filePattern?: string, direction: 'up' | 'down' = 'up'): string[] {
-    let filtered = files.filter(f => f.endsWith(`_${direction}.surql`));
-
-    if (filePattern) {
-      filtered = filtered.filter(f => this.matchesMigrationPattern(f, filePattern));
-    }
-
-    return direction === 'down' ? filtered.reverse() : filtered.sort();
-  }
-
-  static processContent(content: string, context: MigrationContext): string {
-    const processed = replaceEnvVars(content);
-    const statements: string[] = [];
-
-    const hasNamespaceOperation = this.NAMESPACE_OPERATIONS.test(processed);
-    const hasDatabaseOperation = this.DATABASE_OPERATIONS.test(processed);
-    const hasDDLOperation = this.DDL_OPERATIONS.test(processed);
-    const hasBeginTransaction = this.TRANSACTION_BEGIN.test(processed);
-    const hasCommitTransaction = this.TRANSACTION_COMMIT.test(processed);
-    
-    if (!hasNamespaceOperation && context.defaultNamespace) {
-      statements.push(`USE NAMESPACE ${context.defaultNamespace};`);
-    }
-    if (!hasDatabaseOperation && context.defaultDatabase) {
-      statements.push(`USE DATABASE ${context.defaultDatabase};`);
-    }
-
-    if (hasDDLOperation || !context.useTransactions || hasBeginTransaction || hasCommitTransaction) {
-      statements.push(processed);
-    } else {
-      statements.push('BEGIN TRANSACTION;');
-      statements.push(processed);
-      statements.push('COMMIT TRANSACTION;');
-    }
-
-    return statements.join('\n\n');
-  }
-}
 
 export interface MigrationEngineOptions {
   url: string;
@@ -170,16 +44,6 @@ export interface ResolvedMigrationOptions {
   configPath?: string;
 }
 
-export interface MigrationFile {
-  number: string;
-  name: string;
-  direction: 'up' | 'down';
-  filename: string;
-  filePath: string;
-  moduleId: string;
-  content: string;
-  checksum: string;
-}
 
 export interface MigrationResult {
   success: boolean;
@@ -200,6 +64,7 @@ export interface MigrationFileResult {
 
 export class MigrationEngine {
   private context: MigrationExecutionContext | null = null;
+  private options: MigrationEngineOptions | null = null;
 
   constructor(private projectContext?: any) {}
 
@@ -209,6 +74,9 @@ export class MigrationEngine {
   }
 
   async initialize(options: MigrationEngineOptions): Promise<void> {
+    // Store options for later use
+    this.options = options;
+    
     // Load environment variables
     if (this.projectContext && options.envFile) {
       loadEnvFile(this.projectContext, options.envFile);
@@ -676,9 +544,8 @@ export class MigrationEngine {
   private async countAppliedMigrations(moduleId: string): Promise<number> {
     if (!this.context) return 0;
     
-    // This would need to query the migration tracker for applied migrations in this module
-    // For now, return 0 as placeholder
-    return 0;
+    const appliedMigrations = await this.getAppliedMigrations(moduleId);
+    return appliedMigrations.length;
   }
 
   private async countPendingMigrations(moduleId: string): Promise<number> {
@@ -698,9 +565,12 @@ export class MigrationEngine {
   private async getLastAppliedMigration(moduleId: string): Promise<Date | undefined> {
     if (!this.context) return undefined;
     
-    // This would need to query the migration tracker for the last applied migration
-    // For now, return undefined as placeholder
-    return undefined;
+    const appliedMigrations = await this.getAppliedMigrations(moduleId);
+    if (appliedMigrations.length === 0) return undefined;
+    
+    // Sort by applied date and get the most recent
+    const sorted = appliedMigrations.sort((a, b) => b.appliedAt.getTime() - a.appliedAt.getTime());
+    return sorted[0].appliedAt;
   }
 
   private async getAppliedMigrations(moduleId: string): Promise<Array<{
@@ -712,12 +582,25 @@ export class MigrationEngine {
     if (!this.context) return [];
     
     const { tracker } = this.context;
+    const basePath = this.projectContext 
+      ? resolveProjectPath(this.projectContext, this.context.options.initPath)
+      : this.context.options.initPath;
+    const modulePath = path.join(basePath, moduleId);
     
-    // Query the migration tracker for applied migrations in this module
-    // This would need to be implemented in MigrationTracker
-    // For now, return empty array as placeholder
-    // TODO: Implement tracker.getAppliedMigrations(moduleId) method
-    
-    return [];
+    try {
+      // Get applied up migrations for this module
+      const upMigrations = await tracker.getMigrationsByDirectionAndPath('up', modulePath);
+      return upMigrations
+        .filter(m => m.status === 'success')
+        .map(migration => ({
+          number: migration.number || '',
+          name: migration.name || '',
+          direction: 'up' as const,
+          appliedAt: new Date(migration.applied_at || Date.now())
+        }));
+    } catch (error) {
+      console.error(`Failed to get applied migrations for ${moduleId}:`, error);
+      return [];
+    }
   }
 }

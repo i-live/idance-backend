@@ -454,35 +454,6 @@ nx run database:status --module mymodule --detailed
 nx run database:migrate --module mymodule --force
 ```
 
-## Migration from Initialize Executor
-
-If you're upgrading from the legacy `initialize` executor:
-
-### 1. **Update project.json**
-Replace `initialize` target with new executors (see Quick Start)
-
-### 2. **Create config.json**
-Add module dependency configuration
-
-### 3. **Test New Commands**
-```bash
-# Old command
-nx run database:initialize --module auth
-
-# New command
-nx run database:migrate --module auth
-```
-
-### 4. **Verify Functionality**
-```bash
-# Check status
-nx run database:status
-
-# Test rollback
-nx run database:rollback --module auth --dryRun
-```
-
-The `initialize` executor remains available but is deprecated. It will be removed in a future version.
 
 ## Contributing
 

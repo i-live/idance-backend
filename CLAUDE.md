@@ -3,13 +3,15 @@
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## Build/Test/Lint Commands
+**ALWAYS use NX native commands for testing - never use `npm test` directly:**
 - Run dev server: `nx run backoffice:dev` or `pnpm dev`
 - Build all apps: `nx run-many --target=build --all` or `pnpm build`
 - Lint all code: `nx run-many --target=lint --all` or `pnpm lint`
 - Type check: `nx run-many --target=type-check --all` or `pnpm type-check`
 - Run all tests: `nx run-many --target=test --all` or `pnpm test`
-- Run specific app tests: `nx run backoffice:test` or `cd apps/backoffice && pnpm test`
-- Run single test file: `nx run backoffice:test --testFile=__tests__/auth.test.ts`
+- Run specific app tests: `nx run backoffice:test`
+- Run package tests: `nx run nx-surrealdb-migrations:test`
+- Run single test file: `nx run nx-surrealdb-migrations:test --testFile=src/lib/client.spec.ts`
 - Run database migrations: `pnpm db:migrate`
 
 ## Code Style Guidelines
@@ -48,6 +50,13 @@ Always include usage updates in responses showing:
 - Maintain .claude/CONTEXT.md with current state and decisions
 - Use TodoWrite tool to track work-in-progress items
 - Document test patterns following NX community standards
+
+## Session Continuation
+**IMPORTANT:** After context compacting or session continuation:
+1. Always read this CLAUDE.md file first to refresh instructions
+2. Use TodoRead tool to check current task status
+3. Continue from the last task that was in progress
+4. Follow the exact commands and patterns documented here
 
 ## File Organization
 - Place package-specific files in their respective package directories (packages/package-name/)

@@ -49,7 +49,8 @@ describe('MigrationEngine', () => {
     mockTracker = {
       initialize: jest.fn().mockResolvedValue(undefined),
       canApplyMigration: jest.fn().mockResolvedValue({ canApply: true }),
-      addMigration: jest.fn().mockResolvedValue(undefined)
+      addMigration: jest.fn().mockResolvedValue(undefined),
+      getMigrationsByDirectionAndPath: jest.fn().mockResolvedValue([])
     } as any;
 
     mockResolver = {

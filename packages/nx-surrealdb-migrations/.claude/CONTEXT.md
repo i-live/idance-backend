@@ -1,51 +1,29 @@
 # nx-surrealdb-migrations Context
 
-## Current State
+## Current State - Production Ready 🚀
 
-### Phase: Step 1 - Foundation & Cleanup
-- **Step 1.1**: ✅ Update numbering to gapped format (COMPLETED)
-  - Renamed 001_auth → 010_auth, 002_schema → 020_schema
-  - Updated README examples
-  - Fixed pattern matching logic for gapped numbering
-  - Added comprehensive tests (all passing)
-  - Committed: `cbdb1e3`
-  
-- **Step 1.2**: ✅ Clean unused code (COMPLETED)
-  - Removed migration-parser.ts, query-file-processor.ts
-  - Removed unplanned migrate-app executor and module-loader.ts
-  - Created placeholder implementations for migrate/rollback/status executors
-  - Updated imports in index.ts
-  - All tests passing
-  - Ready to commit
+### Architecture: 3-Executor Pattern with Dependency Management
+The plugin has been successfully refactored from a single `initialize` executor to a modern 3-executor architecture:
 
-- **Step 1.3**: ✅ Rename path → module terminology (COMPLETED)
-  - Updated InitializeExecutorSchema.path → .module
-  - Updated executor.ts to use options.module
-  - Updated schema.json for initialize executor
-  - Updated README.md examples to use --module
-  - Fixed Jest heap memory issues for CI compatibility
-  - All tests passing (12/12)
-  - Committed: `3280fdd`
+1. **migrate**: Apply pending migrations with dependency resolution
+2. **rollback**: Reverse migrations with safety checks and dependency validation  
+3. **status**: Show migration state with dependency visualization
 
-- **Step 1.4**: ✅ Add configuration system (COMPLETED)
-  - Created ConfigLoader with JSON/YAML support
-  - Added comprehensive validation for config format
-  - Created DependencyResolver with topological sorting
-  - Added circular dependency detection
-  - Created sample config.json in database directory
-  - Added 38 comprehensive tests (18 config + 20 dependency)
-  - All tests passing (50/50)
-  - Committed: `5a6b657`
+### Completed Features
+- ✅ **Dependency Management**: Full topological sorting with circular dependency detection
+- ✅ **Modular Structure**: Gapped numbering (000, 010, 020) for flexible module ordering
+- ✅ **Configuration System**: JSON/YAML support with module dependencies
+- ✅ **Migration Engine**: Centralized orchestration with state tracking
+- ✅ **Safety Validation**: Rollback protection when dependents exist
+- ✅ **Export/Import**: Module packaging and reuse across projects
+- ✅ **Code Organization**: Centralized utilities, removed dead code, consistent patterns
 
-- **Step 1.5**: ✅ Update migration generator (COMPLETED)
-  - Replaced timestamp-based naming with sequential numbering
-  - Added --module option to target specific modules
-  - Auto-create module directories with gapped numbering
-  - Updated templates with better content and metadata
-  - Added module auto-discovery and validation
-  - Created 5 comprehensive tests covering all scenarios
-  - All tests passing (53/53)
-  - Committed: TBD
+### Recent Improvements
+- **Code Cleanup**: Removed unused imports (RecordId, PreparedQuery) and dead methods
+- **Centralized Utilities**: Created migration-file-utils.ts for shared file operations
+- **Fixed Broken Exports**: Updated index.ts to export new executors
+- **Implemented Placeholders**: Replaced dummy methods with real MigrationTracker integration
+- **Generator Refactoring**: Migration generator now uses shared utilities
 
 ## Architecture Decisions
 
@@ -140,13 +118,52 @@ const mockFs = fs as jest.Mocked<typeof fs>;
 mockFs.readdir.mockResolvedValue([...]);
 ```
 
-## Next Steps
+## Library Structure
 
-1. Complete Step 1.2: Remove unused files
-2. Step 1.3: Rename path → module terminology
-3. Step 1.4: Add configuration system
-4. Step 1.5: Update migration generator
-5. Create comprehensive tests for each component
+### Current Organization (Flat)
+```
+lib/
+├── client.ts                 # SurrealDB connection management
+├── migration-tracker.ts      # Migration state tracking in database
+├── migration-engine.ts       # Core orchestration and execution
+├── migration-file-utils.ts   # Shared file processing utilities
+├── config-loader.ts          # JSON/YAML configuration loading
+├── dependency-resolver.ts    # Topological sorting and dependency management
+├── env.ts                    # Environment variable handling
+├── project.ts                # NX project path resolution
+├── types.ts                  # Shared TypeScript interfaces
+└── index.ts                  # Public API exports
+```
+
+### Key Components
+
+**MigrationEngine**: Central orchestrator that coordinates all migration operations
+- Manages initialization and database connections
+- Finds pending migrations based on dependencies
+- Executes migrations with transaction support
+- Validates rollback safety
+- Provides migration status information
+
+**MigrationFileUtils**: Centralized file processing utilities
+- Module discovery and pattern matching
+- Migration file parsing and filtering
+- Content processing with environment variables
+- Module ID generation with gapped numbering
+
+**MigrationTracker**: Database state management
+- Records migration execution history
+- Tracks checksums and execution times
+- Validates migration applicability
+- Provides migration history queries
+
+## Pending Work
+
+### Generator Refactoring (In Progress)
+The export-module and import-module generators need refactoring to:
+1. Use Tree API instead of direct fs operations
+2. Leverage MigrationFileUtils for module discovery
+3. Remove code duplication
+4. Add comprehensive test coverage
 
 ## Known Issues
 

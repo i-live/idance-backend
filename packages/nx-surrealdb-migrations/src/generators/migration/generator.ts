@@ -4,6 +4,7 @@ import {
   joinPathFragments,
   readProjectConfiguration
 } from '@nx/devkit';
+import { MigrationFileUtils } from '../../lib/migration-file-utils';
 
 export interface MigrationGeneratorSchema {
   name: string;
@@ -56,7 +57,7 @@ async function resolveModuleInfo(
     // Try to find existing module
     const existingModule = await findExistingModule(tree, migrationsPath, String(modulePattern));
     if (existingModule) {
-      const nextNumber = await getNextMigrationNumber(tree, existingModule.modulePath);
+      const nextNumber = await MigrationFileUtils.getNextMigrationNumber(existingModule.modulePath);
       return {
         moduleId: existingModule.moduleId,
         modulePath: existingModule.modulePath,
@@ -81,7 +82,7 @@ async function resolveModuleInfo(
   
   // Use the highest numbered module
   const lastModule = existingModules[existingModules.length - 1];
-  const nextNumber = await getNextMigrationNumber(tree, lastModule.modulePath);
+  const nextNumber = await MigrationFileUtils.getNextMigrationNumber(lastModule.modulePath);
   return {
     moduleId: lastModule.moduleId,
     modulePath: lastModule.modulePath,
@@ -162,10 +163,8 @@ async function createNewModule(
   } else {
     // Need to determine next available number
     const existingModules = await discoverExistingModules(tree, migrationsPath);
-    const nextNumber = getNextModuleNumber(existingModules);
-    
     const cleanName = pattern.replace(/^\d+_?/, '').toLowerCase();
-    moduleId = `${nextNumber.toString().padStart(3, '0')}_${cleanName}`;
+    moduleId = MigrationFileUtils.generateModuleId(cleanName, existingModules);
   }
   
   const modulePath = joinPathFragments(migrationsPath, moduleId);
@@ -182,50 +181,6 @@ async function createNewModule(
   };
 }
 
-function getNextModuleNumber(existingModules: { moduleId: string }[]): number {
-  if (existingModules.length === 0) {
-    return 0;
-  }
-  
-  // Find the highest number
-  let maxNumber = 0;
-  for (const module of existingModules) {
-    const match = module.moduleId.match(/^(\d{1,4})_/);
-    if (match) {
-      const number = parseInt(match[1], 10);
-      maxNumber = Math.max(maxNumber, number);
-    }
-  }
-  
-  // Return next gapped number (increment by 10)
-  return maxNumber + 10;
-}
-
-async function getNextMigrationNumber(tree: Tree, modulePath: string): Promise<string> {
-  if (!tree.exists(modulePath)) {
-    return '0001';
-  }
-  
-  const files = tree.children(modulePath)
-    .filter(file => file.endsWith('.surql'))
-    .filter(file => /^\d{4}_.*_(up|down)\.surql$/.test(file));
-  
-  if (files.length === 0) {
-    return '0001';
-  }
-  
-  // Find the highest migration number
-  let maxNumber = 0;
-  for (const file of files) {
-    const match = file.match(/^(\d{4})_/);
-    if (match) {
-      const number = parseInt(match[1], 10);
-      maxNumber = Math.max(maxNumber, number);
-    }
-  }
-  
-  return (maxNumber + 1).toString().padStart(4, '0');
-}
 
 export async function migrationGenerator(
   tree: Tree,
