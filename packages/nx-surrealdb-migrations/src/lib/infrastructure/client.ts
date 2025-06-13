@@ -51,12 +51,11 @@ export class SurrealDBClient {
     }
 
     try {
-      console.log('Attempting to connect with config:', {
+      this.debug.log('Connecting to SurrealDB:', {
         url: config.url,
         namespace: config.namespace,
         database: config.database,
         username: config.username,
-        // Don't log the actual password
         hasPassword: !!config.password
       });
       
@@ -75,7 +74,7 @@ export class SurrealDBClient {
       this.namespace = config.namespace;
       this.database = config.database;
     } catch (error) {
-      console.error('Connection error details:', error);
+      this.debug.error('SurrealDB connection failed:', error);
       throw new Error(`Failed to connect to SurrealDB: ${error.message}`);
     }
   }

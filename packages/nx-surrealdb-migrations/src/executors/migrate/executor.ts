@@ -49,14 +49,14 @@ export default async function runExecutor(
 
     // Determine target modules
     const targetModules = options.module ? [String(options.module)] : undefined;
-    debug.log(`options `,options);
     debug.log(`Target modules: ${targetModules ? targetModules.join(', ') : 'all'}`);
 
     // Execute migrations
     if (options.dryRun) {
-      logger.info('🔍 Dry run mode - showing pending migrations without applying them');
+      logger.info('Dry run mode - showing pending migrations without applying them');
+    } else if (options.debug) {
+      logger.info('🚀 Starting migration execution...');
     }
-    logger.info('🚀 Starting migration execution...');
     
     const result = await engine.executeMigrations(targetModules);
     

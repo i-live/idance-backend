@@ -65,30 +65,6 @@ export default async function runExecutor(
     const targetModules = options.module ? [String(options.module)] : undefined;
 
     // Get migration status
-    logger.info('📊 Checking migration status...');
-    
-    // Debug: Check raw migration records
-    const client = (engine as any).context?.client;
-    const tracker = (engine as any).context?.tracker;
-    if (client && tracker) {
-      try {
-        const allMigrations = await client.query('SELECT * FROM system_migrations');
-        debug.log(`Total records in system_migrations: ${allMigrations.length}`);
-        if (allMigrations.length > 0) {
-          debug.log('Sample migration records:');
-          allMigrations.slice(0, 3).forEach((m: any) => {
-            debug.log(`   - ${m.path}/${m.filename} | ${m.direction} | ${m.status} | ${m.applied_at}`);
-          });
-        }
-        
-        // Check unique paths
-        const uniquePaths = await client.query('SELECT path, count() as count FROM system_migrations GROUP BY path');
-        debug.data('Migration paths', uniquePaths);
-      } catch (e) {
-        debug.error('Error checking raw migrations:', e);
-      }
-    }
-    
     const status = await engine.getMigrationStatus(targetModules);
 
     if (options.json) {
@@ -117,10 +93,21 @@ export default async function runExecutor(
 
     // Human-readable format
     if (status.modules.length === 0) {
-      logger.info('📂 No migration modules found');
+      logger.info('No migration modules found');
       return { success: true };
     }
 
+    // Default: Minimal summary (unless detailed or debug flag is used)
+    if (!options.detailed && !options.debug) {
+      if (status.totalPending > 0) {
+        logger.info(`${status.totalPending} migration(s) pending, ${status.totalApplied} applied`);
+      } else {
+        logger.info(`All migrations up to date (${status.totalApplied} applied)`);
+      }
+      return { success: true };
+    }
+
+    // Detailed output
     logger.info(`\n📈 Migration Status Summary`);
     logger.info(`   Total Applied: ${status.totalApplied}`);
     logger.info(`   Total Pending: ${status.totalPending}`);

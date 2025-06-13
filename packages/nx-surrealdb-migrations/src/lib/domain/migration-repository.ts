@@ -38,7 +38,7 @@ export class MigrationRepository {
 
       // Execute the schema query
       await this.client.query(schemaQuery);
-      console.log('Initialized system_migrations table');
+      this.debug.log('Initialized system_migrations table');
     } catch (error) {
       if (error.code === 'ENOENT') {
         throw new Error(`Schema file not found: ${schemaFile}`);
