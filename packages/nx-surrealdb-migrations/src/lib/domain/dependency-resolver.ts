@@ -1,4 +1,4 @@
-import { ConfigLoader, MigrationsConfig, ModuleConfig } from './config-loader';
+import { ConfigLoader, MigrationsConfig, ModuleConfig } from '../configuration/config-loader';
 import * as fs from 'fs/promises';
 
 export interface DependencyNode {

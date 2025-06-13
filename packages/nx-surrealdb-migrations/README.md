@@ -456,48 +456,72 @@ nx run database:migrate --module mymodule --force
 
 ## Code Architecture
 
-### 🏗️ **Modular Design Principles**
+### 🏗️ **Repository Pattern Architecture**
 
-This plugin follows strict modular design principles to ensure maintainability and code reuse:
+This plugin follows the **Repository Pattern** with clean separation of concerns and domain-driven design:
 
-#### **TreeUtils Library** (`/src/lib/tree-utils.ts`)
-A comprehensive utility library that abstracts all NX Tree API operations:
-- **Directory Management**: `findMatchingSubdirectory()`, `ensureDirectory()`, `isDirectory()`
-- **File Operations**: `copyFiles()`, `getMigrationFiles()`, `readJsonFile()`, `writeJsonFile()`
-- **Migration Logic**: `getNextMigrationNumber()`, `findModuleDirectories()`
-
-This eliminates code duplication across generators and provides consistent Tree API usage.
-
-#### **Generator Architecture**
-All generators (`migration`, `import-module`, `export-module`) leverage shared utilities:
-```typescript
-import { TreeUtils } from '../../lib/tree-utils';
-
-// Consistent patterns across all generators
-const moduleDir = TreeUtils.findMatchingSubdirectory(tree, basePath, pattern);
-const migrationFiles = TreeUtils.getMigrationFiles(tree, modulePath);
-TreeUtils.ensureDirectory(tree, targetPath);
+```
+src/lib/
+├── infrastructure/          # Database connectivity, utilities
+│   ├── client.ts           # SurrealDB client wrapper
+│   ├── debug.ts            # Debugging utilities
+│   ├── env.ts              # Environment variable handling
+│   └── project.ts          # NX project integration
+├── configuration/          # Configuration management
+│   ├── config-loader.ts    # Module config loading
+│   └── types.ts           # Type definitions
+├── filesystem/            # File system operations
+│   ├── migration-file-processor.ts  # Migration file handling
+│   └── tree-utils.ts                # NX Tree utilities
+└── domain/               # Core business logic
+    ├── dependency-resolver.ts       # Module dependency management
+    ├── migration-repository.ts      # Data access layer
+    └── migration-service.ts         # Business logic orchestration
 ```
 
-#### **Core Libraries**
-- **`MigrationFileUtils`**: Migration file parsing and validation
-- **`MigrationEngine`**: Core migration execution logic  
-- **`MigrationTracker`**: Database state management
-- **`SurrealDBClient`**: Database connection abstraction
-- **`ConfigLoader`**: Configuration management with environment variable support
+### 🔄 **Repository Pattern Implementation**
 
-#### **Test Coverage**
-- **266 comprehensive tests** covering all components
-- **TreeUtils**: 26 dedicated tests for utility functions
-- **TDD Approach**: All code follows test-driven development methodology
+#### **MigrationRepository** (Data Access Layer)
+**Responsibility**: Database operations for migration state management
+```typescript
+// Simple CRUD operations
+async addMigration(record: MigrationRecord): Promise<void>
+async findLastMigrations(moduleIds: string[]): Promise<Migration[]>
+async getLatestMigrationStatus(number: string, name: string): Promise<Migration | null>
+```
 
-### 🎯 **Benefits of This Architecture**
+#### **MigrationService** (Business Logic Layer)
+**Responsibility**: Orchestrate migration workflows and business rules
+```typescript
+// Complex workflow and rules
+async executeMigrations(modules?: string[]): Promise<MigrationResult>
+async validateRollback(modules: string[]): Promise<RollbackValidation>
+async findPendingMigrations(modules?: string[]): Promise<MigrationFile[]>
+```
 
-✅ **Code Reuse**: Shared utilities eliminate duplication  
-✅ **Consistency**: All generators behave identically  
-✅ **Maintainability**: Changes happen in centralized locations  
-✅ **Testability**: Each component can be tested independently  
-✅ **Extensibility**: New generators can leverage existing utilities  
+#### **Communication Pattern**
+```
+MigrationService (Business Logic)
+    ↓ delegates data operations
+MigrationRepository (Data Access)
+    ↓ executes queries
+SurrealDBClient (Database)
+```
+
+### 🎯 **Design Benefits**
+
+✅ **Single Responsibility**: Each class has one clear purpose  
+✅ **Testability**: Data access can be mocked, business logic tested separately  
+✅ **Maintainability**: Changes to business rules don't affect data access  
+✅ **Scalability**: Can swap database implementations without changing business logic  
+✅ **Repository Pattern**: Industry-standard data access abstraction  
+
+### 🧪 **Test-Driven Development**
+
+- **Comprehensive Test Coverage**: All components follow TDD methodology
+- **Layer Testing**: Repository and Service layers tested independently
+- **Integration Tests**: End-to-end workflow validation
+- **Mock-friendly**: Clean interfaces enable easy mocking for unit tests  
 
 ## Contributing
 

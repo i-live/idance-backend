@@ -1,11 +1,11 @@
-import { Migration } from './types';
-import { SurrealDBClient } from './client';
-import { Debug } from './debug';
+import { Migration, MigrationRecord } from '../configuration/types';
+import { SurrealDBClient } from '../infrastructure/client';
+import { Debug } from '../infrastructure/debug';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 
-export class MigrationTracker {
-  private debug = Debug.scope('migration-tracker');
+export class MigrationRepository {
+  private debug = Debug.scope('migration-repository');
 
   constructor(
     private client: SurrealDBClient,
@@ -14,7 +14,7 @@ export class MigrationTracker {
 
   async initialize(): Promise<void> {
     // Default schema path relative to the plugin
-    const defaultSchemaPath = path.join(__dirname, '../schema/system_migrations.surql');
+    const defaultSchemaPath = path.join(__dirname, '../../schema/system_migrations.surql');
     const schemaFile = this.schemaPath || defaultSchemaPath;
 
     try {
@@ -22,7 +22,7 @@ export class MigrationTracker {
       const schemaQuery = await fs.readFile(schemaFile, 'utf8');
 
       // Basic validation to ensure required fields are defined
-      const requiredFields = ['number', 'name', 'direction', 'filename', 'path', 'content', 'status', 'applied_at'];
+      const requiredFields = ['number', 'name', 'direction', 'filename', 'path', 'content', 'module', 'status', 'applied_at'];
       for (const field of requiredFields) {
         if (!schemaQuery.includes(`DEFINE FIELD IF NOT EXISTS ${field} ON system_migrations`)) {
           throw new Error(`Schema file ${schemaFile} is missing required field: ${field}`);
@@ -129,7 +129,7 @@ export class MigrationTracker {
     }
   }
 
-  async addMigration(migration: Migration): Promise<void> {
+  async addMigration(migration: MigrationRecord): Promise<void> {
     await this.initialize();
     
     if (!migration.number || !migration.name || !migration.filename || !migration.path || !migration.content) {
@@ -152,6 +152,7 @@ export class MigrationTracker {
       filename: migration.filename,
       path: migration.path,
       content: migration.content,
+      module: migration.module,
       checksum: migration.checksum,
       status: migration.status ?? 'success',
       applied_by: this.client.username,
@@ -206,6 +207,7 @@ export class MigrationTracker {
         filename: migration.filename,
         path: migration.path,
         content: migration.content,
+        module: migration.module,
         checksum: migration.checksum,
         status: migration.status,
         namespace: migration.namespace,
@@ -272,6 +274,67 @@ export class MigrationTracker {
     } catch (error) {
       this.debug.error(`Failed to fetch migrations for direction='${direction}' path='${path}':`, error);
       throw new Error(`Failed to fetch migrations: ${error.message}`);
+    }
+  }
+
+  async findLastMigrations(moduleIds: string[]): Promise<Migration[]> {
+    if (moduleIds.length === 0) {
+      return [];
+    }
+
+    try {
+      this.debug.log(`Finding last migrations for modules: [${moduleIds.join(', ')}]`);
+      
+      // Single batched query for all modules to get latest applied migrations
+      const result = await this.client.query(`
+        SELECT number, name, applied_at, module, direction, status 
+        FROM system_migrations 
+        WHERE module IN $modules 
+        AND status = 'success' 
+        AND direction = 'up'
+        ORDER BY module ASC, applied_at DESC
+      `, { modules: moduleIds });
+
+      const migrations = result[0] || [];
+      this.debug.log(`Found ${migrations.length} total applied migrations across modules`);
+      
+      // Group by module and take the latest migration per module
+      const latestByModule = new Map<string, any>();
+      
+      for (const migration of Array.isArray(migrations) ? migrations : []) {
+        const moduleId = migration.module;
+        if (!latestByModule.has(moduleId)) {
+          latestByModule.set(moduleId, migration);
+          this.debug.log(`Latest migration for ${moduleId}: ${migration.number}_${migration.name}`);
+        }
+        // Since we're ordered by applied_at DESC, first occurrence is the latest
+      }
+
+      // Convert to Migration interface format
+      const result_migrations = Array.from(latestByModule.values()).map(m => ({
+        id: m.id,
+        number: m.number,
+        name: m.name,
+        direction: m.direction,
+        filename: m.filename || '',
+        path: m.path || '',
+        content: m.content || '',
+        module: m.module,
+        checksum: m.checksum,
+        status: m.status,
+        namespace: m.namespace,
+        database: m.database,
+        applied_at: m.applied_at,
+        applied_by: m.applied_by,
+        execution_time_ms: m.execution_time_ms
+      }));
+
+      this.debug.log(`Returning ${result_migrations.length} latest migrations`);
+      return result_migrations;
+
+    } catch (error) {
+      this.debug.error(`Failed to fetch last migrations for modules [${moduleIds.join(', ')}]:`, error);
+      throw new Error(`Failed to fetch last migrations: ${error.message}`);
     }
   }
 

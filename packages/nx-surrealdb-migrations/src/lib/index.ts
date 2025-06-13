@@ -1,9 +1,9 @@
-export * from './client';
-export * from './migration-tracker';
-export * from './types';
-export * from './env';
-export * from './project';
-export { ConfigLoader, type MigrationsConfig } from './config-loader';
-export { DependencyResolver } from './dependency-resolver';
-export { MigrationEngine } from './migration-engine';
-export { MigrationFileUtils, type MigrationFile, type MigrationContext } from './migration-file-utils';
+export * from './infrastructure/client';
+export * from './domain/migration-repository';
+export * from './configuration/types';
+export * from './infrastructure/env';
+export * from './infrastructure/project';
+export { ConfigLoader, type MigrationsConfig } from './configuration/config-loader';
+export { DependencyResolver } from './domain/dependency-resolver';
+export { MigrationService } from './domain/migration-service';
+export { MigrationFileProcessor, type MigrationFile, type MigrationContext } from './filesystem/migration-file-processor';

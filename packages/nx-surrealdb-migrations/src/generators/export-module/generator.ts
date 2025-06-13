@@ -10,9 +10,9 @@ import {
 import * as path from 'path';
 import * as fs from 'fs';
 import { execSync } from 'child_process';
-import { ConfigLoader } from '../../lib/config-loader';
-import { MigrationEngine } from '../../lib/migration-engine';
-import { TreeUtils } from '../../lib/tree-utils';
+import { ConfigLoader } from '../../lib/configuration/config-loader';
+import { MigrationService } from '../../lib/domain/migration-service';
+import { TreeUtils } from '../../lib/filesystem/tree-utils';
 
 export interface ExportModuleGeneratorSchema {
   module: string | number;

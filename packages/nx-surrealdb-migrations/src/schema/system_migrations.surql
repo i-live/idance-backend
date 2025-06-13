@@ -6,6 +6,7 @@ DEFINE FIELD IF NOT EXISTS direction ON system_migrations TYPE string ASSERT $va
 DEFINE FIELD IF NOT EXISTS filename ON system_migrations TYPE string;
 DEFINE FIELD IF NOT EXISTS path ON system_migrations TYPE string;
 DEFINE FIELD IF NOT EXISTS content ON system_migrations TYPE string;
+DEFINE FIELD IF NOT EXISTS module ON system_migrations TYPE string;
 
 DEFINE FIELD IF NOT EXISTS namespace ON system_migrations TYPE string DEFAULT session::ns() ?? 'default';
 DEFINE FIELD IF NOT EXISTS database ON system_migrations TYPE string DEFAULT session::db() ?? 'default';

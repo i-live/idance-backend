@@ -1,6 +1,6 @@
 import { ExecutorContext, logger } from '@nx/devkit';
-import { MigrationEngine } from '../../lib/migration-engine';
-import { Debug } from '../../lib/debug';
+import { MigrationService } from '../../lib/domain/migration-service';
+import { Debug } from '../../lib/infrastructure/debug';
 
 export interface StatusExecutorSchema {
   url?: string;
@@ -38,7 +38,7 @@ export default async function runExecutor(
   options: StatusExecutorSchema,
   context: ExecutorContext
 ): Promise<{ success: boolean }> {
-  const engine = new MigrationEngine(context);
+  const engine = new MigrationService(context);
   const debug = Debug.scope('status-executor');
 
   // Enable debug mode if requested

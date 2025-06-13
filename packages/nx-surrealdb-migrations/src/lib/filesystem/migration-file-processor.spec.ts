@@ -1,15 +1,15 @@
-import { MigrationFileUtils } from './migration-file-utils';
+import { MigrationFileProcessor } from './migration-file-processor';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 
 jest.mock('fs/promises');
-jest.mock('./env', () => ({
+jest.mock('../infrastructure/env', () => ({
   replaceEnvVars: jest.fn((content: string) => content.replace('${TEST_VAR}', 'test_value'))
 }));
 
 const mockFs = fs as jest.Mocked<typeof fs>;
 
-describe('MigrationFileUtils', () => {
+describe('MigrationFileProcessor', () => {
   beforeEach(() => {
     jest.clearAllMocks();
   });
@@ -22,7 +22,7 @@ describe('MigrationFileUtils', () => {
         { name: '020_schema', isDirectory: () => true }
       ] as any);
 
-      const result = await MigrationFileUtils.findMatchingSubdirectory('/base', '010_auth');
+      const result = await MigrationFileProcessor.findMatchingSubdirectory('/base', '010_auth');
       
       expect(result).toBe('010_auth');
     });
@@ -33,7 +33,7 @@ describe('MigrationFileUtils', () => {
         { name: '010_auth', isDirectory: () => true }
       ] as any);
 
-      const result = await MigrationFileUtils.findMatchingSubdirectory('/base', '10');
+      const result = await MigrationFileProcessor.findMatchingSubdirectory('/base', '10');
       
       expect(result).toBe('010_auth');
     });
@@ -44,7 +44,7 @@ describe('MigrationFileUtils', () => {
         { name: '010_auth', isDirectory: () => true }
       ] as any);
 
-      const result = await MigrationFileUtils.findMatchingSubdirectory('/base', 'auth');
+      const result = await MigrationFileProcessor.findMatchingSubdirectory('/base', 'auth');
       
       expect(result).toBe('010_auth');
     });
@@ -54,7 +54,7 @@ describe('MigrationFileUtils', () => {
         { name: '010_auth', isDirectory: () => true }
       ] as any);
 
-      const result = await MigrationFileUtils.findMatchingSubdirectory('/base', '10_auth');
+      const result = await MigrationFileProcessor.findMatchingSubdirectory('/base', '10_auth');
       
       expect(result).toBe('010_auth');
     });
@@ -64,7 +64,7 @@ describe('MigrationFileUtils', () => {
         { name: '010_auth', isDirectory: () => true }
       ] as any);
 
-      const result = await MigrationFileUtils.findMatchingSubdirectory('/base', 'nonexistent');
+      const result = await MigrationFileProcessor.findMatchingSubdirectory('/base', 'nonexistent');
       
       expect(result).toBeNull();
     });
@@ -72,7 +72,7 @@ describe('MigrationFileUtils', () => {
     it('should handle directory read errors', async () => {
       mockFs.readdir.mockRejectedValue(new Error('Permission denied'));
 
-      await expect(MigrationFileUtils.findMatchingSubdirectory('/base', 'auth'))
+      await expect(MigrationFileProcessor.findMatchingSubdirectory('/base', 'auth'))
         .rejects.toThrow('Failed to read subdirectories in /base: Permission denied');
     });
 
@@ -82,7 +82,7 @@ describe('MigrationFileUtils', () => {
         { name: '010_auth', isDirectory: () => true }
       ] as any);
 
-      const result = await MigrationFileUtils.findMatchingSubdirectory('/base', 'auth');
+      const result = await MigrationFileProcessor.findMatchingSubdirectory('/base', 'auth');
       
       expect(result).toBe('010_auth');
     });
@@ -97,7 +97,7 @@ describe('MigrationFileUtils', () => {
         { name: 'README.md', isDirectory: () => false }
       ] as any);
 
-      const result = await MigrationFileUtils.discoverModules('/base');
+      const result = await MigrationFileProcessor.discoverModules('/base');
       
       expect(result).toEqual([
         { moduleId: '000_admin', modulePath: path.join('/base', '000_admin') },
@@ -109,7 +109,7 @@ describe('MigrationFileUtils', () => {
     it('should handle empty directory', async () => {
       mockFs.readdir.mockResolvedValue([]);
 
-      const result = await MigrationFileUtils.discoverModules('/base');
+      const result = await MigrationFileProcessor.discoverModules('/base');
       
       expect(result).toEqual([]);
     });
@@ -119,7 +119,7 @@ describe('MigrationFileUtils', () => {
       error.code = 'ENOENT';
       mockFs.readdir.mockRejectedValue(error);
 
-      const result = await MigrationFileUtils.discoverModules('/base');
+      const result = await MigrationFileProcessor.discoverModules('/base');
       
       expect(result).toEqual([]);
     });
@@ -127,7 +127,7 @@ describe('MigrationFileUtils', () => {
     it('should handle other filesystem errors', async () => {
       mockFs.readdir.mockRejectedValue(new Error('Permission denied'));
 
-      await expect(MigrationFileUtils.discoverModules('/base'))
+      await expect(MigrationFileProcessor.discoverModules('/base'))
         .rejects.toThrow('Failed to discover modules in /base: Permission denied');
     });
 
@@ -138,7 +138,7 @@ describe('MigrationFileUtils', () => {
         { name: 'config.json', isDirectory: () => false }
       ] as any);
 
-      const result = await MigrationFileUtils.discoverModules('/base');
+      const result = await MigrationFileProcessor.discoverModules('/base');
       
       expect(result).toEqual([
         { moduleId: '010_auth', modulePath: path.join('/base', '010_auth') }
@@ -150,7 +150,7 @@ describe('MigrationFileUtils', () => {
     it('should return 0001 for empty directory', async () => {
       mockFs.readdir.mockResolvedValue([]);
 
-      const result = await MigrationFileUtils.getNextMigrationNumber('/module');
+      const result = await MigrationFileProcessor.getNextMigrationNumber('/module');
       
       expect(result).toBe('0001');
     });
@@ -160,7 +160,7 @@ describe('MigrationFileUtils', () => {
       error.code = 'ENOENT';
       mockFs.readdir.mockRejectedValue(error);
 
-      const result = await MigrationFileUtils.getNextMigrationNumber('/module');
+      const result = await MigrationFileProcessor.getNextMigrationNumber('/module');
       
       expect(result).toBe('0001');
     });
@@ -174,7 +174,7 @@ describe('MigrationFileUtils', () => {
         'README.md'
       ]);
 
-      const result = await MigrationFileUtils.getNextMigrationNumber('/module');
+      const result = await MigrationFileProcessor.getNextMigrationNumber('/module');
       
       expect(result).toBe('0004');
     });
@@ -186,7 +186,7 @@ describe('MigrationFileUtils', () => {
         '0010_third_up.surql'
       ]);
 
-      const result = await MigrationFileUtils.getNextMigrationNumber('/module');
+      const result = await MigrationFileProcessor.getNextMigrationNumber('/module');
       
       expect(result).toBe('0011');
     });
@@ -199,7 +199,7 @@ describe('MigrationFileUtils', () => {
         'not_a_migration.txt'
       ]);
 
-      const result = await MigrationFileUtils.getNextMigrationNumber('/module');
+      const result = await MigrationFileProcessor.getNextMigrationNumber('/module');
       
       expect(result).toBe('0003');
     });
@@ -207,7 +207,7 @@ describe('MigrationFileUtils', () => {
     it('should handle filesystem errors', async () => {
       mockFs.readdir.mockRejectedValue(new Error('Permission denied'));
 
-      await expect(MigrationFileUtils.getNextMigrationNumber('/module'))
+      await expect(MigrationFileProcessor.getNextMigrationNumber('/module'))
         .rejects.toThrow('Failed to get next migration number for /module: Permission denied');
     });
   });
@@ -220,13 +220,13 @@ describe('MigrationFileUtils', () => {
         { moduleId: '020_schema' }
       ];
 
-      const result = MigrationFileUtils.generateModuleId('messaging', existingModules);
+      const result = MigrationFileProcessor.generateModuleId('messaging', existingModules);
       
       expect(result).toBe('030_messaging');
     });
 
     it('should start from 000 when no modules exist', async () => {
-      const result = MigrationFileUtils.generateModuleId('admin', []);
+      const result = MigrationFileProcessor.generateModuleId('admin', []);
       
       expect(result).toBe('000_admin');
     });
@@ -237,13 +237,13 @@ describe('MigrationFileUtils', () => {
         { moduleId: '020_schema' } // highest is 020
       ];
 
-      const result = MigrationFileUtils.generateModuleId('auth', existingModules);
+      const result = MigrationFileProcessor.generateModuleId('auth', existingModules);
       
       expect(result).toBe('030_auth'); // next after 020
     });
 
     it('should normalize module names', async () => {
-      const result = MigrationFileUtils.generateModuleId('User Authentication!', []);
+      const result = MigrationFileProcessor.generateModuleId('User Authentication!', []);
       
       expect(result).toBe('000_user_authentication_');
     });
@@ -254,7 +254,7 @@ describe('MigrationFileUtils', () => {
         { moduleId: '15_another' }
       ];
 
-      const result = MigrationFileUtils.generateModuleId('new', existingModules);
+      const result = MigrationFileProcessor.generateModuleId('new', existingModules);
       
       // The algorithm finds next after highest (15), so returns 25
       expect(result).toBe('025_new');
@@ -263,7 +263,7 @@ describe('MigrationFileUtils', () => {
 
   describe('parseMigrationFile', () => {
     it('should parse valid migration file name', () => {
-      const result = MigrationFileUtils.parseMigrationFile(
+      const result = MigrationFileProcessor.parseMigrationFile(
         '0001_create_users_up.surql',
         '/base/path',
         '010_auth'
@@ -282,7 +282,7 @@ describe('MigrationFileUtils', () => {
     });
 
     it('should parse down migration file', () => {
-      const result = MigrationFileUtils.parseMigrationFile('0002_add_index_down.surql');
+      const result = MigrationFileProcessor.parseMigrationFile('0002_add_index_down.surql');
 
       expect(result).toEqual({
         number: '0002',
@@ -297,13 +297,13 @@ describe('MigrationFileUtils', () => {
     });
 
     it('should return null for invalid file name', () => {
-      const result = MigrationFileUtils.parseMigrationFile('invalid_file.txt');
+      const result = MigrationFileProcessor.parseMigrationFile('invalid_file.txt');
       
       expect(result).toBeNull();
     });
 
     it('should handle missing optional parameters', () => {
-      const result = MigrationFileUtils.parseMigrationFile('0001_test_up.surql');
+      const result = MigrationFileProcessor.parseMigrationFile('0001_test_up.surql');
 
       expect(result).toEqual({
         number: '0001',
@@ -320,7 +320,7 @@ describe('MigrationFileUtils', () => {
 
   describe('matchesMigrationPattern', () => {
     it('should match by full filename', () => {
-      const result = MigrationFileUtils.matchesMigrationPattern(
+      const result = MigrationFileProcessor.matchesMigrationPattern(
         '0001_create_users_up.surql',
         '0001_create_users_up.surql'
       );
@@ -329,7 +329,7 @@ describe('MigrationFileUtils', () => {
     });
 
     it('should match by migration number', () => {
-      const result = MigrationFileUtils.matchesMigrationPattern(
+      const result = MigrationFileProcessor.matchesMigrationPattern(
         '0001_create_users_up.surql',
         '1'
       );
@@ -338,7 +338,7 @@ describe('MigrationFileUtils', () => {
     });
 
     it('should match by migration name', () => {
-      const result = MigrationFileUtils.matchesMigrationPattern(
+      const result = MigrationFileProcessor.matchesMigrationPattern(
         '0001_create_users_up.surql',
         'create_users'
       );
@@ -347,7 +347,7 @@ describe('MigrationFileUtils', () => {
     });
 
     it('should match by number_name format', () => {
-      const result = MigrationFileUtils.matchesMigrationPattern(
+      const result = MigrationFileProcessor.matchesMigrationPattern(
         '0001_create_users_up.surql',
         '1_create_users'
       );
@@ -356,7 +356,7 @@ describe('MigrationFileUtils', () => {
     });
 
     it('should handle case insensitive matching', () => {
-      const result = MigrationFileUtils.matchesMigrationPattern(
+      const result = MigrationFileProcessor.matchesMigrationPattern(
         '0001_create_users_up.surql',
         'CREATE_USERS'
       );
@@ -365,7 +365,7 @@ describe('MigrationFileUtils', () => {
     });
 
     it('should return false for non-matching patterns', () => {
-      const result = MigrationFileUtils.matchesMigrationPattern(
+      const result = MigrationFileProcessor.matchesMigrationPattern(
         '0001_create_users_up.surql',
         'nonexistent'
       );
@@ -374,7 +374,7 @@ describe('MigrationFileUtils', () => {
     });
 
     it('should return false for invalid filenames', () => {
-      const result = MigrationFileUtils.matchesMigrationPattern(
+      const result = MigrationFileProcessor.matchesMigrationPattern(
         'invalid_file.txt',
         'anything'
       );
@@ -395,7 +395,7 @@ describe('MigrationFileUtils', () => {
     ];
 
     it('should filter up migrations by default', () => {
-      const result = MigrationFileUtils.filterMigrationFiles(sampleFiles);
+      const result = MigrationFileProcessor.filterMigrationFiles(sampleFiles);
       
       expect(result).toEqual([
         '0001_create_users_up.surql',
@@ -405,7 +405,7 @@ describe('MigrationFileUtils', () => {
     });
 
     it('should filter down migrations when specified', () => {
-      const result = MigrationFileUtils.filterMigrationFiles(sampleFiles, undefined, 'down');
+      const result = MigrationFileProcessor.filterMigrationFiles(sampleFiles, undefined, 'down');
       
       expect(result).toEqual([
         '0002_add_index_down.surql',
@@ -414,13 +414,13 @@ describe('MigrationFileUtils', () => {
     });
 
     it('should filter by file pattern', () => {
-      const result = MigrationFileUtils.filterMigrationFiles(sampleFiles, 'create_users');
+      const result = MigrationFileProcessor.filterMigrationFiles(sampleFiles, 'create_users');
       
       expect(result).toEqual(['0001_create_users_up.surql']);
     });
 
     it('should filter by pattern and direction', () => {
-      const result = MigrationFileUtils.filterMigrationFiles(
+      const result = MigrationFileProcessor.filterMigrationFiles(
         sampleFiles, 
         '0001', 
         'down'
@@ -430,7 +430,7 @@ describe('MigrationFileUtils', () => {
     });
 
     it('should return empty array when no matches', () => {
-      const result = MigrationFileUtils.filterMigrationFiles(sampleFiles, 'nonexistent');
+      const result = MigrationFileProcessor.filterMigrationFiles(sampleFiles, 'nonexistent');
       
       expect(result).toEqual([]);
     });
@@ -442,7 +442,7 @@ describe('MigrationFileUtils', () => {
         '0002_second_up.surql'
       ];
       
-      const result = MigrationFileUtils.filterMigrationFiles(unsortedFiles);
+      const result = MigrationFileProcessor.filterMigrationFiles(unsortedFiles);
       
       expect(result).toEqual([
         '0001_first_up.surql',
@@ -458,7 +458,7 @@ describe('MigrationFileUtils', () => {
         '0002_second_down.surql'
       ];
       
-      const result = MigrationFileUtils.filterMigrationFiles(unsortedFiles, undefined, 'down');
+      const result = MigrationFileProcessor.filterMigrationFiles(unsortedFiles, undefined, 'down');
       
       // The actual implementation uses .reverse() which reverses the order after sorting
       expect(result).toEqual([
@@ -474,7 +474,7 @@ describe('MigrationFileUtils', () => {
       const content = 'USE NAMESPACE ${TEST_VAR};';
       const context = {};
       
-      const result = MigrationFileUtils.processContent(content, context);
+      const result = MigrationFileProcessor.processContent(content, context);
       
       expect(result).toContain('USE NAMESPACE test_value;');
     });
@@ -483,7 +483,7 @@ describe('MigrationFileUtils', () => {
       const content = 'DEFINE TABLE users;';
       const context = { defaultNamespace: 'myapp' };
       
-      const result = MigrationFileUtils.processContent(content, context);
+      const result = MigrationFileProcessor.processContent(content, context);
       
       expect(result).toContain('USE NAMESPACE myapp;');
     });
@@ -492,7 +492,7 @@ describe('MigrationFileUtils', () => {
       const content = 'DEFINE TABLE users;';
       const context = { defaultDatabase: 'main' };
       
-      const result = MigrationFileUtils.processContent(content, context);
+      const result = MigrationFileProcessor.processContent(content, context);
       
       expect(result).toContain('USE DATABASE main;');
     });
@@ -501,7 +501,7 @@ describe('MigrationFileUtils', () => {
       const content = 'USE NAMESPACE custom; DEFINE TABLE users;';
       const context = { defaultNamespace: 'myapp' };
       
-      const result = MigrationFileUtils.processContent(content, context);
+      const result = MigrationFileProcessor.processContent(content, context);
       
       expect(result).not.toContain('USE NAMESPACE myapp;');
       expect(result).toContain('USE NAMESPACE custom;');
@@ -511,7 +511,7 @@ describe('MigrationFileUtils', () => {
       const content = 'INSERT INTO users VALUES (1);';
       const context = { useTransactions: true };
       
-      const result = MigrationFileUtils.processContent(content, context);
+      const result = MigrationFileProcessor.processContent(content, context);
       
       expect(result).toContain('BEGIN TRANSACTION;');
       expect(result).toContain('COMMIT TRANSACTION;');
@@ -521,7 +521,7 @@ describe('MigrationFileUtils', () => {
       const content = 'DEFINE TABLE users;';
       const context = { useTransactions: true };
       
-      const result = MigrationFileUtils.processContent(content, context);
+      const result = MigrationFileProcessor.processContent(content, context);
       
       // Should not wrap DDL in transactions
       expect(result).not.toContain('BEGIN TRANSACTION;');
@@ -531,7 +531,7 @@ describe('MigrationFileUtils', () => {
       const content = 'BEGIN TRANSACTION; INSERT INTO users VALUES (1); COMMIT TRANSACTION;';
       const context = { useTransactions: true };
       
-      const result = MigrationFileUtils.processContent(content, context);
+      const result = MigrationFileProcessor.processContent(content, context);
       
       // Should not add extra transaction wrapper
       const transactionCount = (result.match(/BEGIN TRANSACTION/g) || []).length;
@@ -542,7 +542,7 @@ describe('MigrationFileUtils', () => {
       const content = 'USE NAMESPACE test; USE DATABASE main; INSERT INTO users VALUES (1);';
       const context = {};
       
-      const result = MigrationFileUtils.processContent(content, context);
+      const result = MigrationFileProcessor.processContent(content, context);
       
       expect(result).toBe(content);
     });

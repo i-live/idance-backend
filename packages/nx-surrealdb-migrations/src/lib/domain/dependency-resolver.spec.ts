@@ -1,9 +1,9 @@
 import * as fs from 'fs/promises';
 import { DependencyResolver } from './dependency-resolver';
-import { ConfigLoader } from './config-loader';
+import { ConfigLoader } from '../configuration/config-loader';
 
 jest.mock('fs/promises');
-jest.mock('./config-loader');
+jest.mock('../configuration/config-loader');
 
 const mockFs = fs as jest.Mocked<typeof fs>;
 const MockConfigLoader = ConfigLoader as jest.Mocked<typeof ConfigLoader>;

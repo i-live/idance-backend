@@ -4,8 +4,8 @@ import {
   joinPathFragments,
   readProjectConfiguration
 } from '@nx/devkit';
-import { MigrationFileUtils } from '../../lib/migration-file-utils';
-import { TreeUtils } from '../../lib/tree-utils';
+import { MigrationFileProcessor } from '../../lib/filesystem/migration-file-processor';
+import { TreeUtils } from '../../lib/filesystem/tree-utils';
 
 export interface MigrationGeneratorSchema {
   name: string;
@@ -150,7 +150,7 @@ async function createNewModule(
     // Need to determine next available number
     const existingModules = await discoverExistingModules(tree, migrationsPath);
     const cleanName = pattern.replace(/^\d+_?/, '').toLowerCase();
-    moduleId = MigrationFileUtils.generateModuleId(cleanName, existingModules);
+    moduleId = MigrationFileProcessor.generateModuleId(cleanName, existingModules);
   }
   
   const modulePath = joinPathFragments(migrationsPath, moduleId);

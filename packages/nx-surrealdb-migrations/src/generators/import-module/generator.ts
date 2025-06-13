@@ -5,8 +5,8 @@ import {
 import * as path from 'path';
 import * as fs from 'fs';
 import { execSync } from 'child_process';
-import { DependencyResolver } from '../../lib/dependency-resolver';
-import { TreeUtils } from '../../lib/tree-utils';
+import { DependencyResolver } from '../../lib/domain/dependency-resolver';
+import { TreeUtils } from '../../lib/filesystem/tree-utils';
 
 export interface ImportModuleGeneratorSchema {
   module: string;

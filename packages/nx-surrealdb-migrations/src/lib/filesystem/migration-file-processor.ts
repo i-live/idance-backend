@@ -1,6 +1,6 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import { replaceEnvVars } from './env';
+import { replaceEnvVars } from '../infrastructure/env';
 
 export interface MigrationFile {
   number: string;
@@ -19,7 +19,7 @@ export interface MigrationContext {
   useTransactions?: boolean;
 }
 
-export class MigrationFileUtils {
+export class MigrationFileProcessor {
   private static readonly MIGRATION_PATTERN = /^(\d{4})_(.+?)_(up|down)\.surql$/;
   private static readonly SUBDIR_PATTERN = /^(\d{1,4})_(.+)$/;
   private static readonly NAMESPACE_OPERATIONS = /(?:DEFINE|USE|REMOVE)\s+NAMESPACE/i;

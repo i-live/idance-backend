@@ -1,6 +1,6 @@
 import { ExecutorContext, logger } from '@nx/devkit';
-import { MigrationEngine } from '../../lib/migration-engine';
-import { Debug } from '../../lib/debug';
+import { MigrationService } from '../../lib/domain/migration-service';
+import { Debug } from '../../lib/infrastructure/debug';
 
 export interface MigrateExecutorSchema {
   url?: string;
@@ -23,7 +23,7 @@ export default async function runExecutor(
   options: MigrateExecutorSchema,
   context: ExecutorContext
 ): Promise<{ success: boolean }> {
-  const engine = new MigrationEngine(context);
+  const engine = new MigrationService(context);
   const debug = Debug.scope('migrate-executor');
 
   // Enable debug mode if requested
@@ -48,6 +48,7 @@ export default async function runExecutor(
 
     // Determine target modules
     const targetModules = options.module ? [String(options.module)] : undefined;
+    debug.log(`options `,options);
     debug.log(`Target modules: ${targetModules ? targetModules.join(', ') : 'all'}`);
 
     if (options.dryRun) {
@@ -55,7 +56,7 @@ export default async function runExecutor(
       logger.info('🔍 Dry run mode - showing pending migrations without applying them');
       
       const pendingMigrations = await engine.findPendingMigrations(targetModules);
-      
+
       if (pendingMigrations.length === 0) {
         logger.info('✅ No pending migrations found');
         return { success: true };

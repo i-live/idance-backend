@@ -2,16 +2,17 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as crypto from 'crypto';
 import { performance } from 'perf_hooks';
-import { SurrealDBClient } from './client';
-import { MigrationTracker } from './migration-tracker';
-import { ConfigLoader } from './config-loader';
+import { SurrealDBClient } from '../infrastructure/client';
+import { MigrationRepository } from './migration-repository';
+import { ConfigLoader } from '../configuration/config-loader';
 import { DependencyResolver } from './dependency-resolver';
-import { MigrationFileUtils, type MigrationFile, type MigrationContext } from './migration-file-utils';
-import { replaceEnvVars, loadEnvFile } from './env';
-import { resolveProjectPath } from './project';
-import { Debug } from './debug';
+import { MigrationFileProcessor, type MigrationFile, type MigrationContext } from '../filesystem/migration-file-processor';
+import { replaceEnvVars, loadEnvFile } from '../infrastructure/env';
+import { resolveProjectPath } from '../infrastructure/project';
+import { Debug } from '../infrastructure/debug';
+import { MigrationRecord, Migration } from '../configuration/types';
 
-export interface MigrationEngineOptions {
+export interface MigrationServiceOptions {
   url: string;
   user: string;
   pass: string;
@@ -28,7 +29,7 @@ export interface MigrationEngineOptions {
 
 export interface MigrationExecutionContext {
   client: SurrealDBClient;
-  tracker: MigrationTracker;
+  repository: MigrationRepository;
   resolver: DependencyResolver;
   options: ResolvedMigrationOptions;
 }
@@ -65,19 +66,19 @@ export interface MigrationFileResult {
   skipReason?: string;
 }
 
-export class MigrationEngine {
+export class MigrationService {
   private context: MigrationExecutionContext | null = null;
-  private options: MigrationEngineOptions | null = null;
-  private debug = Debug.scope('migration-engine');
+  private options: MigrationServiceOptions | null = null;
+  private debug = Debug.scope('migration-service');
 
   constructor(private projectContext?: any) {}
 
   // Static utility methods for file operations
   static async findMatchingSubdirectory(basePath: string, pattern: string): Promise<string | null> {
-    return MigrationFileUtils.findMatchingSubdirectory(basePath, pattern);
+    return MigrationFileProcessor.findMatchingSubdirectory(basePath, pattern);
   }
 
-  async initialize(options: MigrationEngineOptions): Promise<void> {
+  async initialize(options: MigrationServiceOptions): Promise<void> {
     // Store options for later use
     this.options = options;
     
@@ -123,9 +124,9 @@ export class MigrationEngine {
       database: resolvedOptions.database
     });
 
-    // Initialize migration tracker
-    const tracker = new MigrationTracker(client, resolvedOptions.schemaPath);
-    await tracker.initialize();
+    // Initialize migration repository
+    const repository = new MigrationRepository(client, resolvedOptions.schemaPath);
+    await repository.initialize();
 
     // Initialize dependency resolver
     const resolver = new DependencyResolver(basePath);
@@ -133,7 +134,7 @@ export class MigrationEngine {
 
     this.context = {
       client,
-      tracker,
+      repository,
       resolver,
       options: resolvedOptions
     };
@@ -146,8 +147,9 @@ export class MigrationEngine {
     if (!this.context) {
       throw new Error('Migration engine not initialized. Call initialize() first.');
     }
-
-    const { resolver, options, tracker } = this.context;
+    this.debug.log("findPendingMigrations:",targetModules);
+    
+    const { resolver, options, repository } = this.context;
     const basePath = this.projectContext 
       ? resolveProjectPath(this.projectContext, options.initPath)
       : options.initPath;
@@ -169,7 +171,7 @@ export class MigrationEngine {
       
       for (const file of moduleFiles) {
         // Check if migration should be applied
-        const { canApply } = await tracker.canApplyMigration(
+        const { canApply } = await repository.canApplyMigration(
           file.number,
           file.name,
           direction
@@ -346,7 +348,7 @@ export class MigrationEngine {
       throw new Error('Migration engine not initialized. Call initialize() first.');
     }
 
-    const { resolver, tracker } = this.context;
+    const { resolver, repository } = this.context;
     const modulesToCheck = targetModules || resolver.getAllModules();
     
     const modules = [];
@@ -379,6 +381,37 @@ export class MigrationEngine {
       totalApplied,
       totalPending
     };
+  }
+
+  private buildMigrationRecord(
+    migrationFile: MigrationFile, 
+    status: 'success' | 'fail', 
+    executionTimeMs: number
+  ): MigrationRecord {
+    const { options } = this.context!;
+    
+    return {
+      number: migrationFile.number,
+      name: migrationFile.name,
+      direction: migrationFile.direction,
+      filename: migrationFile.filename,
+      path: path.dirname(migrationFile.filePath),
+      content: migrationFile.content,
+      module: migrationFile.moduleId,
+      namespace: options.namespace,
+      database: options.database,
+      checksum: migrationFile.checksum,
+      status,
+      execution_time_ms: executionTimeMs
+    };
+  }
+
+  async findLastMigrations(moduleIds: string[]): Promise<Migration[]> {
+    if (!this.context) {
+      throw new Error('Migration engine not initialized. Call initialize() first.');
+    }
+
+    return await this.context.repository.findLastMigrations(moduleIds);
   }
 
   async close(): Promise<void> {
@@ -441,7 +474,7 @@ export class MigrationEngine {
     
     try {
       const files = await fs.readdir(modulePath);
-      const migrationFiles = MigrationFileUtils.filterMigrationFiles(files, undefined, direction);
+      const migrationFiles = MigrationFileProcessor.filterMigrationFiles(files, undefined, direction);
       
       const migrations: MigrationFile[] = [];
       
@@ -479,13 +512,13 @@ export class MigrationEngine {
       throw new Error('Migration engine not initialized.');
     }
 
-    const { client, tracker, options } = this.context;
+    const { client, repository, options } = this.context;
     const startTime = performance.now();
 
     try {
       // Check if migration can be applied (unless forcing)
       if (!options.force) {
-        const { canApply, reason } = await tracker.canApplyMigration(
+        const { canApply, reason } = await repository.canApplyMigration(
           migrationFile.number,
           migrationFile.name,
           migrationFile.direction
@@ -503,7 +536,7 @@ export class MigrationEngine {
       }
 
       // Process migration content
-      const processedContent = MigrationFileUtils.processContent(migrationFile.content, {
+      const processedContent = MigrationFileProcessor.processContent(migrationFile.content, {
         defaultNamespace: options.namespace,
         defaultDatabase: options.database,
         useTransactions: options.useTransactions
@@ -514,19 +547,7 @@ export class MigrationEngine {
       const executionTimeMs = Math.round(performance.now() - startTime);
 
       // Record migration
-      await tracker.addMigration({
-        number: migrationFile.number,
-        name: migrationFile.name,
-        direction: migrationFile.direction,
-        filename: migrationFile.filename,
-        path: path.dirname(migrationFile.filePath),
-        content: migrationFile.content,
-        namespace: options.namespace,
-        database: options.database,
-        checksum: migrationFile.checksum,
-        status: 'success',
-        execution_time_ms: executionTimeMs
-      });
+      await repository.addMigration(this.buildMigrationRecord(migrationFile, 'success', executionTimeMs));
 
       return {
         file: migrationFile,
@@ -538,19 +559,7 @@ export class MigrationEngine {
       const executionTimeMs = Math.round(performance.now() - startTime);
       
       // Record failed migration
-      await tracker.addMigration({
-        number: migrationFile.number,
-        name: migrationFile.name,
-        direction: migrationFile.direction,
-        filename: migrationFile.filename,
-        path: path.dirname(migrationFile.filePath),
-        content: migrationFile.content,
-        namespace: options.namespace,
-        database: options.database,
-        checksum: migrationFile.checksum,
-        status: 'fail',
-        execution_time_ms: executionTimeMs
-      });
+      await repository.addMigration(this.buildMigrationRecord(migrationFile, 'fail', executionTimeMs));
 
       return {
         file: migrationFile,
@@ -579,7 +588,7 @@ export class MigrationEngine {
     let currentlyAppliedCount = 0;
     
     for (const migration of allMigrations) {
-      const latestStatus = await this.context.tracker.getLatestMigrationStatus(
+      const latestStatus = await this.context.repository.getLatestMigrationStatus(
         migration.number, 
         migration.name
       );
@@ -612,7 +621,7 @@ export class MigrationEngine {
   }>> {
     if (!this.context) return [];
     
-    const { tracker } = this.context;
+    const { repository } = this.context;
     const basePath = this.projectContext 
       ? resolveProjectPath(this.projectContext, this.context.options.initPath)
       : this.context.options.initPath;
@@ -622,7 +631,7 @@ export class MigrationEngine {
     
     try {
       // Get applied up migrations for this module
-      const upMigrations = await tracker.getMigrationsByDirectionAndPath('up', modulePath);
+      const upMigrations = await repository.getMigrationsByDirectionAndPath('up', modulePath);
       this.debug.log(`Found ${upMigrations.length} up migrations for ${moduleId}`);
       
       const successfulMigrations = upMigrations.filter(m => m.status === 'success');

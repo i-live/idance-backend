@@ -1,5 +1,5 @@
 import { Surreal } from 'surrealdb';
-import { SurrealDBConfig, SurrealQueryResult } from './types';
+import { SurrealDBConfig, SurrealQueryResult } from '../configuration/types';
 
 export class SurrealDBClient {
   private db: Surreal;

@@ -146,6 +146,13 @@ Always include usage updates in responses showing:
 3. Example: `nx run nx-surrealdb-migrations:build`
 4. This applies to all code changes in packages/ directory
 
+**CRITICAL - NEVER EDIT COMPILED FILES:**
+- NEVER manually edit files in `dist/` or any compiled/generated folders
+- NEVER attempt to fix issues by modifying compiled JavaScript files
+- ALWAYS edit the source TypeScript files in `src/` directories
+- If something is missing in `dist/`, check the build configuration in `project.json`
+- If files aren't being copied correctly, rebuild with `nx run <package>:build`
+
 ## File Organization
 - Place package-specific files in their respective package directories (packages/package-name/)
 - Never add package-specific code/docs to monorepo root

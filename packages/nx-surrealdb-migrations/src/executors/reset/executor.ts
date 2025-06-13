@@ -1,8 +1,8 @@
 import { ExecutorContext } from '@nx/devkit';
-import { SurrealDBClient } from '../../lib/client';
-import { loadEnvFile, replaceEnvVars } from '../../lib/env';
-import { resolveProjectPath } from '../../lib/project';
-import { Debug } from '../../lib/debug';
+import { SurrealDBClient } from '../../lib/infrastructure/client';
+import { loadEnvFile, replaceEnvVars } from '../../lib/infrastructure/env';
+import { resolveProjectPath } from '../../lib/infrastructure/project';
+import { Debug } from '../../lib/infrastructure/debug';
 
 export interface ResetExecutorSchema {
   url: string;
