@@ -68,10 +68,15 @@ export default async function runExecutor(
     const result = await engine.executeMigrations(targetModules, 'migrate', targetFilenames);
     
     if (result.success) {
-      logger.info(`✅ Migration completed successfully!`);
-      logger.info(`   Files processed: ${result.filesProcessed}`);
-      logger.info(`   Files skipped: ${result.filesSkipped}`);
-      logger.info(`   Execution time: ${result.executionTimeMs}ms`);
+      if (result.filesProcessed === 0 && result.results.length === 0) {
+        logger.info(`✅ All migrations are up to date - no pending migrations found`);
+        logger.info(`   Execution time: ${result.executionTimeMs}ms`);
+      } else {
+        logger.info(`✅ Migration completed successfully!`);
+        logger.info(`   Files processed: ${result.filesProcessed}`);
+        logger.info(`   Files skipped: ${result.filesSkipped}`);
+        logger.info(`   Execution time: ${result.executionTimeMs}ms`);
+      }
       
       if (result.results.length > 0) {
         logger.info('\n📊 Migration Details:');

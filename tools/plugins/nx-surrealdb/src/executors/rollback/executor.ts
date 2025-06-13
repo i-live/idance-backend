@@ -137,10 +137,15 @@ export default async function runExecutor(
     const result = await service.executeMigrations(resolvedTargetModules, 'rollback', targetFilenames);
     
     if (result.success) {
-      logger.info(`✅ Rollback completed successfully!`);
-      logger.info(`   Files processed: ${result.filesProcessed}`);
-      logger.info(`   Files skipped: ${result.filesSkipped}`);
-      logger.info(`   Execution time: ${result.executionTimeMs}ms`);
+      if (result.filesProcessed === 0 && result.results.length === 0) {
+        logger.info(`⚠️  No migrations to rollback - all requested migrations are already rolled back or not yet applied`);
+        logger.info(`   Execution time: ${result.executionTimeMs}ms`);
+      } else {
+        logger.info(`✅ Rollback completed successfully!`);
+        logger.info(`   Files processed: ${result.filesProcessed}`);
+        logger.info(`   Files skipped: ${result.filesSkipped}`);
+        logger.info(`   Execution time: ${result.executionTimeMs}ms`);
+      }
       
       if (result.results.length > 0) {
         logger.info('\n📊 Rollback Details:');

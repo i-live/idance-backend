@@ -373,11 +373,21 @@ export class MigrationService {
       // 1. Check dependency conflicts
       const dependencyValidation = resolver.validateRollback(moduleId, resolvedModules);
       if (!dependencyValidation.canRollback) {
-        canRollback = false;
-        dependencyValidation.blockedBy.forEach(blocker => blockedBySet.add(blocker));
-        if (dependencyValidation.reason) {
-          warnings.push(dependencyValidation.reason);
+        // Check if the blockers actually have applied migrations
+        const actualBlockers = [];
+        for (const blocker of dependencyValidation.blockedBy) {
+          const blockerMigrations = await this.getAppliedMigrations(blocker);
+          if (blockerMigrations.length > 0) {
+            actualBlockers.push(blocker);
+          }
         }
+        
+        if (actualBlockers.length > 0) {
+          canRollback = false;
+          actualBlockers.forEach(blocker => blockedBySet.add(blocker));
+          warnings.push(`Cannot rollback ${moduleId} because it has active dependents with applied migrations: ${actualBlockers.join(', ')}`);
+        }
+        // If no actual blockers (all dependents have 0 applied migrations), allow rollback
       }
 
       // 2. Get migration state
@@ -774,23 +784,14 @@ export class MigrationService {
   }>> {
     if (!this.context) return [];
     
-    const { repository } = this.context;
-    const basePath = this.projectContext 
-      ? resolveProjectPath(this.projectContext, this.context.options.initPath)
-      : this.context.options.initPath;
-    const modulePath = path.join(basePath, moduleId);
-    
-    this.debug.log(`Checking applied migrations for module ${moduleId} at path: ${modulePath}`);
+    this.debug.log(`Checking currently applied migrations for module ${moduleId}`);
     
     try {
-      // Get applied up migrations for this module
-      const upMigrations = await repository.getMigrationsByDirectionAndPath('up', modulePath);
-      this.debug.log(`Found ${upMigrations.length} up migrations for ${moduleId}`);
+      // Use findLastMigrations to get only migrations where the latest status is UP+SUCCESS
+      const lastMigrations = await this.context.repository.findLastMigrations([moduleId]);
+      this.debug.log(`Found ${lastMigrations.length} currently applied migrations for ${moduleId}`);
       
-      const successfulMigrations = upMigrations.filter(m => m.status === 'success');
-      this.debug.log(`${successfulMigrations.length} successful migrations for ${moduleId}`);
-      
-      return successfulMigrations
+      return lastMigrations
         .map(migration => ({
           number: migration.number || '',
           name: migration.name || '',

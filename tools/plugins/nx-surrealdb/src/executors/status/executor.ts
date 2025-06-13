@@ -1,6 +1,7 @@
 import { ExecutorContext, logger } from '@nx/devkit';
 import { MigrationService } from '../../lib/domain/migration-service';
 import { Debug } from '../../lib/infrastructure/debug';
+const chalk = require('chalk');
 
 export interface StatusExecutorSchema {
   url?: string;
@@ -200,8 +201,11 @@ export default async function runExecutor(
     for (const module of status.modules) {
       const statusIcon = module.pendingMigrations > 0 ? '🔄' : '✅';
       const statusText = module.pendingMigrations > 0 ? 'PENDING' : 'UP-TO-DATE';
+      const coloredStatus = module.pendingMigrations > 0 
+        ? chalk.yellow(`[${statusText}]`)
+        : chalk.green(`[${statusText}]`);
       
-      logger.info(`\n   ${statusIcon} ${module.moduleId} [${statusText}]`);
+      logger.info(`\n   ${statusIcon} ${module.moduleId} ${coloredStatus}`);
       logger.info(`      Applied: ${module.appliedMigrations} migration(s)`);
       
       if (module.pendingMigrations > 0) {
@@ -254,51 +258,96 @@ function showDependencyGraph(
   title: string = '🌐 Dependency Graph:'
 ): void {
   logger.info(`\n${title}`);
+  
+  // Build a complete tree structure from the modules
+  const tree = buildDependencyTree(modules);
+  
+  // Display the tree
+  displayDependencyTree(tree, '   ');
+}
+
+interface TreeNode {
+  moduleId: string;
+  isRoot: boolean;
+  children: TreeNode[];
+  dependencies: string[];
+}
+
+function buildDependencyTree(
+  modules: Array<{ moduleId: string; dependencies: string[]; dependents: string[] }>
+): TreeNode[] {
+  const moduleMap = new Map(modules.map(m => [m.moduleId, m]));
+  const nodeMap = new Map<string, TreeNode>();
   const processedModules = new Set<string>();
   
-  // Find and process root modules (those with no dependencies)
-  const rootModules = modules.filter(m => m.dependencies.length === 0);
+  // Create nodes for all modules
+  for (const module of modules) {
+    nodeMap.set(module.moduleId, {
+      moduleId: module.moduleId,
+      isRoot: module.dependencies.length === 0,
+      children: [],
+      dependencies: module.dependencies
+    });
+  }
   
-  if (rootModules.length > 0) {
-    for (const rootModule of rootModules) {
-      if (processedModules.has(rootModule.moduleId)) continue;
-      logger.info(`   ${rootModule.moduleId} (root)`);
-      showDependents(rootModule.moduleId, modules, 1, processedModules);
+  // Build parent-child relationships
+  for (const module of modules) {
+    const parentNode = nodeMap.get(module.moduleId);
+    if (!parentNode) continue;
+    
+    for (const dependent of module.dependents) {
+      const childNode = nodeMap.get(dependent);
+      if (childNode) {
+        parentNode.children.push(childNode);
+      }
     }
   }
-
-  // Show any remaining modules in dependency chains or circular dependencies
+  
+  // Find root nodes (modules with no dependencies within our set)
+  const roots: TreeNode[] = [];
   for (const module of modules) {
-    if (!processedModules.has(module.moduleId)) {
-      if (module.dependencies.length > 0) {
-        // This module has dependencies but wasn't reached from a root
-        // Could be part of a circular dependency or missing dependency
-        logger.info(`   ${module.moduleId} → depends on: ${module.dependencies.join(', ')}`);
-      } else {
-        // This shouldn't happen as root modules are processed above
-        logger.info(`   ${module.moduleId} (isolated)`);
-      }
+    const node = nodeMap.get(module.moduleId);
+    if (!node) continue;
+    
+    // Check if all dependencies are outside our module set
+    const hasInternalDependencies = module.dependencies.some(dep => moduleMap.has(dep));
+    
+    if (!hasInternalDependencies) {
+      roots.push(node);
       processedModules.add(module.moduleId);
     }
   }
+  
+  // If no roots found (circular dependencies or all modules have deps), 
+  // find modules with external dependencies only
+  if (roots.length === 0) {
+    for (const module of modules) {
+      if (processedModules.has(module.moduleId)) continue;
+      const node = nodeMap.get(module.moduleId);
+      if (node) {
+        roots.push(node);
+      }
+    }
+  }
+  
+  return roots;
 }
 
-function showDependents(
-  moduleId: string, 
-  allModules: Array<{ moduleId: string; dependencies: string[]; dependents: string[] }>, 
-  depth: number, 
-  processed: Set<string>
-): void {
-  processed.add(moduleId);
-  
-  const module = allModules.find(m => m.moduleId === moduleId);
-  if (!module) return;
-
-  for (const dependent of module.dependents) {
-    if (processed.has(dependent)) continue;
+function displayDependencyTree(nodes: TreeNode[], prefix: string, isChild: boolean = false): void {
+  for (const node of nodes) {
+    const suffix = node.isRoot ? ' (root)' : '';
     
-    const indent = '  '.repeat(depth);
-    logger.info(`${indent}└─ ${dependent}`);
-    showDependents(dependent, allModules, depth + 1, processed);
+    if (isChild) {
+      logger.info(`${prefix}└─ ${node.moduleId}${suffix}`);
+    } else {
+      logger.info(`${prefix}${node.moduleId}${suffix}`);
+    }
+    
+    // Display children
+    if (node.children.length > 0) {
+      const childPrefix = isChild ? prefix + '  ' : prefix;
+      displayDependencyTree(node.children, childPrefix, true);
+    }
   }
 }
+
