@@ -32,7 +32,12 @@
     },
     "module": {
       "type": ["string", "number"],
-      "description": "Target specific module by name (e.g., 'auth'), number (e.g., 10), or full directory name (e.g., '010_auth')",
+      "description": "Target specific module by name (e.g., 'auth'), number (e.g., 10), full directory name (e.g., '010_auth'), or comma-separated list (e.g., '010,020,auth')",
+      "default": ""
+    },
+    "filename": {
+      "type": ["string", "number"],
+      "description": "Target specific rollback file by number (e.g., 1), name (e.g., 'auth'), full filename (e.g., '0001_authentication_down.surql'), or comma-separated list (e.g., '1,2,auth')",
       "default": ""
     },
     "envFile": {
@@ -74,6 +79,11 @@
       "type": "number",
       "description": "Number of migration steps to rollback (default: 1, use 0 for all)",
       "default": 1
+    },
+    "detailed": {
+      "type": "boolean",
+      "description": "Show detailed rollback information including execution details",
+      "default": false
     },
     "debug": {
       "type": "boolean",

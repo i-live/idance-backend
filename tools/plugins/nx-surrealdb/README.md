@@ -34,7 +34,8 @@ A comprehensive SurrealDB toolkit for [Nx](https://nx.dev/) monorepos featuring 
 - **Transaction Control**: Optional transaction wrapping for atomicity
 
 ### 🎯 **Developer Experience**
-- **Module Targeting**: Reference modules by name (`auth`), number (`10`), or full path (`010_auth`)
+- **Smart Module Targeting**: Reference modules by index (`1`), name (`auth`), number (`10`), or full path (`010_auth`)
+- **Multiple Reference Patterns**: Mix and match module patterns in a single command (`--module 0,auth,20`)
 - **Environment Variables**: Full `.env` support with variable interpolation
 - **Rich Logging**: Emoji-enhanced console output with detailed execution statistics
 - **Error Handling**: Comprehensive error messages with actionable guidance
@@ -194,12 +195,20 @@ nx g @idance/nx-surrealdb-migrations:migration setup-notifications --project dat
 # Apply all pending migrations
 nx run database:migrate
 
-# Apply migrations for specific module
-nx run database:migrate --module auth
-nx run database:migrate --module 10
+# Apply migrations for specific module (multiple ways)
+nx run database:migrate --module 1          # Index-based (2nd module)
+nx run database:migrate --module 10         # Number-based (module 010)
+nx run database:migrate --module auth       # Name-based
+nx run database:migrate --module 010_auth   # Full name
 
-# Dry run to see what would be applied
+# Apply multiple modules
+nx run database:migrate --module 0,1        # First two modules
+nx run database:migrate --module admin,auth # By names
+nx run database:migrate --module 0,auth,20  # Mixed patterns
+
+# Dry run to preview what would be applied
 nx run database:migrate --dryRun
+nx run database:migrate --module auth --dryRun
 
 # Force apply even if already applied
 nx run database:migrate --force
@@ -211,30 +220,131 @@ nx run database:migrate --force
 # Show overall migration status
 nx run database:status
 
-# Show status for specific module
-nx run database:status --module auth
+# Show status for specific module (multiple ways)
+nx run database:status --module 1          # Index-based (2nd module)
+nx run database:status --module 10         # Number-based (module 010)
+nx run database:status --module auth       # Name-based
+nx run database:status --module 010_auth   # Full name
 
-# Show detailed information with file names
+# Show status for multiple modules
+nx run database:status --module 0,1,2      # All modules by index
+nx run database:status --module admin,auth # Multiple by name
+
+# Show detailed information with file names and timing
 nx run database:status --detailed
+nx run database:status --module auth --detailed
 
 # Output as JSON for automation
 nx run database:status --json
+nx run database:status --module auth --json
 ```
 
 ### Rollback Migrations
 
 ```bash
-# Rollback specific module (with safety validation)
-nx run database:rollback --module auth
+# Rollback specific module (with dependency safety validation)
+nx run database:rollback --module 1          # Index-based (2nd module)
+nx run database:rollback --module 10         # Number-based (module 010)
+nx run database:rollback --module auth       # Name-based
+nx run database:rollback --module 010_auth   # Full name
 
-# Dry run to see what would be rolled back
+# Rollback multiple modules (in dependency-safe order)
+nx run database:rollback --module 1,0        # Rollback auth, then admin
+nx run database:rollback --module auth,admin # Same as above, by name
+
+# Dry run to preview what would be rolled back
 nx run database:rollback --module auth --dryRun
+nx run database:rollback --module 0,1 --dryRun
 
-# Force rollback (bypass safety checks)
+# Show detailed rollback information
+nx run database:rollback --module auth --detailed
+nx run database:rollback --module auth --dryRun --detailed
+
+# Force rollback (bypass dependency safety checks - use with caution!)
 nx run database:rollback --module auth --force
 
 # Rollback specific number of steps
 nx run database:rollback --module auth --steps 2
+```
+
+## Common Workflows
+
+### Quick Development Workflow
+```bash
+# Check what needs to be done
+nx run database:status
+
+# Apply pending migrations to the auth module
+nx run database:migrate --module 1          # Using index (quick to type)
+
+# Check status again
+nx run database:status --module 1 --detailed
+```
+
+### Safe Production Deployment
+```bash
+# Preview all changes first
+nx run database:migrate --dryRun
+
+# Apply migrations module by module for safety
+nx run database:migrate --module admin      # Core system first
+nx run database:migrate --module auth       # Then authentication
+nx run database:migrate --module schema     # Finally application schema
+
+# Verify everything is applied
+nx run database:status
+```
+
+### Emergency Rollback Workflow
+```bash
+# Check current state
+nx run database:status --detailed
+
+# Preview rollback (recommended first step)
+nx run database:rollback --module auth --dryRun --detailed
+
+# Safe rollback with dependency validation
+nx run database:rollback --module auth
+
+# If blocked by dependencies, rollback dependents first
+nx run database:rollback --module schema    # Rollback dependent module first
+nx run database:rollback --module auth      # Then target module
+
+# Emergency override (use with extreme caution)
+# nx run database:rollback --module auth --force
+```
+
+### Team Development Best Practices
+```bash
+# Always check status before starting work
+nx run database:status
+
+# Use descriptive module names for clarity in team scripts
+nx run database:migrate --module authentication
+nx run database:status --module user-management
+
+# Use indices for quick interactive commands
+nx run database:status --module 0,1,2       # Check first three modules
+nx run database:migrate --module 1          # Quick migrate second module
+```
+
+### Working with Locked Modules
+```bash
+# Check which modules are locked
+nx run database:status --detailed
+
+# Attempt rollback (will be blocked)
+nx run database:rollback --module admin
+# Output: 🔒 Rollback locked - cannot rollback protected modules!
+
+# Preview what would happen with force override
+nx run database:rollback --module admin --dryRun --force
+
+# Emergency rollback with force override (use with extreme caution)
+nx run database:rollback --module admin --force
+
+# Migrations work normally on locked modules
+nx run database:migrate --module admin      # ✅ Allowed
 ```
 
 ## Configuration
@@ -265,6 +375,47 @@ The `config.json` file defines module dependencies:
   }
 }
 ```
+
+### Module Lock Protection
+
+Protect critical modules from accidental rollbacks by adding lock configuration:
+
+```json
+{
+  "modules": {
+    "000_admin": {
+      "name": "System Administration",
+      "description": "Core database setup and administrative functions",
+      "depends": [],
+      "locked": true,
+      "lockReason": "Critical system module - contains core admin setup and permissions"
+    },
+    "010_auth": {
+      "name": "Authentication & Users",
+      "description": "User authentication and authorization system", 
+      "depends": ["000_admin"],
+      "locked": true,
+      "lockReason": "Core authentication system - rollback would break user access"
+    },
+    "020_schema": {
+      "name": "Application Schema",
+      "description": "Core application data models and relationships",
+      "depends": ["010_auth"]
+    }
+  }
+}
+```
+
+#### Lock Configuration Properties
+- **`locked`** (boolean, optional): When `true`, prevents rollback of this module
+- **`lockReason`** (string, optional): Human-readable explanation for why the module is locked
+
+#### Lock Protection Features
+- 🔒 **Visual Indicators**: Locked modules display with lock icons in status output
+- 🛡️ **Rollback Prevention**: Automatically blocks rollback attempts on locked modules
+- 📝 **Clear Messaging**: Shows specific lock reasons when rollback is blocked
+- ⚡ **Force Override**: Use `--force` flag to bypass lock protection for emergencies
+- 🎯 **Selective Locking**: Lock only critical modules, leave development modules unlocked
 
 ### Executor Options
 
@@ -325,12 +476,40 @@ Use gapped numbering (000, 010, 020, 030) to allow insertion of new modules:
 ```
 
 ### Module Reference Patterns
-All these patterns work for module targeting:
 
-- By number: `--module 10` → `010_auth`
-- By name: `--module auth` → `010_auth`  
-- By full path: `--module 010_auth` → `010_auth`
-- Legacy support: `--module 0` → `000_admin`
+The plugin supports multiple intuitive ways to specify modules, making it easy for developers to target the modules they need:
+
+#### **Index-Based (Most User-Friendly)**
+Reference modules by their position in sorted order:
+- `--module 0` → `000_admin` (first module)
+- `--module 1` → `010_auth` (second module)  
+- `--module 2` → `020_schema` (third module)
+
+#### **Number-Based (Direct Mapping)**
+Reference modules by their numeric prefix:
+- `--module 10` → `010_auth`
+- `--module 20` → `020_schema`
+- `--module 0` → `000_admin`
+
+#### **Name-Based (Semantic)**
+Reference modules by their descriptive name:
+- `--module auth` → `010_auth`
+- `--module admin` → `000_admin`
+- `--module schema` → `020_schema`
+
+#### **Full Name (Explicit)**
+Reference modules by their complete directory name:
+- `--module 010_auth` → `010_auth`
+- `--module 000_admin` → `000_admin`
+- `--module 020_schema` → `020_schema`
+
+#### **Multiple Modules**
+Combine any reference patterns with comma separation:
+- `--module 0,1` → `000_admin,010_auth`
+- `--module admin,auth,schema` → `000_admin,010_auth,020_schema`
+- `--module 0,auth,20` → `000_admin,010_auth,020_schema`
+
+**💡 Pro Tip**: Index-based referencing (`--module 1`) is often the quickest for interactive use, while name-based (`--module auth`) is most readable for scripts and documentation.
 
 ## Console Output Examples
 
@@ -345,14 +524,16 @@ All these patterns work for module targeting:
 
 📋 Module Details:
 
-   ✅ 000_admin [UP-TO-DATE]
+   ✅ 000_admin [UP-TO-DATE] 🔒
       Applied: 3 migration(s)
       Last Applied: 2024-01-15T10:30:00.000Z
+      🔒 Locked: Critical system module - contains core admin setup and permissions
 
-   🔄 010_auth [PENDING]
+   🔄 010_auth [PENDING] 🔒
       Applied: 2 migration(s)
       Pending: 1 migration(s)
       Dependencies: 000_admin
+      🔒 Locked: Core authentication system - rollback would break user access
 
    ✅ 020_schema [UP-TO-DATE]
       Applied: 3 migration(s)
@@ -391,6 +572,17 @@ All these patterns work for module targeting:
 💡 Use --force to bypass safety checks
 ```
 
+### Module Lock Protection
+```
+🔒 Rollback locked - cannot rollback protected modules!
+   Locked modules:
+   🔒 000_admin: Critical system module - contains core admin setup and permissions
+
+💡 To resolve this:
+   Option 1: Remove modules from the locked list in config.json
+   Option 2: Use --force to bypass lock protection (use with extreme caution)
+```
+
 ## Best Practices
 
 ### 1. **Module Organization**
@@ -408,13 +600,19 @@ All these patterns work for module targeting:
 - Avoid circular dependencies
 - Keep dependency chains shallow when possible
 
-### 4. **Safety Practices**
+### 4. **Module Lock Protection**
+- Lock critical modules to prevent accidental rollbacks
+- Use descriptive lock reasons to explain why modules are protected
+- Reserve locks for essential infrastructure modules (admin, core schema)
+- Document locked modules in team procedures
+
+### 5. **Safety Practices**
 - Use dry-run mode to preview changes
 - Validate rollback safety before applying
 - Use force flag sparingly and with caution
 - Test migration paths in development environments
 
-### 5. **Environment Management**
+### 6. **Environment Management**
 - Use environment variables for all connection details
 - Never commit credentials to version control
 - Use different databases for different environments
@@ -459,6 +657,32 @@ nx run database:status --module mymodule --detailed
 nx run database:migrate --module mymodule --force
 ```
 
+#### 5. **Module Lock Issues**
+```bash
+# Check which modules are locked
+nx run database:status --detailed
+
+# Identify locked modules blocking rollback
+nx run database:rollback --module mymodule --dryRun
+
+# Remove lock from config.json (for non-critical modules)
+# Edit database/config.json and remove "locked": true
+
+# Emergency override (use extreme caution)
+nx run database:rollback --module mymodule --force
+```
+
+#### 6. **Lock Configuration Errors**
+```bash
+# Validate config syntax
+nx run database:status
+
+# Common config issues:
+# - Missing comma after "depends": ["other_module"]
+# - Typo in "locked": true (must be boolean)
+# - Missing quotes around lockReason string
+```
+
 ## Code Architecture
 
 ### 🏗️ **Repository Pattern Architecture**
@@ -481,7 +705,8 @@ src/lib/
 └── domain/               # Core business logic
     ├── dependency-resolver.ts       # Module dependency management
     ├── migration-repository.ts      # Data access layer
-    └── migration-service.ts         # Business logic orchestration
+    ├── migration-service.ts         # Business logic orchestration
+    └── module-lock-manager.ts       # Module lock protection
 ```
 
 ### 🔄 **Repository Pattern Implementation**
@@ -504,6 +729,15 @@ async validateRollback(modules: string[]): Promise<RollbackValidation>
 async findPendingMigrations(modules?: string[]): Promise<MigrationFile[]>
 ```
 
+#### **ModuleLockManager** (Security Layer)
+**Responsibility**: Module lock protection and validation
+```typescript
+// Lock validation and management
+validateRollbackLock(moduleIds: string[]): { canRollback: boolean; blockedModules: string[] }
+validateMigrationLock(moduleIds: string[]): { canMigrate: boolean; blockedModules: string[] }
+isModuleLocked(moduleId: string): boolean
+```
+
 #### **Communication Pattern**
 ```
 MigrationService (Business Logic)
@@ -511,6 +745,10 @@ MigrationService (Business Logic)
 MigrationRepository (Data Access)
     ↓ executes queries
 SurrealDBClient (Database)
+
+ModuleLockManager (Security)
+    ↓ validates lock policies
+MigrationService (Business Logic)
 ```
 
 ### 🎯 **Design Benefits**

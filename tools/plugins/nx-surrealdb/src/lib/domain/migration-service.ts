@@ -4,9 +4,11 @@ import * as crypto from 'crypto';
 import { performance } from 'perf_hooks';
 import { SurrealDBClient } from '../infrastructure/client';
 import { MigrationRepository } from './migration-repository';
+import { ModuleLockManager } from './module-lock-manager';
 import { ConfigLoader } from '../configuration/config-loader';
 import { DependencyResolver } from './dependency-resolver';
 import { MigrationFileProcessor, type MigrationFile, type MigrationContext } from '../filesystem/migration-file-processor';
+import { PatternResolver, type PatternResolutionResult, type ResolvedFilename } from '../filesystem/pattern-resolver';
 import { replaceEnvVars, loadEnvFile } from '../infrastructure/env';
 import { resolveProjectPath } from '../infrastructure/project';
 import { Debug } from '../infrastructure/debug';
@@ -71,6 +73,7 @@ export interface MigrationFileResult {
 export class MigrationService {
   private context: MigrationExecutionContext | null = null;
   private options: MigrationServiceOptions | null = null;
+  private patternResolver: PatternResolver | null = null;
   private debug = Debug.scope('migration-service');
 
   constructor(private projectContext?: any) {}
@@ -135,6 +138,9 @@ export class MigrationService {
     const resolver = new DependencyResolver(basePath);
     await resolver.initialize(resolvedOptions.configPath);
 
+    // Initialize pattern resolver
+    this.patternResolver = new PatternResolver(resolver, basePath);
+
     this.context = {
       client,
       repository,
@@ -191,7 +197,8 @@ export class MigrationService {
 
   async executeMigrations(
     targetModules?: string[],
-    operation: 'migrate' | 'rollback' = 'migrate'
+    operation: 'migrate' | 'rollback' = 'migrate',
+    targetFilenames?: string[]
   ): Promise<MigrationResult> {
     if (!this.context) {
       throw new Error('Migration engine not initialized. Call initialize() first.');
@@ -202,7 +209,29 @@ export class MigrationService {
     // For rollback, find last applied migrations instead of pending migrations
     let migrationsToProcess: MigrationFile[];
     if (operation === 'rollback') {
-      const appliedMigrations = await this.findLastMigrations(targetModules || []);
+      // If no target modules specified, get all modules for rollback
+      let modulesToRollback: string[];
+      if (targetModules && targetModules.length > 0) {
+        // For specific modules, resolve them first
+        const resolvedModules = this.resolveTargetModules(targetModules);
+        const resolvedSet = new Set(resolvedModules);
+        
+        // Get the full rollback order, then filter to only requested modules
+        const allModules = this.context.resolver.getAllModules();
+        const fullRollbackOrder = this.context.resolver.getRollbackOrder(allModules);
+        
+        // Keep only the modules that were specifically requested, but in rollback order
+        modulesToRollback = fullRollbackOrder.filter(module => resolvedSet.has(module));
+        
+        this.debug.log(`Specific modules requested for rollback (in order): ${modulesToRollback.join(', ')}`);
+      } else {
+        // For full rollback, get all modules in proper rollback order
+        const allModules = this.context.resolver.getAllModules();
+        modulesToRollback = this.context.resolver.getRollbackOrder(allModules);
+        this.debug.log(`Rolling back all modules in order: ${modulesToRollback.join(', ')}`);
+      }
+      
+      const appliedMigrations = await this.findLastMigrations(modulesToRollback);
       
       // Find corresponding down files for each applied migration
       const { options } = this.context;
@@ -237,9 +266,45 @@ export class MigrationService {
           this.debug.log(`Error details: ${error.message}`);
         }
       }
+      
+      // Filter out locked modules unless force is enabled
+      if (!options.force && operation === 'rollback') {
+        const config = this.context.resolver.getConfig();
+        const lockManager = ModuleLockManager.createLockManager(config);
+        const originalCount = migrationsToProcess.length;
+        
+        migrationsToProcess = migrationsToProcess.filter(migration => {
+          const isLocked = lockManager.isModuleLocked(migration.moduleId);
+          if (isLocked) {
+            this.debug.log(`Skipping locked module migration: ${migration.moduleId}/${migration.filename}`);
+          }
+          return !isLocked;
+        });
+        
+        const filteredCount = originalCount - migrationsToProcess.length;
+        if (filteredCount > 0) {
+          this.debug.log(`Filtered out ${filteredCount} migrations from locked modules`);
+        }
+      }
+      
       this.debug.log(`Total migrations to process: ${migrationsToProcess.length}`);
     } else {
       migrationsToProcess = await this.findPendingMigrations(targetModules, 'up');
+    }
+
+    // Apply filename filtering if specified
+    if (targetFilenames && targetFilenames.length > 0) {
+      const resolvedFilenames = await this.resolveTargetFilenames(
+        targetFilenames, 
+        targetModules, 
+        operation === 'rollback' ? 'down' : 'up'
+      );
+      
+      // Filter migrations to only include resolved filenames
+      const filenameSet = new Set(resolvedFilenames.map(rf => rf.filename));
+      migrationsToProcess = migrationsToProcess.filter(m => filenameSet.has(m.filename));
+      
+      this.debug.log(`Filtered migrations by filename: ${migrationsToProcess.length} remaining`);
     }
     
     if (migrationsToProcess.length === 0) {
@@ -296,7 +361,7 @@ export class MigrationService {
     };
   }
 
-  async validateRollback(targetModules: string[]): Promise<{ 
+  async validateRollback(targetModules?: string[]): Promise<{ 
     canRollback: boolean; 
     blockedBy: string[]; 
     warnings: string[];
@@ -317,7 +382,9 @@ export class MigrationService {
       : options.initPath;
 
     // Resolve target modules to handle patterns like "010" -> "010_auth"
-    const resolvedModules = this.resolveTargetModules(targetModules);
+    const resolvedModules = targetModules 
+      ? this.resolveTargetModules(targetModules)
+      : resolver.getAllModules();
 
     // Initialize result collectors
     const warnings: string[] = [];
@@ -330,11 +397,21 @@ export class MigrationService {
       // 1. Check dependency conflicts
       const dependencyValidation = resolver.validateRollback(moduleId, resolvedModules);
       if (!dependencyValidation.canRollback) {
-        canRollback = false;
-        dependencyValidation.blockedBy.forEach(blocker => blockedBySet.add(blocker));
-        if (dependencyValidation.reason) {
-          warnings.push(dependencyValidation.reason);
+        // Check if the blockers actually have applied migrations
+        const actualBlockers = [];
+        for (const blocker of dependencyValidation.blockedBy) {
+          const blockerMigrations = await this.getAppliedMigrations(blocker);
+          if (blockerMigrations.length > 0) {
+            actualBlockers.push(blocker);
+          }
         }
+        
+        if (actualBlockers.length > 0) {
+          canRollback = false;
+          actualBlockers.forEach(blocker => blockedBySet.add(blocker));
+          warnings.push(`Cannot rollback ${moduleId} because it has active dependents with applied migrations: ${actualBlockers.join(', ')}`);
+        }
+        // If no actual blockers (all dependents have 0 applied migrations), allow rollback
       }
 
       // 2. Get migration state
@@ -374,6 +451,26 @@ export class MigrationService {
         rollbackFilesAvailable: hasRollbackFiles,
         dependencyConflicts: dependencyValidation.blockedBy
       });
+    }
+
+    // Check for locked modules ONLY if there are applied migrations to rollback and force is not enabled
+    if (!options.force && canRollback) {
+      const modulesWithAppliedMigrations = migrationChecks.filter(check => check.hasAppliedMigrations);
+      
+      if (modulesWithAppliedMigrations.length > 0) {
+        const config = resolver.getConfig();
+        const lockManager = ModuleLockManager.createLockManager(config);
+        const modulesToCheck = modulesWithAppliedMigrations.map(check => check.moduleId);
+        const lockValidation = lockManager.validateRollbackLock(modulesToCheck);
+        
+        if (lockValidation.blockedModules.length > 0) {
+          // Add warnings for locked modules but don't block the operation
+          for (const blockedModule of lockValidation.blockedModules) {
+            const reason = lockValidation.lockReasons[blockedModule];
+            warnings.push(`🔒 Module ${blockedModule} is locked and will be skipped: ${reason}`);
+          }
+        }
+      }
     }
 
     // Handle force flag override
@@ -448,6 +545,51 @@ export class MigrationService {
     };
   }
 
+  async getFileStatus(resolvedFilenames: ResolvedFilename[]): Promise<Array<{
+    filename: string;
+    moduleId: string;
+    number: string;
+    name: string;
+    direction: 'up' | 'down';
+    status: 'applied' | 'pending' | 'unknown';
+    appliedAt?: Date;
+    checksum?: string;
+    dependencies: string[];
+    dependents: string[];
+  }>> {
+    if (!this.context) {
+      throw new Error('Migration engine not initialized. Call initialize() first.');
+    }
+
+    const { repository, resolver } = this.context;
+    const fileStatuses = [];
+
+    for (const file of resolvedFilenames) {
+      // Check if migration is applied
+      const migrationStatus = await repository.getLatestMigrationStatus(file.number, file.name);
+      const isApplied = migrationStatus && migrationStatus.status === 'success';
+      
+      // Get module dependencies and dependents
+      const dependencies = resolver.getModuleDependencies(file.moduleId);
+      const dependents = resolver.getModuleDependents(file.moduleId);
+
+      fileStatuses.push({
+        filename: file.filename,
+        moduleId: file.moduleId,
+        number: file.number,
+        name: file.name,
+        direction: file.direction,
+        status: isApplied ? 'applied' : 'pending',
+        appliedAt: migrationStatus?.applied_at ? new Date(migrationStatus.applied_at) : undefined,
+        checksum: migrationStatus?.checksum,
+        dependencies,
+        dependents
+      });
+    }
+
+    return fileStatuses;
+  }
+
   private buildMigrationRecord(
     migrationFile: MigrationFile, 
     status: 'success' | 'fail', 
@@ -487,47 +629,62 @@ export class MigrationService {
   }
 
   public resolveTargetModules(targetModules: string[]): string[] {
-    if (!this.context) {
+    if (!this.patternResolver) {
       throw new Error('Migration engine not initialized.');
     }
 
-    const { resolver } = this.context;
-    const resolved: string[] = [];
-
-    for (const pattern of targetModules) {
-      // Try to find existing module using the same logic as MigrationFileProcessor
-      const allModules = resolver.getAllModules();
-      const normalizedPattern = pattern.trim().toLowerCase();
-      const patternAsNumber = parseInt(normalizedPattern, 10);
-      const normalizedPatternNumber = isNaN(patternAsNumber) ? null : patternAsNumber.toString();
-
-      let found = false;
-      for (const moduleId of allModules) {
-        const match = moduleId.match(/^(\d{1,4})_(.+)$/);
-        if (!match) continue;
-
-        const [, number, name] = match;
-        const normalizedNumber = parseInt(number, 10).toString();
-
-        if (
-          moduleId.toLowerCase() === normalizedPattern ||
-          (normalizedPatternNumber !== null && normalizedPatternNumber === normalizedNumber) ||
-          normalizedPattern === name.toLowerCase() ||
-          normalizedPattern === `${normalizedNumber}_${name.toLowerCase()}` ||
-          normalizedPattern === `${number}_${name.toLowerCase()}`
-        ) {
-          resolved.push(moduleId);
-          found = true;
-          break;
-        }
-      }
-
-      if (!found) {
-        throw new Error(`Module not found: ${pattern}. Available modules: ${allModules.join(', ')}`);
-      }
+    const result = this.patternResolver.resolveModules(targetModules);
+    
+    if (result.notFound.length > 0) {
+      const allModules = this.context?.resolver.getAllModules() || [];
+      throw new Error(`Module(s) not found: ${result.notFound.join(', ')}. Available modules: ${allModules.join(', ')}`);
     }
 
-    return resolved;
+    return result.resolved.map(r => r.moduleId);
+  }
+
+  public async resolveTargetFilenames(
+    filenamePatterns: string[], 
+    targetModules?: string[], 
+    direction: 'up' | 'down' = 'up'
+  ): Promise<ResolvedFilename[]> {
+    if (!this.patternResolver) {
+      throw new Error('Migration engine not initialized.');
+    }
+
+    // Resolve module patterns first if provided
+    const resolvedTargetModules = targetModules ? this.resolveTargetModules(targetModules) : undefined;
+
+    const result = await this.patternResolver.resolveFilenames(filenamePatterns, resolvedTargetModules, direction);
+    
+    if (result.notFound.length > 0) {
+      throw new Error(`Filename(s) not found: ${result.notFound.join(', ')}`);
+    }
+
+    return result.resolved;
+  }
+
+  public async resolveRollbackFilenames(
+    filenamePatterns: string[],
+    targetModules?: string[]
+  ): Promise<{ resolved: ResolvedFilename[]; warnings: string[] }> {
+    if (!this.patternResolver) {
+      throw new Error('Migration engine not initialized.');
+    }
+
+    // Resolve module patterns first if provided
+    const resolvedTargetModules = targetModules ? this.resolveTargetModules(targetModules) : undefined;
+
+    const result = await this.patternResolver.resolveRollbackFilenames(filenamePatterns, resolvedTargetModules);
+    
+    if (result.notFound.length > 0) {
+      throw new Error(`Rollback filename(s) not found: ${result.notFound.join(', ')}`);
+    }
+
+    return {
+      resolved: result.resolved,
+      warnings: result.dependencyWarnings
+    };
   }
 
   private async findModuleMigrations(
@@ -671,23 +828,14 @@ export class MigrationService {
   }>> {
     if (!this.context) return [];
     
-    const { repository } = this.context;
-    const basePath = this.projectContext 
-      ? resolveProjectPath(this.projectContext, this.context.options.initPath)
-      : this.context.options.initPath;
-    const modulePath = path.join(basePath, moduleId);
-    
-    this.debug.log(`Checking applied migrations for module ${moduleId} at path: ${modulePath}`);
+    this.debug.log(`Checking currently applied migrations for module ${moduleId}`);
     
     try {
-      // Get applied up migrations for this module
-      const upMigrations = await repository.getMigrationsByDirectionAndPath('up', modulePath);
-      this.debug.log(`Found ${upMigrations.length} up migrations for ${moduleId}`);
+      // Use findLastMigrations to get only migrations where the latest status is UP+SUCCESS
+      const lastMigrations = await this.context.repository.findLastMigrations([moduleId]);
+      this.debug.log(`Found ${lastMigrations.length} currently applied migrations for ${moduleId}`);
       
-      const successfulMigrations = upMigrations.filter(m => m.status === 'success');
-      this.debug.log(`${successfulMigrations.length} successful migrations for ${moduleId}`);
-      
-      return successfulMigrations
+      return lastMigrations
         .map(migration => ({
           number: migration.number || '',
           name: migration.name || '',
@@ -698,5 +846,13 @@ export class MigrationService {
       console.error(`Failed to get applied migrations for ${moduleId}:`, error);
       return [];
     }
+  }
+
+  getConfig() {
+    return this.context?.resolver.getConfig() || null;
+  }
+
+  getAllModules(): string[] {
+    return this.context?.resolver.getAllModules() || [];
   }
 }

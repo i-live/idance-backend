@@ -289,6 +289,9 @@ importers:
       '@nx/devkit':
         specifier: ^20.8.2
         version: 20.8.2(nx@20.8.2(@swc-node/register@1.10.10(@swc/core@1.11.29(@swc/helpers@0.5.17))(@swc/types@0.1.21)(typescript@5.8.3))(@swc/core@1.11.29(@swc/helpers@0.5.17)))
+      chalk:
+        specifier: ^4.1.2
+        version: 4.1.2
       dotenv:
         specifier: ^16.0.3
         version: 16.5.0
