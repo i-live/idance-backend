@@ -208,7 +208,16 @@ export class MigrationService {
     // For rollback, find last applied migrations instead of pending migrations
     let migrationsToProcess: MigrationFile[];
     if (operation === 'rollback') {
-      const appliedMigrations = await this.findLastMigrations(targetModules || []);
+      // If no target modules specified, get all modules for rollback
+      const modulesToRollback = targetModules && targetModules.length > 0
+        ? this.resolveTargetModules(targetModules)
+        : this.context.resolver.getAllModules();
+      
+      // Get modules in rollback order (reverse dependency order)
+      const rollbackOrder = this.context.resolver.getRollbackOrder(modulesToRollback);
+      
+      this.debug.log(`Modules to rollback (in order): ${rollbackOrder.join(', ')}`);
+      const appliedMigrations = await this.findLastMigrations(rollbackOrder);
       
       // Find corresponding down files for each applied migration
       const { options } = this.context;
