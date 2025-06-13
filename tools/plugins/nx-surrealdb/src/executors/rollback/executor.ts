@@ -106,7 +106,12 @@ export default async function runExecutor(
           }
         }
         
-        logger.info('\n💡 Use --force to bypass safety checks');
+        logger.info('\n💡 To resolve this:');
+        logger.info('   Option 1: Rollback dependent modules first');
+        for (const blocker of validation.blockedBy) {
+          logger.info(`   • nx run ${context.projectName}:rollback --module ${blocker}`);
+        }
+        logger.info('   Option 2: Use --force to bypass safety checks (not recommended)');
         return { success: false };
       }
 
