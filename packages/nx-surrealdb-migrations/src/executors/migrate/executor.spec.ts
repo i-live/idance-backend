@@ -2,9 +2,9 @@ import { ExecutorContext, logger } from '@nx/devkit';
 import { createTreeWithEmptyWorkspace } from '@nx/devkit/testing';
 import executor from './executor';
 import { MigrateExecutorSchema } from './executor';
-import { MigrationEngine } from '../../lib/migration-engine';
+import { MigrationService } from '../../lib/domain/migration-service';
 
-jest.mock('../../lib/migration-engine');
+jest.mock('../../lib/domain/migration-service');
 jest.mock('@nx/devkit', () => ({
   ...jest.requireActual('@nx/devkit'),
   logger: {
@@ -14,10 +14,10 @@ jest.mock('@nx/devkit', () => ({
   }
 }));
 
-const MockMigrationEngine = MigrationEngine as jest.MockedClass<typeof MigrationEngine>;
+const MockMigrationService = MigrationService as jest.MockedClass<typeof MigrationService>;
 
 describe('Migrate Executor', () => {
-  let mockEngine: jest.Mocked<MigrationEngine>;
+  let mockEngine: jest.Mocked<MigrationService>;
   let context: ExecutorContext;
   
   const defaultOptions: MigrateExecutorSchema = {
@@ -74,7 +74,7 @@ describe('Migrate Executor', () => {
       close: jest.fn().mockResolvedValue(undefined)
     } as any;
 
-    MockMigrationEngine.mockImplementation(() => mockEngine);
+    MockMigrationService.mockImplementation(() => mockEngine);
   });
 
   afterEach(() => {

@@ -1,5 +1,6 @@
 import { ExecutorContext, logger } from '@nx/devkit';
-import { MigrationEngine } from '../../lib/migration-engine';
+import { MigrationService } from '../../lib/domain/migration-service';
+import { Debug } from '../../lib/infrastructure/debug';
 
 export interface StatusExecutorSchema {
   url?: string;
@@ -14,6 +15,7 @@ export interface StatusExecutorSchema {
   configPath?: string;
   detailed?: boolean;
   json?: boolean;
+  debug?: boolean;
 }
 
 interface StatusOutput {
@@ -36,7 +38,11 @@ export default async function runExecutor(
   options: StatusExecutorSchema,
   context: ExecutorContext
 ): Promise<{ success: boolean }> {
-  const engine = new MigrationEngine(context);
+  const engine = new MigrationService(context);
+  const debug = Debug.scope('status-executor');
+
+  // Enable debug mode if requested
+  Debug.setEnabled(!!options.debug);
 
   try {
     // Initialize migration engine
@@ -51,14 +57,14 @@ export default async function runExecutor(
       initPath: options.initPath || 'database',
       schemaPath: options.schemaPath,
       force: false, // Not applicable for status
-      configPath: options.configPath
+      configPath: options.configPath,
+      debug: options.debug
     });
 
     // Determine target modules
     const targetModules = options.module ? [String(options.module)] : undefined;
 
     // Get migration status
-    logger.info('📊 Checking migration status...');
     const status = await engine.getMigrationStatus(targetModules);
 
     if (options.json) {
@@ -87,10 +93,21 @@ export default async function runExecutor(
 
     // Human-readable format
     if (status.modules.length === 0) {
-      logger.info('📂 No migration modules found');
+      logger.info('No migration modules found');
       return { success: true };
     }
 
+    // Default: Minimal summary (unless detailed or debug flag is used)
+    if (!options.detailed && !options.debug) {
+      if (status.totalPending > 0) {
+        logger.info(`${status.totalPending} migration(s) pending, ${status.totalApplied} applied`);
+      } else {
+        logger.info(`All migrations up to date (${status.totalApplied} applied)`);
+      }
+      return { success: true };
+    }
+
+    // Detailed output
     logger.info(`\n📈 Migration Status Summary`);
     logger.info(`   Total Applied: ${status.totalApplied}`);
     logger.info(`   Total Pending: ${status.totalPending}`);

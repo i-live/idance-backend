@@ -1,5 +1,6 @@
 import { ExecutorContext, logger } from '@nx/devkit';
-import { MigrationEngine } from '../../lib/migration-engine';
+import { MigrationService } from '../../lib/domain/migration-service';
+import { Debug } from '../../lib/infrastructure/debug';
 
 export interface RollbackExecutorSchema {
   url?: string;
@@ -16,17 +17,28 @@ export interface RollbackExecutorSchema {
   configPath?: string;
   dryRun?: boolean;
   steps?: number;
+  debug?: boolean;
 }
 
 export default async function runExecutor(
   options: RollbackExecutorSchema,
   context: ExecutorContext
 ): Promise<{ success: boolean }> {
-  const engine = new MigrationEngine(context);
+  const service = new MigrationService(context);
+  const debug = Debug.scope('rollback-executor');
+
+  // Enable debug mode if requested
+  Debug.setEnabled(!!options.debug);
 
   try {
-    // Initialize migration engine
-    await engine.initialize({
+    // Service already initialized above
+
+    // Determine target modules  
+    const rawTargetModules = options.module ? [String(options.module)] : undefined;
+    debug.log(`Raw target modules: ${rawTargetModules ? rawTargetModules.join(', ') : 'all'}`);
+
+    // Initialize migration service first
+    await service.initialize({
       url: options.url || '',
       user: options.user || '',
       pass: options.pass || '',
@@ -37,17 +49,20 @@ export default async function runExecutor(
       initPath: options.initPath || 'database',
       schemaPath: options.schemaPath,
       force: options.force || false,
-      configPath: options.configPath
+      configPath: options.configPath,
+      debug: options.debug,
+      dryRun: options.dryRun || false
     });
 
-    // Determine target modules
-    const targetModules = options.module ? [String(options.module)] : undefined;
+    // Now resolve target modules to full names (e.g., "010" -> "010_auth")
+    const resolvedTargetModules = rawTargetModules ? service.resolveTargetModules(rawTargetModules) : undefined;
+    debug.log(`Resolved target modules: ${resolvedTargetModules ? resolvedTargetModules.join(', ') : 'all'}`);
 
     // First, validate rollback safety unless force is enabled
-    if (!options.force && targetModules) {
+    if (!options.force && rawTargetModules) {
       logger.info('🔍 Validating rollback safety...');
       
-      const validation = await engine.validateRollback(targetModules);
+      const validation = await service.validateRollback(rawTargetModules);
       
       if (!validation.canRollback) {
         logger.error('❌ Rollback validation failed!');
@@ -77,38 +92,13 @@ export default async function runExecutor(
       logger.info('✅ Rollback safety validation passed');
     }
 
-    if (options.dryRun) {
-      // Dry run: show what would be rolled back
-      logger.info('🔍 Dry run mode - showing rollback migrations without executing them');
-      
-      const pendingRollbacks = await engine.findPendingMigrations(targetModules, 'down');
-      
-      if (pendingRollbacks.length === 0) {
-        logger.info('✅ No rollback migrations found');
-        return { success: true };
-      }
-
-      // Apply steps limit in dry run
-      const stepsToShow = options.steps && options.steps > 0 
-        ? pendingRollbacks.slice(0, options.steps)
-        : pendingRollbacks;
-
-      logger.info(`📋 Found ${stepsToShow.length} rollback migration(s):`);
-      for (const migration of stepsToShow) {
-        logger.info(`  • ${migration.moduleId}/${migration.filename}`);
-      }
-
-      if (options.steps && options.steps > 0 && pendingRollbacks.length > options.steps) {
-        logger.info(`   (${pendingRollbacks.length - options.steps} additional rollbacks available)`);
-      }
-
-      return { success: true };
-    }
-
     // Execute rollback migrations
+    if (options.dryRun) {
+      logger.info('🔍 Dry run mode - showing rollback migrations without executing them');
+    }
     logger.info('🔄 Starting rollback execution...');
     
-    const result = await engine.executeMigrations(targetModules, 'down');
+    const result = await service.executeMigrations(resolvedTargetModules, 'rollback');
     
     if (result.success) {
       logger.info(`✅ Rollback completed successfully!`);
@@ -145,6 +135,6 @@ export default async function runExecutor(
     logger.error(error instanceof Error ? error.message : String(error));
     return { success: false };
   } finally {
-    await engine.close();
+    await service.close();
   }
 }

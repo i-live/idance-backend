@@ -31,14 +31,7 @@
       "default": ""
     },
     "module": {
-      "oneOf": [
-        {
-          "type": "string"
-        },
-        {
-          "type": "number"
-        }
-      ],
+      "type": ["string", "number"],
       "description": "Target specific module by name (e.g., 'auth'), number (e.g., 10), or full directory name (e.g., '010_auth')",
       "default": ""
     },
@@ -81,6 +74,11 @@
       "type": "number",
       "description": "Number of migration steps to rollback (default: 1, use 0 for all)",
       "default": 1
+    },
+    "debug": {
+      "type": "boolean",
+      "description": "Enable debug logging for troubleshooting",
+      "default": false
     }
   },
   "additionalProperties": false

@@ -31,14 +31,7 @@
       "default": ""
     },
     "module": {
-      "oneOf": [
-        {
-          "type": "string"
-        },
-        {
-          "type": "number"
-        }
-      ],
+      "type": ["string", "number"],
       "description": "Target specific module by name (e.g., 'auth'), number (e.g., 10), or full directory name (e.g., '010_auth')",
       "default": ""
     },
@@ -75,6 +68,16 @@
     "dryRun": {
       "type": "boolean",
       "description": "Show what migrations would be applied without executing them",
+      "default": false
+    },
+    "detailed": {
+      "type": "boolean",
+      "description": "Show detailed migration information including execution details",
+      "default": false
+    },
+    "debug": {
+      "type": "boolean",
+      "description": "Enable debug logging for troubleshooting (includes detailed output)",
       "default": false
     }
   },

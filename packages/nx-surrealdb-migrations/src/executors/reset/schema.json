@@ -39,6 +39,11 @@
       "type": "boolean",
       "description": "Show what would be deleted without actually deleting",
       "default": false
+    },
+    "debug": {
+      "type": "boolean",
+      "description": "Enable debug logging for troubleshooting",
+      "default": false
     }
   },
   "required": ["url", "user", "pass", "namespace", "database"]

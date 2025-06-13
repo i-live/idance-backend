@@ -1,33 +1,33 @@
 import * as fs from 'fs/promises';
-import { MigrationEngine, MigrationEngineOptions } from './migration-engine';
-import { SurrealDBClient } from './client';
-import { MigrationTracker } from './migration-tracker';
+import { MigrationService, MigrationServiceOptions } from './migration-service';
+import { SurrealDBClient } from '../infrastructure/client';
+import { MigrationRepository } from './migration-repository';
 import { DependencyResolver } from './dependency-resolver';
 
 jest.mock('fs/promises');
-jest.mock('./client');
-jest.mock('./migration-tracker');
+jest.mock('../infrastructure/client');
+jest.mock('./migration-repository');
 jest.mock('./dependency-resolver');
-jest.mock('./env', () => ({
+jest.mock('../infrastructure/env', () => ({
   replaceEnvVars: jest.fn((str) => str),
   loadEnvFile: jest.fn()
 }));
-jest.mock('./project', () => ({
+jest.mock('../infrastructure/project', () => ({
   resolveProjectPath: jest.fn((ctx, path) => `/resolved/${path}`)
 }));
 
 const mockFs = fs as jest.Mocked<typeof fs>;
 const MockSurrealDBClient = SurrealDBClient as jest.MockedClass<typeof SurrealDBClient>;
-const MockMigrationTracker = MigrationTracker as jest.MockedClass<typeof MigrationTracker>;
+const MockMigrationRepository = MigrationRepository as jest.MockedClass<typeof MigrationRepository>;
 const MockDependencyResolver = DependencyResolver as jest.MockedClass<typeof DependencyResolver>;
 
-describe('MigrationEngine', () => {
-  let engine: MigrationEngine;
+describe('MigrationService', () => {
+  let engine: MigrationService;
   let mockClient: jest.Mocked<SurrealDBClient>;
-  let mockTracker: jest.Mocked<MigrationTracker>;
+  let mockRepository: jest.Mocked<MigrationRepository>;
   let mockResolver: jest.Mocked<DependencyResolver>;
 
-  const defaultOptions: MigrationEngineOptions = {
+  const defaultOptions: MigrationServiceOptions = {
     url: 'ws://localhost:8000',
     user: 'root',
     pass: 'root',
@@ -46,7 +46,7 @@ describe('MigrationEngine', () => {
       close: jest.fn().mockResolvedValue(undefined)
     } as any;
 
-    mockTracker = {
+    mockRepository = {
       initialize: jest.fn().mockResolvedValue(undefined),
       canApplyMigration: jest.fn().mockResolvedValue({ canApply: true }),
       addMigration: jest.fn().mockResolvedValue(undefined),
@@ -64,10 +64,10 @@ describe('MigrationEngine', () => {
     } as any;
 
     MockSurrealDBClient.mockImplementation(() => mockClient);
-    MockMigrationTracker.mockImplementation(() => mockTracker);
+    MockMigrationRepository.mockImplementation(() => mockRepository);
     MockDependencyResolver.mockImplementation(() => mockResolver);
 
-    engine = new MigrationEngine();
+    engine = new MigrationService();
   });
 
   afterEach(async () => {
@@ -86,7 +86,7 @@ describe('MigrationEngine', () => {
         namespace: 'test',
         database: 'test'
       });
-      expect(mockTracker.initialize).toHaveBeenCalled();
+      expect(mockRepository.initialize).toHaveBeenCalled();
       expect(mockResolver.initialize).toHaveBeenCalled();
     });
 
@@ -179,7 +179,7 @@ describe('MigrationEngine', () => {
     });
 
     it('should skip migrations that cannot be applied', async () => {
-      mockTracker.canApplyMigration.mockResolvedValueOnce({ canApply: false, reason: 'Already applied' });
+      mockRepository.canApplyMigration.mockResolvedValueOnce({ canApply: false, reason: 'Already applied' });
 
       const pending = await engine.findPendingMigrations();
 
@@ -188,7 +188,7 @@ describe('MigrationEngine', () => {
 
     it('should include non-applicable migrations when force is true', async () => {
       await engine.initialize({ ...defaultOptions, force: true });
-      mockTracker.canApplyMigration.mockResolvedValue({ canApply: false, reason: 'Already applied' });
+      mockRepository.canApplyMigration.mockResolvedValue({ canApply: false, reason: 'Already applied' });
 
       const pending = await engine.findPendingMigrations();
 
@@ -218,7 +218,7 @@ describe('MigrationEngine', () => {
       expect(result.filesSkipped).toBe(0);
       expect(result.results).toHaveLength(1);
       expect(mockClient.query).toHaveBeenCalled();
-      expect(mockTracker.addMigration).toHaveBeenCalled();
+      expect(mockRepository.addMigration).toHaveBeenCalled();
     });
 
     it('should handle migration execution failure', async () => {
@@ -229,7 +229,7 @@ describe('MigrationEngine', () => {
       expect(result.success).toBe(false);
       expect(result.results[0].success).toBe(false);
       expect(result.results[0].error).toBe('SQL error');
-      expect(mockTracker.addMigration).toHaveBeenCalledWith(
+      expect(mockRepository.addMigration).toHaveBeenCalledWith(
         expect.objectContaining({ status: 'fail' })
       );
     });
@@ -243,7 +243,7 @@ describe('MigrationEngine', () => {
         return [];
       });
       
-      mockTracker.canApplyMigration.mockResolvedValue({ canApply: false, reason: 'Already applied' });
+      mockRepository.canApplyMigration.mockResolvedValue({ canApply: false, reason: 'Already applied' });
 
       const result = await engine.executeMigrations();
 

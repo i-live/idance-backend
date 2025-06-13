@@ -5,15 +5,15 @@ import * as path from 'path';
 
 import generator from './generator';
 import { ExportModuleGeneratorSchema } from './generator';
-import { MigrationEngine } from '../../lib/migration-engine';
-import { ConfigLoader } from '../../lib/config-loader';
+import { MigrationService } from '../../lib/domain/migration-service';
+import { ConfigLoader } from '../../lib/configuration/config-loader';
 import { execSync } from 'child_process';
 
 // Mock filesystem operations
 jest.mock('fs');
 jest.mock('child_process');
-jest.mock('../../lib/migration-engine');
-jest.mock('../../lib/config-loader');
+jest.mock('../../lib/domain/migration-service');
+jest.mock('../../lib/configuration/config-loader');
 jest.mock('@nx/devkit', () => ({
   ...jest.requireActual('@nx/devkit'),
   formatFiles: jest.fn().mockResolvedValue(undefined),
