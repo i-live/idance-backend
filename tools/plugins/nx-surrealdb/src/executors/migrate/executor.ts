@@ -49,10 +49,10 @@ export default async function runExecutor(
     });
 
     // Determine target modules and filenames
-    const targetModules = options.module 
+    const targetModules = (options.module !== undefined && options.module !== '') 
       ? String(options.module).split(',').map(m => m.trim()).filter(m => m.length > 0)
       : undefined;
-    const targetFilenames = options.filename 
+    const targetFilenames = (options.filename !== undefined && options.filename !== '') 
       ? String(options.filename).split(',').map(f => f.trim()).filter(f => f.length > 0)
       : undefined;
     debug.log(`Target modules: ${targetModules ? targetModules.join(', ') : 'all'}`);
