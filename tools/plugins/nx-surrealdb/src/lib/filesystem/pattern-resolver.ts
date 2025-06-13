@@ -131,7 +131,15 @@ export class PatternResolver {
   private findMatchingModule(pattern: string, allModules: string[]): string | null {
     const normalizedPattern = pattern.trim().toLowerCase();
     const patternAsNumber = parseInt(normalizedPattern, 10);
-    const normalizedPatternNumber = isNaN(patternAsNumber) ? null : patternAsNumber.toString();
+    const isNumericPattern = !isNaN(patternAsNumber) && /^\d+$/.test(normalizedPattern);
+
+    // Try index-based mapping first for small numbers (0-based indexing)
+    if (isNumericPattern && patternAsNumber >= 0 && patternAsNumber < allModules.length) {
+      return allModules[patternAsNumber];
+    }
+
+    // Try number-based mapping for larger numbers or when index mapping fails
+    const normalizedPatternNumber = isNumericPattern ? patternAsNumber.toString() : null;
 
     for (const moduleId of allModules) {
       const match = moduleId.match(PatternResolver.MODULE_PATTERN);
