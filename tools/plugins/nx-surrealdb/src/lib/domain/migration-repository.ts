@@ -303,17 +303,12 @@ export class MigrationRepository {
     try {
       this.debug.log(`Finding last migrations for modules: [${moduleIds.join(', ')}]`);
       
-      // Query for latest migration status using GROUP BY with subquery
+      // Use SurrealDB's GROUP BY to get the latest record per migration file automatically
       const result = await this.client.query(`
         SELECT id, module, name, number, direction, status, applied_at, filename, path, content, checksum, namespace, database, applied_by, execution_time_ms
         FROM system_migrations 
         WHERE module IN [${moduleIds.map(m => `'${m}'`).join(', ')}]
-        AND (module, name, number, applied_at) IN (
-          SELECT module, name, number, MAX(applied_at) as applied_at
-          FROM system_migrations 
-          WHERE module IN [${moduleIds.map(m => `'${m}'`).join(', ')}]
-          GROUP BY module, name, number
-        )
+        GROUP BY module, name, number 
         ORDER BY applied_at DESC
       `);
 
@@ -419,12 +414,7 @@ export class MigrationRepository {
         SELECT module, name, number, direction, status, applied_at
         FROM system_migrations 
         ${whereClause}
-        AND (module, name, number, applied_at) IN (
-          SELECT module, name, number, MAX(applied_at) as applied_at
-          FROM system_migrations 
-          ${whereClause}
-          GROUP BY module, name, number
-        )
+        GROUP BY module, name, number 
         ORDER BY applied_at DESC
       `);
 
