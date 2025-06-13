@@ -5,6 +5,8 @@ export interface ModuleConfig {
   name: string;
   description?: string;
   depends: string[];
+  locked?: boolean;
+  lockReason?: string;
 }
 
 export interface MigrationsConfig {

@@ -14,6 +14,8 @@ export interface ModuleConfig {
   migrations: ModuleMigration[];
   tags: string[];
   environments: string[];
+  locked?: boolean;
+  lockReason?: string;
 }
 
 export interface ModuleMigration {

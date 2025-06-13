@@ -1,5 +1,6 @@
 import { ExecutorContext, logger } from '@nx/devkit';
 import { MigrationService } from '../../lib/domain/migration-service';
+import { ModuleLockManager } from '../../lib/domain/module-lock-manager';
 import { Debug } from '../../lib/infrastructure/debug';
 
 export interface RollbackExecutorSchema {
@@ -87,7 +88,7 @@ export default async function runExecutor(
     }
 
     // First, validate rollback safety unless force is enabled
-    if (!options.force && rawTargetModules) {
+    if (!options.force) {
       logger.info('🔍 Validating rollback safety...');
       
       const validation = await service.validateRollback(rawTargetModules);

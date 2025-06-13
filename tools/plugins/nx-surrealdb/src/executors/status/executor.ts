@@ -1,5 +1,6 @@
 import { ExecutorContext, logger } from '@nx/devkit';
 import { MigrationService } from '../../lib/domain/migration-service';
+import { ModuleLockManager } from '../../lib/domain/module-lock-manager';
 import { Debug } from '../../lib/infrastructure/debug';
 const chalk = require('chalk');
 
@@ -30,6 +31,8 @@ interface StatusOutput {
     dependencies: string[];
     dependents: string[];
     status: 'up-to-date' | 'pending' | 'error';
+    locked?: boolean;
+    lockReason?: string;
   }>;
   totalApplied: number;
   totalPending: number;
@@ -73,6 +76,10 @@ export default async function runExecutor(
 
     // Get migration status
     const status = await engine.getMigrationStatus(targetModules);
+    
+    // Initialize lock manager
+    const config = engine.getConfig();
+    const lockManager = ModuleLockManager.createLockManager(config);
 
     // If filename filtering is specified, show specific file status instead
     if (targetFilenames && targetFilenames.length > 0) {
@@ -148,15 +155,20 @@ export default async function runExecutor(
     if (options.json) {
       // Output JSON format
       const output: StatusOutput = {
-        modules: status.modules.map(module => ({
-          moduleId: module.moduleId,
-          appliedMigrations: module.appliedMigrations,
-          pendingMigrations: module.pendingMigrations,
-          lastApplied: module.lastApplied,
-          dependencies: module.dependencies,
-          dependents: module.dependents,
-          status: module.pendingMigrations > 0 ? 'pending' : 'up-to-date'
-        })),
+        modules: status.modules.map(module => {
+          const lockValidation = lockManager.validateModuleLock(module.moduleId);
+          return {
+            moduleId: module.moduleId,
+            appliedMigrations: module.appliedMigrations,
+            pendingMigrations: module.pendingMigrations,
+            lastApplied: module.lastApplied,
+            dependencies: module.dependencies,
+            dependents: module.dependents,
+            status: module.pendingMigrations > 0 ? 'pending' : 'up-to-date',
+            locked: lockValidation.isLocked ? true : undefined,
+            lockReason: lockValidation.reason
+          };
+        }),
         totalApplied: status.totalApplied,
         totalPending: status.totalPending,
         dependencyGraph: status.modules.reduce((graph, module) => {
@@ -205,7 +217,11 @@ export default async function runExecutor(
         ? chalk.yellow(`[${statusText}]`)
         : chalk.green(`[${statusText}]`);
       
-      logger.info(`\n   ${statusIcon} ${module.moduleId} ${coloredStatus}`);
+      // Add lock information
+      const lockValidation = lockManager.validateModuleLock(module.moduleId);
+      const lockDisplay = lockValidation.isLocked ? ` ${lockValidation.lockIcon}` : '';
+      
+      logger.info(`\n   ${statusIcon} ${module.moduleId} ${coloredStatus}${lockDisplay}`);
       logger.info(`      Applied: ${module.appliedMigrations} migration(s)`);
       
       if (module.pendingMigrations > 0) {
@@ -214,6 +230,11 @@ export default async function runExecutor(
       
       if (module.lastApplied) {
         logger.info(`      Last Applied: ${module.lastApplied.toISOString()}`);
+      }
+
+      // Show lock information if locked
+      if (lockValidation.isLocked) {
+        logger.info(`      🔒 Locked: ${lockValidation.reason || 'Module is locked for safety'}`);
       }
 
       // Show dependencies

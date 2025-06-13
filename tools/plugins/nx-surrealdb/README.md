@@ -328,6 +328,25 @@ nx run database:status --module 0,1,2       # Check first three modules
 nx run database:migrate --module 1          # Quick migrate second module
 ```
 
+### Working with Locked Modules
+```bash
+# Check which modules are locked
+nx run database:status --detailed
+
+# Attempt rollback (will be blocked)
+nx run database:rollback --module admin
+# Output: 🔒 Rollback locked - cannot rollback protected modules!
+
+# Preview what would happen with force override
+nx run database:rollback --module admin --dryRun --force
+
+# Emergency rollback with force override (use with extreme caution)
+nx run database:rollback --module admin --force
+
+# Migrations work normally on locked modules
+nx run database:migrate --module admin      # ✅ Allowed
+```
+
 ## Configuration
 
 ### Module Dependencies
@@ -356,6 +375,47 @@ The `config.json` file defines module dependencies:
   }
 }
 ```
+
+### Module Lock Protection
+
+Protect critical modules from accidental rollbacks by adding lock configuration:
+
+```json
+{
+  "modules": {
+    "000_admin": {
+      "name": "System Administration",
+      "description": "Core database setup and administrative functions",
+      "depends": [],
+      "locked": true,
+      "lockReason": "Critical system module - contains core admin setup and permissions"
+    },
+    "010_auth": {
+      "name": "Authentication & Users",
+      "description": "User authentication and authorization system", 
+      "depends": ["000_admin"],
+      "locked": true,
+      "lockReason": "Core authentication system - rollback would break user access"
+    },
+    "020_schema": {
+      "name": "Application Schema",
+      "description": "Core application data models and relationships",
+      "depends": ["010_auth"]
+    }
+  }
+}
+```
+
+#### Lock Configuration Properties
+- **`locked`** (boolean, optional): When `true`, prevents rollback of this module
+- **`lockReason`** (string, optional): Human-readable explanation for why the module is locked
+
+#### Lock Protection Features
+- 🔒 **Visual Indicators**: Locked modules display with lock icons in status output
+- 🛡️ **Rollback Prevention**: Automatically blocks rollback attempts on locked modules
+- 📝 **Clear Messaging**: Shows specific lock reasons when rollback is blocked
+- ⚡ **Force Override**: Use `--force` flag to bypass lock protection for emergencies
+- 🎯 **Selective Locking**: Lock only critical modules, leave development modules unlocked
 
 ### Executor Options
 
@@ -464,14 +524,16 @@ Combine any reference patterns with comma separation:
 
 📋 Module Details:
 
-   ✅ 000_admin [UP-TO-DATE]
+   ✅ 000_admin [UP-TO-DATE] 🔒
       Applied: 3 migration(s)
       Last Applied: 2024-01-15T10:30:00.000Z
+      🔒 Locked: Critical system module - contains core admin setup and permissions
 
-   🔄 010_auth [PENDING]
+   🔄 010_auth [PENDING] 🔒
       Applied: 2 migration(s)
       Pending: 1 migration(s)
       Dependencies: 000_admin
+      🔒 Locked: Core authentication system - rollback would break user access
 
    ✅ 020_schema [UP-TO-DATE]
       Applied: 3 migration(s)
@@ -510,6 +572,17 @@ Combine any reference patterns with comma separation:
 💡 Use --force to bypass safety checks
 ```
 
+### Module Lock Protection
+```
+🔒 Rollback locked - cannot rollback protected modules!
+   Locked modules:
+   🔒 000_admin: Critical system module - contains core admin setup and permissions
+
+💡 To resolve this:
+   Option 1: Remove modules from the locked list in config.json
+   Option 2: Use --force to bypass lock protection (use with extreme caution)
+```
+
 ## Best Practices
 
 ### 1. **Module Organization**
@@ -527,13 +600,19 @@ Combine any reference patterns with comma separation:
 - Avoid circular dependencies
 - Keep dependency chains shallow when possible
 
-### 4. **Safety Practices**
+### 4. **Module Lock Protection**
+- Lock critical modules to prevent accidental rollbacks
+- Use descriptive lock reasons to explain why modules are protected
+- Reserve locks for essential infrastructure modules (admin, core schema)
+- Document locked modules in team procedures
+
+### 5. **Safety Practices**
 - Use dry-run mode to preview changes
 - Validate rollback safety before applying
 - Use force flag sparingly and with caution
 - Test migration paths in development environments
 
-### 5. **Environment Management**
+### 6. **Environment Management**
 - Use environment variables for all connection details
 - Never commit credentials to version control
 - Use different databases for different environments
@@ -578,6 +657,32 @@ nx run database:status --module mymodule --detailed
 nx run database:migrate --module mymodule --force
 ```
 
+#### 5. **Module Lock Issues**
+```bash
+# Check which modules are locked
+nx run database:status --detailed
+
+# Identify locked modules blocking rollback
+nx run database:rollback --module mymodule --dryRun
+
+# Remove lock from config.json (for non-critical modules)
+# Edit database/config.json and remove "locked": true
+
+# Emergency override (use extreme caution)
+nx run database:rollback --module mymodule --force
+```
+
+#### 6. **Lock Configuration Errors**
+```bash
+# Validate config syntax
+nx run database:status
+
+# Common config issues:
+# - Missing comma after "depends": ["other_module"]
+# - Typo in "locked": true (must be boolean)
+# - Missing quotes around lockReason string
+```
+
 ## Code Architecture
 
 ### 🏗️ **Repository Pattern Architecture**
@@ -600,7 +705,8 @@ src/lib/
 └── domain/               # Core business logic
     ├── dependency-resolver.ts       # Module dependency management
     ├── migration-repository.ts      # Data access layer
-    └── migration-service.ts         # Business logic orchestration
+    ├── migration-service.ts         # Business logic orchestration
+    └── module-lock-manager.ts       # Module lock protection
 ```
 
 ### 🔄 **Repository Pattern Implementation**
@@ -623,6 +729,15 @@ async validateRollback(modules: string[]): Promise<RollbackValidation>
 async findPendingMigrations(modules?: string[]): Promise<MigrationFile[]>
 ```
 
+#### **ModuleLockManager** (Security Layer)
+**Responsibility**: Module lock protection and validation
+```typescript
+// Lock validation and management
+validateRollbackLock(moduleIds: string[]): { canRollback: boolean; blockedModules: string[] }
+validateMigrationLock(moduleIds: string[]): { canMigrate: boolean; blockedModules: string[] }
+isModuleLocked(moduleId: string): boolean
+```
+
 #### **Communication Pattern**
 ```
 MigrationService (Business Logic)
@@ -630,6 +745,10 @@ MigrationService (Business Logic)
 MigrationRepository (Data Access)
     ↓ executes queries
 SurrealDBClient (Database)
+
+ModuleLockManager (Security)
+    ↓ validates lock policies
+MigrationService (Business Logic)
 ```
 
 ### 🎯 **Design Benefits**

@@ -17,6 +17,7 @@ export interface MigrateExecutorSchema {
   force?: boolean;
   configPath?: string;
   dryRun?: boolean;
+  detailed?: boolean;
   debug?: boolean;
 }
 
@@ -85,6 +86,15 @@ export default async function runExecutor(
           const reason = fileResult.skipped ? ` (${fileResult.skipReason})` : 
                         fileResult.error ? ` (${fileResult.error})` : '';
           logger.info(`   ${status} ${fileResult.file.moduleId}/${fileResult.file.filename}${reason}`);
+          
+          // Show detailed information when detailed flag is used
+          if (options.detailed && (fileResult.success || fileResult.skipped)) {
+            logger.info(`      File: ${fileResult.file.number}_${fileResult.file.name}_${fileResult.file.direction}.surql`);
+            logger.info(`      Execution time: ${fileResult.executionTimeMs}ms`);
+            if (fileResult.file.checksum) {
+              logger.info(`      Checksum: ${fileResult.file.checksum.substring(0, 12)}...`);
+            }
+          }
         }
       }
     } else {

@@ -4,6 +4,7 @@ import * as crypto from 'crypto';
 import { performance } from 'perf_hooks';
 import { SurrealDBClient } from '../infrastructure/client';
 import { MigrationRepository } from './migration-repository';
+import { ModuleLockManager } from './module-lock-manager';
 import { ConfigLoader } from '../configuration/config-loader';
 import { DependencyResolver } from './dependency-resolver';
 import { MigrationFileProcessor, type MigrationFile, type MigrationContext } from '../filesystem/migration-file-processor';
@@ -265,6 +266,27 @@ export class MigrationService {
           this.debug.log(`Error details: ${error.message}`);
         }
       }
+      
+      // Filter out locked modules unless force is enabled
+      if (!options.force && operation === 'rollback') {
+        const config = this.context.resolver.getConfig();
+        const lockManager = ModuleLockManager.createLockManager(config);
+        const originalCount = migrationsToProcess.length;
+        
+        migrationsToProcess = migrationsToProcess.filter(migration => {
+          const isLocked = lockManager.isModuleLocked(migration.moduleId);
+          if (isLocked) {
+            this.debug.log(`Skipping locked module migration: ${migration.moduleId}/${migration.filename}`);
+          }
+          return !isLocked;
+        });
+        
+        const filteredCount = originalCount - migrationsToProcess.length;
+        if (filteredCount > 0) {
+          this.debug.log(`Filtered out ${filteredCount} migrations from locked modules`);
+        }
+      }
+      
       this.debug.log(`Total migrations to process: ${migrationsToProcess.length}`);
     } else {
       migrationsToProcess = await this.findPendingMigrations(targetModules, 'up');
@@ -339,7 +361,7 @@ export class MigrationService {
     };
   }
 
-  async validateRollback(targetModules: string[]): Promise<{ 
+  async validateRollback(targetModules?: string[]): Promise<{ 
     canRollback: boolean; 
     blockedBy: string[]; 
     warnings: string[];
@@ -360,7 +382,9 @@ export class MigrationService {
       : options.initPath;
 
     // Resolve target modules to handle patterns like "010" -> "010_auth"
-    const resolvedModules = this.resolveTargetModules(targetModules);
+    const resolvedModules = targetModules 
+      ? this.resolveTargetModules(targetModules)
+      : resolver.getAllModules();
 
     // Initialize result collectors
     const warnings: string[] = [];
@@ -427,6 +451,26 @@ export class MigrationService {
         rollbackFilesAvailable: hasRollbackFiles,
         dependencyConflicts: dependencyValidation.blockedBy
       });
+    }
+
+    // Check for locked modules ONLY if there are applied migrations to rollback and force is not enabled
+    if (!options.force && canRollback) {
+      const modulesWithAppliedMigrations = migrationChecks.filter(check => check.hasAppliedMigrations);
+      
+      if (modulesWithAppliedMigrations.length > 0) {
+        const config = resolver.getConfig();
+        const lockManager = ModuleLockManager.createLockManager(config);
+        const modulesToCheck = modulesWithAppliedMigrations.map(check => check.moduleId);
+        const lockValidation = lockManager.validateRollbackLock(modulesToCheck);
+        
+        if (lockValidation.blockedModules.length > 0) {
+          // Add warnings for locked modules but don't block the operation
+          for (const blockedModule of lockValidation.blockedModules) {
+            const reason = lockValidation.lockReasons[blockedModule];
+            warnings.push(`🔒 Module ${blockedModule} is locked and will be skipped: ${reason}`);
+          }
+        }
+      }
     }
 
     // Handle force flag override
@@ -802,5 +846,13 @@ export class MigrationService {
       console.error(`Failed to get applied migrations for ${moduleId}:`, error);
       return [];
     }
+  }
+
+  getConfig() {
+    return this.context?.resolver.getConfig() || null;
+  }
+
+  getAllModules(): string[] {
+    return this.context?.resolver.getAllModules() || [];
   }
 }
