@@ -341,17 +341,24 @@ export class MigrationRepository {
         execution_time_ms: m.execution_time_ms
       }));
 
-      // Sort migrations by module and then by number in descending order for rollback
+      // Sort migrations by number in descending order within each module
+      // Preserve the module order that was passed in (important for rollback order)
+      const moduleOrder = new Map<string, number>();
+      moduleIds.forEach((moduleId, index) => {
+        moduleOrder.set(moduleId, index);
+      });
+      
       result_migrations.sort((a, b) => {
-        // First sort by module
-        const moduleCompare = a.module.localeCompare(b.module);
-        if (moduleCompare !== 0) return moduleCompare;
+        // First sort by module order (preserve the order passed in)
+        const aOrder = moduleOrder.get(a.module) ?? 999;
+        const bOrder = moduleOrder.get(b.module) ?? 999;
+        if (aOrder !== bOrder) return aOrder - bOrder;
         
         // Then sort by number in descending order (newest first)
         return b.number.localeCompare(a.number);
       });
 
-      this.debug.log(`Returning ${result_migrations.length} eligible migrations for rollback (sorted by module, then number DESC)`);
+      this.debug.log(`Returning ${result_migrations.length} eligible migrations for rollback (preserving module order, number DESC)`);
       return result_migrations;
 
     } catch (error) {
