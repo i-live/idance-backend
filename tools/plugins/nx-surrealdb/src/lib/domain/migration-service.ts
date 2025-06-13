@@ -211,9 +211,18 @@ export class MigrationService {
       // If no target modules specified, get all modules for rollback
       let modulesToRollback: string[];
       if (targetModules && targetModules.length > 0) {
-        // For specific modules, only rollback those modules, not their dependencies
-        modulesToRollback = this.resolveTargetModules(targetModules);
-        this.debug.log(`Specific modules requested for rollback: ${modulesToRollback.join(', ')}`);
+        // For specific modules, resolve them first
+        const resolvedModules = this.resolveTargetModules(targetModules);
+        const resolvedSet = new Set(resolvedModules);
+        
+        // Get the full rollback order, then filter to only requested modules
+        const allModules = this.context.resolver.getAllModules();
+        const fullRollbackOrder = this.context.resolver.getRollbackOrder(allModules);
+        
+        // Keep only the modules that were specifically requested, but in rollback order
+        modulesToRollback = fullRollbackOrder.filter(module => resolvedSet.has(module));
+        
+        this.debug.log(`Specific modules requested for rollback (in order): ${modulesToRollback.join(', ')}`);
       } else {
         // For full rollback, get all modules in proper rollback order
         const allModules = this.context.resolver.getAllModules();
