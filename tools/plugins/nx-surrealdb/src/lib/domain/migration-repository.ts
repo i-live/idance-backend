@@ -341,7 +341,17 @@ export class MigrationRepository {
         execution_time_ms: m.execution_time_ms
       }));
 
-      this.debug.log(`Returning ${result_migrations.length} eligible migrations for rollback`);
+      // Sort migrations by module and then by number in descending order for rollback
+      result_migrations.sort((a, b) => {
+        // First sort by module
+        const moduleCompare = a.module.localeCompare(b.module);
+        if (moduleCompare !== 0) return moduleCompare;
+        
+        // Then sort by number in descending order (newest first)
+        return b.number.localeCompare(a.number);
+      });
+
+      this.debug.log(`Returning ${result_migrations.length} eligible migrations for rollback (sorted by module, then number DESC)`);
       return result_migrations;
 
     } catch (error) {
