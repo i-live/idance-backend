@@ -40,17 +40,7 @@ export default async function runExecutor(
       ? String(options.module).split(',').map(m => m.trim()).filter(m => m.length > 0)
       : undefined;
     const targetFilenames = (options.filename !== undefined && options.filename !== '') 
-      ? String(options.filename).split(',').map(f => {
-          const trimmed = f.trim();
-          // Handle numeric inputs that need zero-padding for filenames
-          if (/^\d+$/.test(trimmed)) {
-            const num = parseInt(trimmed, 10);
-            if (num >= 0 && num <= 9999) {
-              return String(num).padStart(4, '0');
-            }
-          }
-          return trimmed;
-        }).filter(f => f.length > 0)
+      ? String(options.filename).split(',').map(f => f.trim()).filter(f => f.length > 0)
       : undefined;
     debug.log(`Raw target modules: ${rawTargetModules ? rawTargetModules.join(', ') : 'all'}`);
     debug.log(`Target filenames: ${targetFilenames ? targetFilenames.join(', ') : 'all'}`);
