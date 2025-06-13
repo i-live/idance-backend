@@ -1,7 +1,7 @@
 /* eslint-disable */
 export default {
-  displayName: 'nx-surrealdb-migrations',
-  preset: '../../jest.preset.js',
+  displayName: 'nx-surrealdb',
+  preset: '../../../jest.preset.js',
   testEnvironment: 'node',
   maxWorkers: 1,
   workerIdleMemoryLimit: '1024MB',
@@ -12,7 +12,7 @@ export default {
     }],
   },
   moduleFileExtensions: ['ts', 'js', 'html'],
-  coverageDirectory: '../../coverage/packages/nx-surrealdb-migrations',
+  coverageDirectory: '../../../coverage/tools/plugins/nx-surrealdb',
   collectCoverageFrom: [
     'src/**/*.ts',
     '!src/**/files/**',

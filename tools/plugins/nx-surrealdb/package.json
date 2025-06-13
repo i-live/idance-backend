@@ -1,8 +1,8 @@
 {
-  "name": "@idance/nx-surrealdb-migrations",
+  "name": "@idance/nx-surrealdb",
   "version": "0.0.1",
-  "main": "dist/packages/nx-surrealdb-migrations/index.js",
-  "types": "dist/packages/nx-surrealdb-migrations/index.d.ts",
+  "main": "../../../dist/tools/plugins/nx-surrealdb/src/index.js",
+  "types": "../../../dist/tools/plugins/nx-surrealdb/src/index.d.ts",
   "generators": "./generators.json",
   "executors": "./executors.json",
   "dependencies": {
@@ -24,7 +24,7 @@
     "eslint": "^9.8.0"
   },
   "scripts": {
-    "build": "cd ../../ && nx build nx-surrealdb-migrations && nx run nx-surrealdb-migrations:copy-schema"
+    "build": "cd ../../.. && nx build nx-surrealdb && nx run nx-surrealdb:copy-schema"
   },
   "nx": {
     "includedScripts": ["build"]
