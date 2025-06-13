@@ -9,6 +9,7 @@ export interface StatusExecutorSchema {
   namespace?: string;
   database?: string;
   module?: string | number;
+  filename?: string | number;
   envFile?: string;
   initPath?: string;
   schemaPath?: string;
@@ -61,11 +62,78 @@ export default async function runExecutor(
       debug: options.debug
     });
 
-    // Determine target modules
-    const targetModules = options.module ? [String(options.module)] : undefined;
+    // Determine target modules and filenames
+    const targetModules = options.module 
+      ? String(options.module).split(',').map(m => m.trim()).filter(m => m.length > 0)
+      : undefined;
+    const targetFilenames = options.filename 
+      ? String(options.filename).split(',').map(f => f.trim()).filter(f => f.length > 0)
+      : undefined;
 
     // Get migration status
     const status = await engine.getMigrationStatus(targetModules);
+
+    // If filename filtering is specified, show specific file status instead
+    if (targetFilenames && targetFilenames.length > 0) {
+      const resolvedFilenames = await engine.resolveTargetFilenames(targetFilenames, targetModules, 'up');
+      const fileStatuses = await engine.getFileStatus(resolvedFilenames);
+      
+      if (options.json) {
+        const fileStatus = {
+          files: fileStatuses.map(fs => ({
+            filename: fs.filename,
+            moduleId: fs.moduleId,
+            number: fs.number,
+            name: fs.name,
+            direction: fs.direction,
+            status: fs.status,
+            appliedAt: fs.appliedAt,
+            checksum: fs.checksum,
+            dependencies: fs.dependencies,
+            dependents: fs.dependents
+          }))
+        };
+        console.log(JSON.stringify(fileStatus, null, 2));
+        return { success: true };
+      }
+
+      // Enhanced filename status display
+      const appliedCount = fileStatuses.filter(fs => fs.status === 'applied').length;
+      const pendingCount = fileStatuses.filter(fs => fs.status === 'pending').length;
+
+      logger.info(`\n📄 File Status Summary:`);
+      logger.info(`   Files Found: ${fileStatuses.length}`);
+      logger.info(`   Applied: ${appliedCount}`);
+      logger.info(`   Pending: ${pendingCount}`);
+
+      logger.info(`\n📋 File Details:`);
+      for (const fileStatus of fileStatuses) {
+        const statusIcon = fileStatus.status === 'applied' ? '✅' : '🔄';
+        const statusText = fileStatus.status === 'applied' ? 'APPLIED' : 'PENDING';
+        
+        logger.info(`\n   ${statusIcon} ${fileStatus.moduleId}/${fileStatus.filename} [${statusText}]`);
+        logger.info(`      Number: ${fileStatus.number}`);
+        logger.info(`      Name: ${fileStatus.name}`);
+        logger.info(`      Direction: ${fileStatus.direction}`);
+        
+        if (fileStatus.appliedAt) {
+          logger.info(`      Applied At: ${fileStatus.appliedAt.toISOString()}`);
+        }
+        
+        if (fileStatus.dependencies.length > 0) {
+          logger.info(`      Module Dependencies: ${fileStatus.dependencies.join(', ')}`);
+        }
+        
+        if (fileStatus.dependents.length > 0) {
+          logger.info(`      Module Dependents: ${fileStatus.dependents.join(', ')}`);
+        }
+
+        if (options.detailed && fileStatus.checksum) {
+          logger.info(`      Checksum: ${fileStatus.checksum.substring(0, 12)}...`);
+        }
+      }
+      return { success: true };
+    }
 
     if (options.json) {
       // Output JSON format
@@ -162,20 +230,28 @@ export default async function runExecutor(
     logger.info(`\n🌐 Dependency Graph:`);
     const processedModules = new Set<string>();
     
-    for (const module of status.modules) {
-      if (processedModules.has(module.moduleId)) continue;
-      
-      if (module.dependencies.length === 0) {
-        // Root module (no dependencies)
-        logger.info(`   ${module.moduleId} (root)`);
-        showDependents(module.moduleId, status.modules, 1, processedModules);
+    // Find and process root modules (those with no dependencies)
+    const rootModules = status.modules.filter(m => m.dependencies.length === 0);
+    
+    if (rootModules.length > 0) {
+      for (const rootModule of rootModules) {
+        if (processedModules.has(rootModule.moduleId)) continue;
+        logger.info(`   ${rootModule.moduleId} (root)`);
+        showDependents(rootModule.moduleId, status.modules, 1, processedModules);
       }
     }
 
-    // Show any remaining modules (circular dependencies or orphaned)
+    // Show any remaining modules in dependency chains or circular dependencies
     for (const module of status.modules) {
       if (!processedModules.has(module.moduleId)) {
-        logger.info(`   ${module.moduleId} (isolated)`);
+        if (module.dependencies.length > 0) {
+          // This module has dependencies but wasn't reached from a root
+          // Could be part of a circular dependency or missing dependency
+          logger.info(`   ${module.moduleId} → depends on: ${module.dependencies.join(', ')}`);
+        } else {
+          // This shouldn't happen as root modules are processed above
+          logger.info(`   ${module.moduleId} (isolated)`);
+        }
         processedModules.add(module.moduleId);
       }
     }

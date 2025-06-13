@@ -9,6 +9,7 @@ export interface RollbackExecutorSchema {
   namespace?: string;
   database?: string;
   module?: string | number;
+  filename?: string | number;
   envFile?: string;
   useTransactions?: boolean;
   initPath?: string;
@@ -33,9 +34,15 @@ export default async function runExecutor(
   try {
     // Service already initialized above
 
-    // Determine target modules  
-    const rawTargetModules = options.module ? [String(options.module)] : undefined;
+    // Determine target modules and filenames  
+    const rawTargetModules = options.module 
+      ? String(options.module).split(',').map(m => m.trim()).filter(m => m.length > 0)
+      : undefined;
+    const targetFilenames = options.filename 
+      ? String(options.filename).split(',').map(f => f.trim()).filter(f => f.length > 0)
+      : undefined;
     debug.log(`Raw target modules: ${rawTargetModules ? rawTargetModules.join(', ') : 'all'}`);
+    debug.log(`Target filenames: ${targetFilenames ? targetFilenames.join(', ') : 'all'}`);
 
     // Initialize migration service first
     await service.initialize({
@@ -57,6 +64,26 @@ export default async function runExecutor(
     // Now resolve target modules to full names (e.g., "010" -> "010_auth")
     const resolvedTargetModules = rawTargetModules ? service.resolveTargetModules(rawTargetModules) : undefined;
     debug.log(`Resolved target modules: ${resolvedTargetModules ? resolvedTargetModules.join(', ') : 'all'}`);
+
+    // Handle filename-specific rollback validation
+    if (targetFilenames && targetFilenames.length > 0) {
+      try {
+        const rollbackResult = await service.resolveRollbackFilenames(targetFilenames, resolvedTargetModules);
+        
+        // Show dependency warnings if any
+        if (rollbackResult.warnings.length > 0) {
+          logger.warn('⚠️  Rollback filename warnings:');
+          for (const warning of rollbackResult.warnings) {
+            logger.warn(`   • ${warning}`);
+          }
+        }
+
+        debug.log(`Resolved ${rollbackResult.resolved.length} rollback filenames`);
+      } catch (error) {
+        logger.error(`❌ Failed to resolve rollback filenames: ${error.message}`);
+        return { success: false };
+      }
+    }
 
     // First, validate rollback safety unless force is enabled
     if (!options.force && rawTargetModules) {
@@ -98,7 +125,7 @@ export default async function runExecutor(
     }
     logger.info('🔄 Starting rollback execution...');
     
-    const result = await service.executeMigrations(resolvedTargetModules, 'rollback');
+    const result = await service.executeMigrations(resolvedTargetModules, 'rollback', targetFilenames);
     
     if (result.success) {
       logger.info(`✅ Rollback completed successfully!`);

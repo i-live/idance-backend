@@ -9,6 +9,7 @@ export interface MigrateExecutorSchema {
   namespace?: string;
   database?: string;
   module?: string | number;
+  filename?: string | number;
   envFile?: string;
   useTransactions?: boolean;
   initPath?: string;
@@ -47,9 +48,15 @@ export default async function runExecutor(
       dryRun: options.dryRun || false
     });
 
-    // Determine target modules
-    const targetModules = options.module ? [String(options.module)] : undefined;
+    // Determine target modules and filenames
+    const targetModules = options.module 
+      ? String(options.module).split(',').map(m => m.trim()).filter(m => m.length > 0)
+      : undefined;
+    const targetFilenames = options.filename 
+      ? String(options.filename).split(',').map(f => f.trim()).filter(f => f.length > 0)
+      : undefined;
     debug.log(`Target modules: ${targetModules ? targetModules.join(', ') : 'all'}`);
+    debug.log(`Target filenames: ${targetFilenames ? targetFilenames.join(', ') : 'all'}`);
 
     // Execute migrations
     if (options.dryRun) {
@@ -58,7 +65,7 @@ export default async function runExecutor(
       logger.info('🚀 Starting migration execution...');
     }
     
-    const result = await engine.executeMigrations(targetModules);
+    const result = await engine.executeMigrations(targetModules, 'migrate', targetFilenames);
     
     if (result.success) {
       logger.info(`✅ Migration completed successfully!`);

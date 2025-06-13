@@ -7,6 +7,7 @@ import { MigrationRepository } from './migration-repository';
 import { ConfigLoader } from '../configuration/config-loader';
 import { DependencyResolver } from './dependency-resolver';
 import { MigrationFileProcessor, type MigrationFile, type MigrationContext } from '../filesystem/migration-file-processor';
+import { PatternResolver, type PatternResolutionResult, type ResolvedFilename } from '../filesystem/pattern-resolver';
 import { replaceEnvVars, loadEnvFile } from '../infrastructure/env';
 import { resolveProjectPath } from '../infrastructure/project';
 import { Debug } from '../infrastructure/debug';
@@ -71,6 +72,7 @@ export interface MigrationFileResult {
 export class MigrationService {
   private context: MigrationExecutionContext | null = null;
   private options: MigrationServiceOptions | null = null;
+  private patternResolver: PatternResolver | null = null;
   private debug = Debug.scope('migration-service');
 
   constructor(private projectContext?: any) {}
@@ -135,6 +137,9 @@ export class MigrationService {
     const resolver = new DependencyResolver(basePath);
     await resolver.initialize(resolvedOptions.configPath);
 
+    // Initialize pattern resolver
+    this.patternResolver = new PatternResolver(resolver, basePath);
+
     this.context = {
       client,
       repository,
@@ -191,7 +196,8 @@ export class MigrationService {
 
   async executeMigrations(
     targetModules?: string[],
-    operation: 'migrate' | 'rollback' = 'migrate'
+    operation: 'migrate' | 'rollback' = 'migrate',
+    targetFilenames?: string[]
   ): Promise<MigrationResult> {
     if (!this.context) {
       throw new Error('Migration engine not initialized. Call initialize() first.');
@@ -240,6 +246,21 @@ export class MigrationService {
       this.debug.log(`Total migrations to process: ${migrationsToProcess.length}`);
     } else {
       migrationsToProcess = await this.findPendingMigrations(targetModules, 'up');
+    }
+
+    // Apply filename filtering if specified
+    if (targetFilenames && targetFilenames.length > 0) {
+      const resolvedFilenames = await this.resolveTargetFilenames(
+        targetFilenames, 
+        targetModules, 
+        operation === 'rollback' ? 'down' : 'up'
+      );
+      
+      // Filter migrations to only include resolved filenames
+      const filenameSet = new Set(resolvedFilenames.map(rf => rf.filename));
+      migrationsToProcess = migrationsToProcess.filter(m => filenameSet.has(m.filename));
+      
+      this.debug.log(`Filtered migrations by filename: ${migrationsToProcess.length} remaining`);
     }
     
     if (migrationsToProcess.length === 0) {
@@ -448,6 +469,51 @@ export class MigrationService {
     };
   }
 
+  async getFileStatus(resolvedFilenames: ResolvedFilename[]): Promise<Array<{
+    filename: string;
+    moduleId: string;
+    number: string;
+    name: string;
+    direction: 'up' | 'down';
+    status: 'applied' | 'pending' | 'unknown';
+    appliedAt?: Date;
+    checksum?: string;
+    dependencies: string[];
+    dependents: string[];
+  }>> {
+    if (!this.context) {
+      throw new Error('Migration engine not initialized. Call initialize() first.');
+    }
+
+    const { repository, resolver } = this.context;
+    const fileStatuses = [];
+
+    for (const file of resolvedFilenames) {
+      // Check if migration is applied
+      const migrationStatus = await repository.getLatestMigrationStatus(file.number, file.name);
+      const isApplied = migrationStatus && migrationStatus.status === 'success';
+      
+      // Get module dependencies and dependents
+      const dependencies = resolver.getModuleDependencies(file.moduleId);
+      const dependents = resolver.getModuleDependents(file.moduleId);
+
+      fileStatuses.push({
+        filename: file.filename,
+        moduleId: file.moduleId,
+        number: file.number,
+        name: file.name,
+        direction: file.direction,
+        status: isApplied ? 'applied' : 'pending',
+        appliedAt: migrationStatus?.applied_at ? new Date(migrationStatus.applied_at) : undefined,
+        checksum: migrationStatus?.checksum,
+        dependencies,
+        dependents
+      });
+    }
+
+    return fileStatuses;
+  }
+
   private buildMigrationRecord(
     migrationFile: MigrationFile, 
     status: 'success' | 'fail', 
@@ -487,47 +553,62 @@ export class MigrationService {
   }
 
   public resolveTargetModules(targetModules: string[]): string[] {
-    if (!this.context) {
+    if (!this.patternResolver) {
       throw new Error('Migration engine not initialized.');
     }
 
-    const { resolver } = this.context;
-    const resolved: string[] = [];
-
-    for (const pattern of targetModules) {
-      // Try to find existing module using the same logic as MigrationFileProcessor
-      const allModules = resolver.getAllModules();
-      const normalizedPattern = pattern.trim().toLowerCase();
-      const patternAsNumber = parseInt(normalizedPattern, 10);
-      const normalizedPatternNumber = isNaN(patternAsNumber) ? null : patternAsNumber.toString();
-
-      let found = false;
-      for (const moduleId of allModules) {
-        const match = moduleId.match(/^(\d{1,4})_(.+)$/);
-        if (!match) continue;
-
-        const [, number, name] = match;
-        const normalizedNumber = parseInt(number, 10).toString();
-
-        if (
-          moduleId.toLowerCase() === normalizedPattern ||
-          (normalizedPatternNumber !== null && normalizedPatternNumber === normalizedNumber) ||
-          normalizedPattern === name.toLowerCase() ||
-          normalizedPattern === `${normalizedNumber}_${name.toLowerCase()}` ||
-          normalizedPattern === `${number}_${name.toLowerCase()}`
-        ) {
-          resolved.push(moduleId);
-          found = true;
-          break;
-        }
-      }
-
-      if (!found) {
-        throw new Error(`Module not found: ${pattern}. Available modules: ${allModules.join(', ')}`);
-      }
+    const result = this.patternResolver.resolveModules(targetModules);
+    
+    if (result.notFound.length > 0) {
+      const allModules = this.context?.resolver.getAllModules() || [];
+      throw new Error(`Module(s) not found: ${result.notFound.join(', ')}. Available modules: ${allModules.join(', ')}`);
     }
 
-    return resolved;
+    return result.resolved.map(r => r.moduleId);
+  }
+
+  public async resolveTargetFilenames(
+    filenamePatterns: string[], 
+    targetModules?: string[], 
+    direction: 'up' | 'down' = 'up'
+  ): Promise<ResolvedFilename[]> {
+    if (!this.patternResolver) {
+      throw new Error('Migration engine not initialized.');
+    }
+
+    // Resolve module patterns first if provided
+    const resolvedTargetModules = targetModules ? this.resolveTargetModules(targetModules) : undefined;
+
+    const result = await this.patternResolver.resolveFilenames(filenamePatterns, resolvedTargetModules, direction);
+    
+    if (result.notFound.length > 0) {
+      throw new Error(`Filename(s) not found: ${result.notFound.join(', ')}`);
+    }
+
+    return result.resolved;
+  }
+
+  public async resolveRollbackFilenames(
+    filenamePatterns: string[],
+    targetModules?: string[]
+  ): Promise<{ resolved: ResolvedFilename[]; warnings: string[] }> {
+    if (!this.patternResolver) {
+      throw new Error('Migration engine not initialized.');
+    }
+
+    // Resolve module patterns first if provided
+    const resolvedTargetModules = targetModules ? this.resolveTargetModules(targetModules) : undefined;
+
+    const result = await this.patternResolver.resolveRollbackFilenames(filenamePatterns, resolvedTargetModules);
+    
+    if (result.notFound.length > 0) {
+      throw new Error(`Rollback filename(s) not found: ${result.notFound.join(', ')}`);
+    }
+
+    return {
+      resolved: result.resolved,
+      warnings: result.dependencyWarnings
+    };
   }
 
   private async findModuleMigrations(
