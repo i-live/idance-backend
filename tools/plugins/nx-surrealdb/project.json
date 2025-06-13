@@ -1,6 +1,6 @@
 {
-  "name": "nx-surrealdb-migrations",
-  "sourceRoot": "packages/nx-surrealdb-migrations/src",
+  "name": "nx-surrealdb",
+  "sourceRoot": "tools/plugins/nx-surrealdb/src",
   "projectType": "library",
   "targets": {
     "build": {
@@ -8,27 +8,27 @@
       "outputs": ["{options.outputPath}"],
       "cache": false,
       "options": {
-        "outputPath": "dist/packages/nx-surrealdb-migrations",
-        "main": "packages/nx-surrealdb-migrations/src/index.ts",
-        "tsConfig": "packages/nx-surrealdb-migrations/tsconfig.lib.json",
+        "outputPath": "dist/tools/plugins/nx-surrealdb",
+        "main": "tools/plugins/nx-surrealdb/src/index.ts",
+        "tsConfig": "tools/plugins/nx-surrealdb/tsconfig.lib.json",
         "assets": [
           {
-            "input": "packages/nx-surrealdb-migrations/src/generators/migration/files",
+            "input": "tools/plugins/nx-surrealdb/src/generators/migration/files",
             "glob": "**/*",
             "output": "src/generators/migration/files"
           },
           {
-            "input": "packages/nx-surrealdb-migrations",
+            "input": "tools/plugins/nx-surrealdb",
             "glob": "{package.json,generators.json,executors.json,README.md,LICENSE.md}",
             "output": "./"
           },
           {
-            "input": "packages/nx-surrealdb-migrations/src",
+            "input": "tools/plugins/nx-surrealdb/src",
             "glob": "**/*/schema.json",
             "output": "src"
           },
           {
-            "input": "packages/nx-surrealdb-migrations/src/schema",
+            "input": "tools/plugins/nx-surrealdb/src/schema",
             "glob": "**/*",
             "output": "src/schema"
           }
@@ -43,7 +43,7 @@
     "copy-schema": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "mkdir -p dist/packages/nx-surrealdb-migrations/src/schema && cp packages/nx-surrealdb-migrations/src/schema/system_migrations.surql dist/packages/nx-surrealdb-migrations/src/schema/"
+        "command": "mkdir -p dist/tools/plugins/nx-surrealdb/src/schema && cp tools/plugins/nx-surrealdb/src/schema/system_migrations.surql dist/tools/plugins/nx-surrealdb/src/schema/"
       }
     },
     "lint": {
@@ -54,7 +54,7 @@
       "outputs": ["{workspaceRoot}/coverage/{projectRoot}"],
       "cache": false,
       "options": {
-        "jestConfig": "packages/nx-surrealdb-migrations/jest.config.ts"
+        "jestConfig": "tools/plugins/nx-surrealdb/jest.config.ts"
       }
     }
   }

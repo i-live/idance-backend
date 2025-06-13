@@ -33,7 +33,7 @@
   "defaultBase": "main",
   "nxCloudId": "683d0ce209e9a67b1f62f68a",
   "plugins": [
-    "@idance/nx-surrealdb-migrations",
+    "@idance/nx-surrealdb",
     {
       "plugin": "@nx/eslint/plugin",
       "options": {

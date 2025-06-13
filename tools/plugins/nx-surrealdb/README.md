@@ -1,13 +1,18 @@
-# Nx SurrealDB Migrations Plugin
+# @idance/nx-surrealdb
 
-A modern, dependency-aware migration management system for [SurrealDB](https://surrealdb.com/) within [Nx](https://nx.dev/) monorepos. Features a 3-executor architecture (`migrate`, `rollback`, `status`) with comprehensive dependency resolution, safety validation, and rich console visualization.
+A comprehensive SurrealDB toolkit for [Nx](https://nx.dev/) monorepos featuring migration management, dependency resolution, and extensible tooling architecture.
 
 ## Features
 
-### 🚀 **3-Executor Architecture**
+### 🚀 **Migration Management**
 - **`migrate`**: Apply pending migrations with dependency resolution
 - **`rollback`**: Safe rollback with dependency conflict detection  
 - **`status`**: Rich status visualization with dependency graphs
+
+### 🔧 **Extensible Architecture**
+- **Modular Design**: Foundation for expanding SurrealDB tooling beyond migrations
+- **Future Features**: Schema generators, seeder utilities, query builders, and more
+- **Plugin Architecture**: Extensible framework for SurrealDB development workflows
 
 ### 🔄 **Dependency Management**
 - **Module Dependencies**: JSON/YAML configuration with explicit dependency declarations
@@ -45,12 +50,12 @@ A modern, dependency-aware migration management system for [SurrealDB](https://s
 
 1. **Add the Plugin to Your Nx Workspace**:
    ```bash
-   npm install @idance/nx-surrealdb-migrations --save-dev
+   npm install @idance/nx-surrealdb --save-dev
    ```
 
 2. **Verify Installation**:
    ```bash
-   nx list @idance/nx-surrealdb-migrations
+   nx list @idance/nx-surrealdb
    ```
 
 ## Quick Start

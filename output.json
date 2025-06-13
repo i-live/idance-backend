@@ -1,0 +1,982 @@
+{
+  "graph": {
+    "nodes": {
+      "surrealdb-migration-test": {
+        "name": "surrealdb-migration-test",
+        "type": "lib",
+        "data": {
+          "root": "packages/surrealdb-migration-test",
+          "targets": {
+            "eslint:lint": {
+              "cache": true,
+              "options": {
+                "cwd": "packages/surrealdb-migration-test",
+                "command": "eslint ."
+              },
+              "inputs": [
+                "default",
+                "^default",
+                "{workspaceRoot}/eslint.config.mjs",
+                "{workspaceRoot}/tools/eslint-rules/**/*",
+                {
+                  "externalDependencies": [
+                    "eslint"
+                  ]
+                }
+              ],
+              "outputs": [
+                "{options.outputFile}"
+              ],
+              "metadata": {
+                "technologies": [
+                  "eslint"
+                ],
+                "description": "Runs ESLint on project",
+                "help": {
+                  "command": "pnpm exec eslint --help",
+                  "example": {
+                    "options": {
+                      "max-warnings": 0
+                    }
+                  }
+                }
+              },
+              "executor": "nx:run-commands",
+              "configurations": {},
+              "parallelism": true
+            },
+            "test": {
+              "executor": "nx:run-script",
+              "options": {
+                "script": "test"
+              },
+              "metadata": {
+                "scriptContent": "tsx src/test-migration.ts",
+                "runCommand": "pnpm run test"
+              },
+              "configurations": {},
+              "parallelism": true,
+              "cache": false
+            },
+            "test:simple": {
+              "executor": "nx:run-script",
+              "options": {
+                "script": "test:simple"
+              },
+              "metadata": {
+                "scriptContent": "tsx src/test-simple.ts",
+                "runCommand": "pnpm run test:simple"
+              },
+              "configurations": {},
+              "parallelism": true
+            },
+            "test:complex": {
+              "executor": "nx:run-script",
+              "options": {
+                "script": "test:complex"
+              },
+              "metadata": {
+                "scriptContent": "tsx src/test-complex.ts",
+                "runCommand": "pnpm run test:complex"
+              },
+              "configurations": {},
+              "parallelism": true
+            },
+            "test:http": {
+              "executor": "nx:run-script",
+              "options": {
+                "script": "test:http"
+              },
+              "metadata": {
+                "scriptContent": "node http-api-test.mjs",
+                "runCommand": "pnpm run test:http"
+              },
+              "configurations": {},
+              "parallelism": true
+            }
+          },
+          "name": "surrealdb-migration-test",
+          "tags": [
+            "npm:private"
+          ],
+          "metadata": {
+            "targetGroups": {
+              "NPM Scripts": [
+                "test",
+                "test:simple",
+                "test:complex",
+                "test:http"
+              ]
+            },
+            "js": {
+              "packageName": "@idance/surrealdb-migration-test",
+              "isInPackageManagerWorkspaces": true
+            }
+          },
+          "sourceRoot": "packages/surrealdb-migration-test",
+          "projectType": "library",
+          "implicitDependencies": []
+        }
+      },
+      "nx-surrealdb": {
+        "name": "nx-surrealdb",
+        "type": "lib",
+        "data": {
+          "root": "tools/plugins/nx-surrealdb",
+          "targets": {
+            "eslint:lint": {
+              "cache": true,
+              "options": {
+                "cwd": "tools/plugins/nx-surrealdb",
+                "command": "eslint ."
+              },
+              "inputs": [
+                "default",
+                "^default",
+                "{workspaceRoot}/eslint.config.mjs",
+                "{projectRoot}/eslint.config.mjs",
+                "{workspaceRoot}/tools/eslint-rules/**/*",
+                {
+                  "externalDependencies": [
+                    "eslint"
+                  ]
+                }
+              ],
+              "outputs": [
+                "{options.outputFile}"
+              ],
+              "metadata": {
+                "technologies": [
+                  "eslint"
+                ],
+                "description": "Runs ESLint on project",
+                "help": {
+                  "command": "pnpm exec eslint --help",
+                  "example": {
+                    "options": {
+                      "max-warnings": 0
+                    }
+                  }
+                }
+              },
+              "executor": "nx:run-commands",
+              "configurations": {},
+              "parallelism": true
+            },
+            "build": {
+              "executor": "@nx/js:tsc",
+              "outputs": [
+                "{options.outputPath}"
+              ],
+              "cache": false,
+              "options": {
+                "outputPath": "dist/tools/plugins/nx-surrealdb",
+                "main": "tools/plugins/nx-surrealdb/src/index.ts",
+                "tsConfig": "tools/plugins/nx-surrealdb/tsconfig.lib.json",
+                "assets": [
+                  {
+                    "input": "tools/plugins/nx-surrealdb/src/generators/migration/files",
+                    "glob": "**/*",
+                    "output": "src/generators/migration/files"
+                  },
+                  {
+                    "input": "tools/plugins/nx-surrealdb",
+                    "glob": "{package.json,generators.json,executors.json,README.md,LICENSE.md}",
+                    "output": "./"
+                  },
+                  {
+                    "input": "tools/plugins/nx-surrealdb/src",
+                    "glob": "**/*/schema.json",
+                    "output": "src"
+                  },
+                  {
+                    "input": "tools/plugins/nx-surrealdb/src/schema",
+                    "glob": "**/*",
+                    "output": "src/schema"
+                  }
+                ],
+                "updateBuildableProjectDepsInPackageJson": true,
+                "buildableProjectDepsInPackageJsonType": "dependencies"
+              },
+              "configurations": {
+                "production": {}
+              },
+              "parallelism": true,
+              "dependsOn": [
+                "^build"
+              ],
+              "inputs": [
+                "default",
+                "^default"
+              ]
+            },
+            "nx-release-publish": {
+              "executor": "@nx/js:release-publish",
+              "dependsOn": [
+                "^nx-release-publish"
+              ],
+              "options": {},
+              "configurations": {},
+              "parallelism": true
+            },
+            "copy-schema": {
+              "executor": "nx:run-commands",
+              "options": {
+                "command": "mkdir -p dist/tools/plugins/nx-surrealdb/src/schema && cp tools/plugins/nx-surrealdb/src/schema/system_migrations.surql dist/tools/plugins/nx-surrealdb/src/schema/"
+              },
+              "configurations": {},
+              "parallelism": true
+            },
+            "lint": {
+              "executor": "@nx/eslint:lint",
+              "configurations": {},
+              "options": {},
+              "parallelism": true,
+              "cache": true,
+              "inputs": [
+                "default",
+                "{workspaceRoot}/.eslintrc.json",
+                "{workspaceRoot}/.eslintignore",
+                "{workspaceRoot}/eslint.config.mjs"
+              ]
+            },
+            "test": {
+              "executor": "@nx/jest:jest",
+              "outputs": [
+                "{workspaceRoot}/coverage/{projectRoot}"
+              ],
+              "cache": false,
+              "options": {
+                "jestConfig": "tools/plugins/nx-surrealdb/jest.config.ts"
+              },
+              "configurations": {},
+              "parallelism": true
+            }
+          },
+          "name": "nx-surrealdb",
+          "includedScripts": [
+            "build"
+          ],
+          "tags": [
+            "npm:public"
+          ],
+          "metadata": {
+            "targetGroups": {
+              "NPM Scripts": [
+                "build"
+              ]
+            },
+            "js": {
+              "packageName": "@idance/nx-surrealdb",
+              "packageMain": "dist/tools/plugins/nx-surrealdb/index.js",
+              "isInPackageManagerWorkspaces": true
+            }
+          },
+          "sourceRoot": "tools/plugins/nx-surrealdb/src",
+          "projectType": "library",
+          "implicitDependencies": []
+        }
+      },
+      "backoffice": {
+        "name": "backoffice",
+        "type": "app",
+        "data": {
+          "root": "apps/backoffice",
+          "targets": {
+            "eslint:lint": {
+              "cache": true,
+              "options": {
+                "cwd": "apps/backoffice",
+                "command": "eslint ."
+              },
+              "inputs": [
+                "default",
+                "^default",
+                "{workspaceRoot}/eslint.config.mjs",
+                "{workspaceRoot}/tools/eslint-rules/**/*",
+                {
+                  "externalDependencies": [
+                    "eslint"
+                  ]
+                }
+              ],
+              "outputs": [
+                "{options.outputFile}"
+              ],
+              "metadata": {
+                "technologies": [
+                  "eslint"
+                ],
+                "description": "Runs ESLint on project",
+                "help": {
+                  "command": "pnpm exec eslint --help",
+                  "example": {
+                    "options": {
+                      "max-warnings": 0
+                    }
+                  }
+                }
+              },
+              "executor": "nx:run-commands",
+              "configurations": {},
+              "parallelism": true
+            },
+            "vite:test": {
+              "options": {
+                "cwd": "apps/backoffice",
+                "command": "vitest"
+              },
+              "cache": true,
+              "inputs": [
+                "default",
+                "^default",
+                {
+                  "externalDependencies": [
+                    "vitest"
+                  ]
+                },
+                {
+                  "env": "CI"
+                }
+              ],
+              "outputs": [
+                "{workspaceRoot}/coverage/{projectRoot}"
+              ],
+              "metadata": {
+                "technologies": [
+                  "vite"
+                ],
+                "description": "Run Vite tests",
+                "help": {
+                  "command": "pnpm exec vitest --help",
+                  "example": {
+                    "options": {
+                      "bail": 1,
+                      "coverage": true
+                    }
+                  }
+                }
+              },
+              "executor": "nx:run-commands",
+              "configurations": {},
+              "parallelism": true
+            },
+            "typecheck": {
+              "cache": true,
+              "inputs": [
+                "default",
+                "^default",
+                {
+                  "externalDependencies": [
+                    "typescript"
+                  ]
+                }
+              ],
+              "options": {
+                "cwd": "apps/backoffice",
+                "command": "tsc --noEmit -p tsconfig.json"
+              },
+              "metadata": {
+                "description": "Runs type-checking for the project.",
+                "technologies": [
+                  "typescript"
+                ],
+                "help": {
+                  "command": "pnpm exec tsc -p tsconfig.json --help",
+                  "example": {
+                    "options": {
+                      "noEmit": true
+                    }
+                  }
+                }
+              },
+              "executor": "nx:run-commands",
+              "configurations": {},
+              "parallelism": true
+            },
+            "build-deps": {
+              "dependsOn": [
+                "^build"
+              ],
+              "configurations": {},
+              "options": {},
+              "parallelism": true,
+              "executor": "nx:noop"
+            },
+            "watch-deps": {
+              "dependsOn": [
+                "build-deps"
+              ],
+              "executor": "nx:run-commands",
+              "options": {
+                "command": "pnpm exec nx watch --projects backoffice --includeDependentProjects -- pnpm exec nx build-deps backoffice"
+              },
+              "configurations": {},
+              "parallelism": true
+            },
+            "test:ui": {
+              "executor": "nx:run-script",
+              "options": {
+                "script": "test:ui"
+              },
+              "metadata": {
+                "scriptContent": "vitest --ui",
+                "runCommand": "pnpm run test:ui"
+              },
+              "configurations": {},
+              "parallelism": true
+            },
+            "test:integration": {
+              "executor": "nx:run-script",
+              "options": {
+                "script": "test:integration"
+              },
+              "metadata": {
+                "scriptContent": "TEST_MODE=integration vitest run",
+                "runCommand": "pnpm run test:integration"
+              },
+              "configurations": {},
+              "parallelism": true
+            },
+            "setup:test-user": {
+              "executor": "nx:run-script",
+              "options": {
+                "script": "setup:test-user"
+              },
+              "metadata": {
+                "scriptContent": "node ../../packages/auth/src/scripts/create-test-user.js .env.local",
+                "runCommand": "pnpm run setup:test-user"
+              },
+              "configurations": {},
+              "parallelism": true
+            },
+            "dev": {
+              "executor": "nx:run-commands",
+              "options": {
+                "command": "next dev -p 3002",
+                "cwd": "apps/backoffice"
+              },
+              "configurations": {},
+              "parallelism": true
+            },
+            "build": {
+              "executor": "nx:run-commands",
+              "outputs": [
+                "{projectRoot}/.next"
+              ],
+              "options": {
+                "command": "next build",
+                "cwd": "apps/backoffice"
+              },
+              "dependsOn": [
+                "^build"
+              ],
+              "configurations": {},
+              "parallelism": true
+            },
+            "start": {
+              "executor": "nx:run-commands",
+              "options": {
+                "command": "next start -p 3002",
+                "cwd": "apps/backoffice"
+              },
+              "dependsOn": [
+                "build"
+              ],
+              "configurations": {},
+              "parallelism": true
+            },
+            "lint": {
+              "executor": "nx:run-commands",
+              "options": {
+                "command": "next lint",
+                "cwd": "apps/backoffice"
+              },
+              "configurations": {},
+              "parallelism": true
+            },
+            "test": {
+              "executor": "nx:run-commands",
+              "options": {
+                "command": "vitest",
+                "cwd": "apps/backoffice"
+              },
+              "configurations": {},
+              "parallelism": true,
+              "cache": false
+            },
+            "test:run": {
+              "executor": "nx:run-commands",
+              "options": {
+                "command": "vitest run",
+                "cwd": "apps/backoffice"
+              },
+              "configurations": {},
+              "parallelism": true
+            },
+            "test:coverage": {
+              "executor": "nx:run-commands",
+              "options": {
+                "command": "vitest run --coverage",
+                "cwd": "apps/backoffice"
+              },
+              "configurations": {},
+              "parallelism": true
+            },
+            "type-check": {
+              "executor": "nx:run-commands",
+              "options": {
+                "command": "tsc --noEmit",
+                "cwd": "apps/backoffice"
+              },
+              "configurations": {},
+              "parallelism": true
+            },
+            "setup-test-user": {
+              "executor": "nx:run-commands",
+              "options": {
+                "command": "nx run auth:setup-test-user:dev"
+              },
+              "configurations": {},
+              "parallelism": true
+            }
+          },
+          "metadata": {
+            "targetGroups": {
+              "NPM Scripts": [
+                "test:ui",
+                "test:integration",
+                "setup:test-user"
+              ]
+            },
+            "js": {
+              "packageName": "@idance/backoffice",
+              "isInPackageManagerWorkspaces": true
+            }
+          },
+          "name": "backoffice",
+          "tags": [
+            "npm:private",
+            "scope:backoffice",
+            "type:app"
+          ],
+          "$schema": "../../node_modules/nx/schemas/project-schema.json",
+          "sourceRoot": "apps/backoffice/src",
+          "projectType": "application",
+          "implicitDependencies": [
+            "auth",
+            "@idance/ui"
+          ]
+        }
+      },
+      "auth": {
+        "name": "auth",
+        "type": "lib",
+        "data": {
+          "root": "packages/auth",
+          "targets": {
+            "eslint:lint": {
+              "cache": true,
+              "options": {
+                "cwd": "packages/auth",
+                "command": "eslint ."
+              },
+              "inputs": [
+                "default",
+                "^default",
+                "{workspaceRoot}/eslint.config.mjs",
+                "{workspaceRoot}/tools/eslint-rules/**/*",
+                {
+                  "externalDependencies": [
+                    "eslint"
+                  ]
+                }
+              ],
+              "outputs": [
+                "{options.outputFile}"
+              ],
+              "metadata": {
+                "technologies": [
+                  "eslint"
+                ],
+                "description": "Runs ESLint on project",
+                "help": {
+                  "command": "pnpm exec eslint --help",
+                  "example": {
+                    "options": {
+                      "max-warnings": 0
+                    }
+                  }
+                }
+              },
+              "executor": "nx:run-commands",
+              "configurations": {},
+              "parallelism": true
+            },
+            "dev": {
+              "executor": "nx:run-script",
+              "options": {
+                "script": "dev"
+              },
+              "metadata": {
+                "scriptContent": "tsc --watch",
+                "runCommand": "pnpm run dev"
+              },
+              "configurations": {},
+              "parallelism": true
+            },
+            "clean": {
+              "executor": "nx:run-script",
+              "options": {
+                "script": "clean"
+              },
+              "metadata": {
+                "scriptContent": "rm -rf dist",
+                "runCommand": "pnpm run clean"
+              },
+              "configurations": {},
+              "parallelism": true
+            },
+            "type-check": {
+              "executor": "nx:run-script",
+              "options": {
+                "script": "type-check"
+              },
+              "metadata": {
+                "scriptContent": "tsc --noEmit",
+                "runCommand": "pnpm run type-check"
+              },
+              "configurations": {},
+              "parallelism": true
+            },
+            "build": {
+              "executor": "@nx/js:tsc",
+              "outputs": [
+                "{options.outputPath}"
+              ],
+              "options": {
+                "outputPath": "packages/auth/dist",
+                "main": "packages/auth/src/index.ts",
+                "tsConfig": "packages/auth/tsconfig.json"
+              },
+              "configurations": {},
+              "parallelism": true,
+              "cache": true,
+              "dependsOn": [
+                "^build"
+              ],
+              "inputs": [
+                "default",
+                "^default"
+              ]
+            },
+            "setup-test-user": {
+              "executor": "nx:run-commands",
+              "options": {
+                "command": "node packages/auth/src/scripts/create-test-user.js",
+                "cwd": ""
+              },
+              "configurations": {
+                "dev": {
+                  "command": "node packages/auth/src/scripts/create-test-user.js apps/backoffice/.env.local",
+                  "cwd": ""
+                },
+                "staging": {
+                  "command": "node packages/auth/src/scripts/create-test-user.js .env.staging",
+                  "cwd": ""
+                },
+                "production": {
+                  "command": "node packages/auth/src/scripts/create-test-user.js .env.production",
+                  "cwd": ""
+                },
+                "ci": {
+                  "command": "node packages/auth/src/scripts/create-test-user.js .env",
+                  "cwd": ""
+                }
+              },
+              "parallelism": true
+            }
+          },
+          "name": "auth",
+          "tags": [
+            "npm:private",
+            "scope:shared",
+            "type:library"
+          ],
+          "metadata": {
+            "targetGroups": {
+              "NPM Scripts": [
+                "dev",
+                "clean",
+                "type-check"
+              ]
+            },
+            "js": {
+              "packageName": "@idance/auth",
+              "packageExports": {
+                ".": {
+                  "types": "./dist/index.d.ts",
+                  "import": "./dist/index.js",
+                  "require": "./dist/index.js"
+                },
+                "./nextauth": {
+                  "types": "./dist/nextauth/index.d.ts",
+                  "import": "./dist/nextauth/index.js",
+                  "require": "./dist/nextauth/index.js"
+                },
+                "./surrealdb": {
+                  "types": "./dist/surrealdb/index.d.ts",
+                  "import": "./dist/surrealdb/index.js",
+                  "require": "./dist/surrealdb/index.js"
+                }
+              },
+              "packageMain": "./dist/index.js",
+              "isInPackageManagerWorkspaces": true
+            }
+          },
+          "$schema": "../../node_modules/nx/schemas/project-schema.json",
+          "sourceRoot": "packages/auth/src",
+          "projectType": "library",
+          "implicitDependencies": []
+        }
+      },
+      "@idance/ui": {
+        "name": "@idance/ui",
+        "type": "lib",
+        "data": {
+          "root": "packages/ui",
+          "targets": {
+            "eslint:lint": {
+              "cache": true,
+              "options": {
+                "cwd": "packages/ui",
+                "command": "eslint ."
+              },
+              "inputs": [
+                "default",
+                "^default",
+                "{workspaceRoot}/eslint.config.mjs",
+                "{workspaceRoot}/tools/eslint-rules/**/*",
+                {
+                  "externalDependencies": [
+                    "eslint"
+                  ]
+                }
+              ],
+              "outputs": [
+                "{options.outputFile}"
+              ],
+              "metadata": {
+                "technologies": [
+                  "eslint"
+                ],
+                "description": "Runs ESLint on project",
+                "help": {
+                  "command": "pnpm exec eslint --help",
+                  "example": {
+                    "options": {
+                      "max-warnings": 0
+                    }
+                  }
+                }
+              },
+              "executor": "nx:run-commands",
+              "configurations": {},
+              "parallelism": true
+            },
+            "build": {
+              "executor": "nx:run-script",
+              "options": {
+                "script": "build"
+              },
+              "metadata": {
+                "scriptContent": "tsc && npm run build:css",
+                "runCommand": "pnpm run build"
+              },
+              "configurations": {},
+              "parallelism": true,
+              "dependsOn": [
+                "^build"
+              ],
+              "outputs": [
+                "{projectRoot}/dist"
+              ]
+            },
+            "build:css": {
+              "executor": "nx:run-script",
+              "options": {
+                "script": "build:css"
+              },
+              "metadata": {
+                "scriptContent": "tailwindcss -i ./src/styles/globals.css -o ./dist/styles/index.css --minify",
+                "runCommand": "pnpm run build:css"
+              },
+              "configurations": {},
+              "parallelism": true
+            },
+            "dev": {
+              "executor": "nx:run-script",
+              "options": {
+                "script": "dev"
+              },
+              "metadata": {
+                "scriptContent": "tsc --watch",
+                "runCommand": "pnpm run dev"
+              },
+              "configurations": {},
+              "parallelism": true
+            },
+            "clean": {
+              "executor": "nx:run-script",
+              "options": {
+                "script": "clean"
+              },
+              "metadata": {
+                "scriptContent": "rm -rf dist",
+                "runCommand": "pnpm run clean"
+              },
+              "configurations": {},
+              "parallelism": true
+            },
+            "type-check": {
+              "executor": "nx:run-script",
+              "options": {
+                "script": "type-check"
+              },
+              "metadata": {
+                "scriptContent": "tsc --noEmit",
+                "runCommand": "pnpm run type-check"
+              },
+              "configurations": {},
+              "parallelism": true
+            }
+          },
+          "name": "@idance/ui",
+          "tags": [
+            "npm:private"
+          ],
+          "metadata": {
+            "targetGroups": {
+              "NPM Scripts": [
+                "build",
+                "build:css",
+                "dev",
+                "clean",
+                "type-check"
+              ]
+            },
+            "js": {
+              "packageName": "@idance/ui",
+              "packageExports": {
+                ".": {
+                  "types": "./dist/index.d.ts",
+                  "import": "./dist/index.js",
+                  "require": "./dist/index.js"
+                },
+                "./styles": {
+                  "import": "./dist/styles/index.css"
+                },
+                "./tailwind.config.js": "./tailwind.config.js"
+              },
+              "packageMain": "./dist/index.js",
+              "isInPackageManagerWorkspaces": true
+            }
+          },
+          "implicitDependencies": []
+        }
+      },
+      "database": {
+        "name": "database",
+        "type": "lib",
+        "data": {
+          "root": "database",
+          "name": "database",
+          "targets": {
+            "migrate": {
+              "executor": "@idance/nx-surrealdb:migrate",
+              "options": {
+                "url": "${SURREALDB_URL}",
+                "user": "${SURREALDB_ROOT_USER}",
+                "pass": "${SURREALDB_ROOT_PASS}",
+                "namespace": "${SURREALDB_NAMESPACE}",
+                "database": "${SURREALDB_DATABASE}",
+                "initPath": "database"
+              },
+              "configurations": {},
+              "parallelism": true
+            },
+            "rollback": {
+              "executor": "@idance/nx-surrealdb:rollback",
+              "options": {
+                "url": "${SURREALDB_URL}",
+                "user": "${SURREALDB_ROOT_USER}",
+                "pass": "${SURREALDB_ROOT_PASS}",
+                "namespace": "${SURREALDB_NAMESPACE}",
+                "database": "${SURREALDB_DATABASE}",
+                "initPath": "database"
+              },
+              "configurations": {},
+              "parallelism": true
+            },
+            "status": {
+              "executor": "@idance/nx-surrealdb-migrations:status",
+              "options": {
+                "url": "${SURREALDB_URL}",
+                "user": "${SURREALDB_ROOT_USER}",
+                "pass": "${SURREALDB_ROOT_PASS}",
+                "namespace": "${SURREALDB_NAMESPACE}",
+                "database": "${SURREALDB_DATABASE}",
+                "initPath": "database"
+              },
+              "configurations": {},
+              "parallelism": true
+            },
+            "reset": {
+              "executor": "@idance/nx-surrealdb-migrations:reset",
+              "options": {
+                "url": "${SURREALDB_URL}",
+                "user": "${SURREALDB_ROOT_USER}",
+                "pass": "${SURREALDB_ROOT_PASS}",
+                "namespace": "${SURREALDB_NAMESPACE}",
+                "database": "${SURREALDB_DATABASE}"
+              },
+              "configurations": {},
+              "parallelism": true
+            }
+          },
+          "implicitDependencies": [],
+          "tags": []
+        }
+      }
+    },
+    "dependencies": {
+      "surrealdb-migration-test": [],
+      "nx-surrealdb": [],
+      "backoffice": [
+        {
+          "source": "backoffice",
+          "target": "auth",
+          "type": "implicit"
+        },
+        {
+          "source": "backoffice",
+          "target": "@idance/ui",
+          "type": "implicit"
+        },
+        {
+          "source": "backoffice",
+          "target": "auth",
+          "type": "static"
+        },
+        {
+          "source": "backoffice",
+          "target": "@idance/ui",
+          "type": "static"
+        }
+      ],
+      "auth": [],
+      "@idance/ui": [],
+      "database": []
+    }
+  }
+}
