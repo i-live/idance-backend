@@ -3,7 +3,9 @@
     "000_admin": {
       "name": "System Administration",
       "description": "Core database setup and administrative functions",
-      "depends": []
+      "depends": [],
+      "locked": true,
+      "lockReason": "Critical system module - contains core admin setup and permissions"
     },
     "010_auth": {
       "name": "Authentication & Users",
