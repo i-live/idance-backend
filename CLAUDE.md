@@ -139,6 +139,13 @@ Always include usage updates in responses showing:
 3. Continue from the last task that was in progress
 4. Follow the exact commands and patterns documented here
 
+## Package Development
+**IMPORTANT:** When making changes to NX packages (e.g., nx-surrealdb-migrations):
+1. Always build the package after making changes: `nx run <package-name>:build`
+2. Changes won't take effect until the package is built
+3. Example: `nx run nx-surrealdb-migrations:build`
+4. This applies to all code changes in packages/ directory
+
 ## File Organization
 - Place package-specific files in their respective package directories (packages/package-name/)
 - Never add package-specific code/docs to monorepo root

@@ -1,9 +1,12 @@
 import { Migration } from './types';
 import { SurrealDBClient } from './client';
+import { Debug } from './debug';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 
 export class MigrationTracker {
+  private debug = Debug.scope('migration-tracker');
+
   constructor(
     private client: SurrealDBClient,
     private schemaPath?: string
@@ -109,9 +112,19 @@ export class MigrationTracker {
     `;
 
     try {
+      this.debug.log(`Querying latest migration status for ${number}_${name}`);
+      this.debug.log(`Query: ${query}`);
+      this.debug.log(`Params:`, params);
+      
       const result = await this.client.query(query, params); 
-      return result[0][0] ?? null;
+      this.debug.log(`Raw query result:`, JSON.stringify(result, null, 2));
+      
+      const migration = result[0][0] ?? null;
+      this.debug.log(`Parsed migration result:`, migration);
+      
+      return migration;
     } catch (error) {
+      this.debug.error(`Failed to fetch migration status for ${number}_${name}:`, error);
       throw new Error(`Failed to fetch migration status: ${error.message}`);
     }
   }
@@ -181,7 +194,7 @@ export class MigrationTracker {
 
     try {
       const result = await this.client.query(query, params);
-      const migration = result[0]?.result?.[0];
+      const migration = result[0]?.[0];
       
       if (!migration) return null;
       
@@ -215,6 +228,8 @@ export class MigrationTracker {
     }
 
     try {
+      this.debug.log(`Querying migrations by direction='${direction}' and path='${path}'`);
+      
       const result = await this.client.query(
         `
         SELECT * FROM system_migrations 
@@ -225,7 +240,13 @@ export class MigrationTracker {
         { direction, path }
       );
       
-      return (result[0]?.result || []).map((m: Migration) => ({
+      this.debug.log(`Raw query result:`, JSON.stringify(result, null, 2));
+      this.debug.log(`Accessing result[0]:`, result[0]);
+      this.debug.log(`Accessing result[0]?.result:`, result[0]?.result);
+      this.debug.log(`result[0] length:`, Array.isArray(result[0]) ? result[0].length : 'not array');
+      this.debug.log(`result[0]?.result length:`, Array.isArray(result[0]?.result) ? result[0].result.length : 'not array');
+      
+      const migrations = (result[0] || []).map((m: Migration) => ({
         id: m.id,
         number: m.number,
         name: m.name,
@@ -241,7 +262,15 @@ export class MigrationTracker {
         applied_by: m.applied_by,
         execution_time_ms: m.execution_time_ms
       })) as Migration[];
+      
+      this.debug.log(`Mapped migrations count: ${migrations.length}`);
+      if (migrations.length > 0) {
+        this.debug.log(`Sample migration:`, migrations[0]);
+      }
+      
+      return migrations;
     } catch (error) {
+      this.debug.error(`Failed to fetch migrations for direction='${direction}' path='${path}':`, error);
       throw new Error(`Failed to fetch migrations: ${error.message}`);
     }
   }

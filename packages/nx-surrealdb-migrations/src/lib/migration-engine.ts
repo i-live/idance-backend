@@ -251,60 +251,72 @@ export class MigrationEngine {
       throw new Error('Migration engine not initialized. Call initialize() first.');
     }
 
-    const { resolver, tracker, options } = this.context;
+    const { resolver, options } = this.context;
     const basePath = this.projectContext 
       ? resolveProjectPath(this.projectContext, options.initPath)
       : options.initPath;
 
-    const warnings: string[] = [];
-    let canRollback = true;
-    const allBlockedBy: string[] = [];
-    const migrationChecks = [];
+    // Resolve target modules to handle patterns like "010" -> "010_auth"
+    const resolvedModules = this.resolveTargetModules(targetModules);
 
-    for (const moduleId of targetModules) {
-      // Check dependency conflicts
-      const validation = resolver.validateRollback(moduleId, targetModules);
-      if (!validation.canRollback) {
+    // Initialize result collectors
+    const warnings: string[] = [];
+    const blockedBySet = new Set<string>();
+    const migrationChecks = [];
+    let canRollback = true;
+
+    // Validate each module
+    for (const moduleId of resolvedModules) {
+      // 1. Check dependency conflicts
+      const dependencyValidation = resolver.validateRollback(moduleId, resolvedModules);
+      if (!dependencyValidation.canRollback) {
         canRollback = false;
-        allBlockedBy.push(...validation.blockedBy);
-        if (validation.reason) {
-          warnings.push(validation.reason);
+        dependencyValidation.blockedBy.forEach(blocker => blockedBySet.add(blocker));
+        if (dependencyValidation.reason) {
+          warnings.push(dependencyValidation.reason);
         }
       }
 
-      // Check for applied migrations and available rollback files
-      const appliedMigrations = await this.getAppliedMigrations(moduleId);
-      const rollbackFiles = await this.findModuleMigrations(moduleId, 'down', basePath);
+      // 2. Get migration state
+      const [appliedMigrations, rollbackFiles] = await Promise.all([
+        this.getAppliedMigrations(moduleId),
+        this.findModuleMigrations(moduleId, 'down', basePath)
+      ]);
       
       const hasAppliedMigrations = appliedMigrations.length > 0;
-      const rollbackFilesAvailable = rollbackFiles.length > 0;
+      const hasRollbackFiles = rollbackFiles.length > 0;
 
-      // Validate rollback file availability
-      if (hasAppliedMigrations && !rollbackFilesAvailable) {
+      // 3. Validate rollback file availability
+      if (hasAppliedMigrations && !hasRollbackFiles) {
         canRollback = false;
         warnings.push(`Module ${moduleId} has applied migrations but no rollback files available`);
       }
 
-      // Check for missing rollback files for specific applied migrations
-      for (const applied of appliedMigrations) {
-        const hasRollbackFile = rollbackFiles.some(
-          rf => rf.number === applied.number && rf.name === applied.name
+      // 4. Validate each applied migration has a corresponding rollback file
+      if (hasAppliedMigrations && hasRollbackFiles) {
+        const rollbackFileMap = new Map(
+          rollbackFiles.map(rf => [`${rf.number}_${rf.name}`, rf])
         );
-        if (!hasRollbackFile) {
-          canRollback = false;
-          warnings.push(`Missing rollback file for migration ${applied.number}_${applied.name} in ${moduleId}`);
+        
+        for (const applied of appliedMigrations) {
+          const migrationKey = `${applied.number}_${applied.name}`;
+          if (!rollbackFileMap.has(migrationKey)) {
+            canRollback = false;
+            warnings.push(`Missing rollback file for migration ${migrationKey} in ${moduleId}`);
+          }
         }
       }
 
+      // 5. Record migration check results
       migrationChecks.push({
         moduleId,
         hasAppliedMigrations,
-        rollbackFilesAvailable,
-        dependencyConflicts: validation.blockedBy
+        rollbackFilesAvailable: hasRollbackFiles,
+        dependencyConflicts: dependencyValidation.blockedBy
       });
     }
 
-    // Override safety checks if force is enabled
+    // Handle force flag override
     if (options.force && !canRollback) {
       warnings.push('WARNING: Force flag enabled - bypassing rollback safety checks');
       canRollback = true;
@@ -312,7 +324,7 @@ export class MigrationEngine {
 
     return {
       canRollback,
-      blockedBy: [...new Set(allBlockedBy)],
+      blockedBy: Array.from(blockedBySet),
       warnings,
       migrationChecks
     };
@@ -559,15 +571,26 @@ export class MigrationEngine {
   private async countPendingMigrations(moduleId: string): Promise<number> {
     if (!this.context) return 0;
     
-    const pendingMigrations = await this.findModuleMigrations(
-      moduleId, 
-      'up', 
-      this.projectContext 
-        ? resolveProjectPath(this.projectContext, this.context.options.initPath)
-        : this.context.options.initPath
-    );
+    const basePath = this.projectContext 
+      ? resolveProjectPath(this.projectContext, this.context.options.initPath)
+      : this.context.options.initPath;
     
-    return pendingMigrations.length;
+    const allMigrations = await this.findModuleMigrations(moduleId, 'up', basePath);
+    let currentlyAppliedCount = 0;
+    
+    for (const migration of allMigrations) {
+      const latestStatus = await this.context.tracker.getLatestMigrationStatus(
+        migration.number, 
+        migration.name
+      );
+      
+      // Count as applied if latest status is 'up' and 'success'
+      if (latestStatus && latestStatus.direction === 'up' && latestStatus.status === 'success') {
+        currentlyAppliedCount++;
+      }
+    }
+    
+    return allMigrations.length - currentlyAppliedCount;
   }
 
   private async getLastAppliedMigration(moduleId: string): Promise<Date | undefined> {
