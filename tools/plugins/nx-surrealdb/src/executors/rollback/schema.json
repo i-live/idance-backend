@@ -80,6 +80,11 @@
       "description": "Number of migration steps to rollback (default: 1, use 0 for all)",
       "default": 1
     },
+    "detailed": {
+      "type": "boolean",
+      "description": "Show detailed rollback information including execution details",
+      "default": false
+    },
     "debug": {
       "type": "boolean",
       "description": "Enable debug logging for troubleshooting",

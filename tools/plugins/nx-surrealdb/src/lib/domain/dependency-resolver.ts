@@ -136,9 +136,10 @@ export class DependencyResolver {
     }
 
     // Check if any dependents would be affected
+    // Only consider dependents that are NOT also being rolled back
     const affectedDependents = node.dependents.filter(dependent => {
-      // If targetModules is specified, only consider dependents in that list
-      return !targetModules || targetModules.includes(dependent);
+      // If targetModules is specified, exclude dependents that are also in the rollback list
+      return !targetModules || !targetModules.includes(dependent);
     });
 
     if (affectedDependents.length > 0) {

@@ -132,6 +132,15 @@ export default async function runExecutor(
           logger.info(`      Checksum: ${fileStatus.checksum.substring(0, 12)}...`);
         }
       }
+
+      // Show dependency graph for involved modules when detailed flag is used
+      if (options.detailed) {
+        const involvedModules = [...new Set(fileStatuses.map(fs => fs.moduleId))];
+        const moduleStatuses = status.modules.filter(m => involvedModules.includes(m.moduleId));
+        
+        showDependencyGraph(moduleStatuses, '🌐 Module Dependency Graph:');
+      }
+
       return { success: true };
     }
 
@@ -227,34 +236,7 @@ export default async function runExecutor(
     }
 
     // Show dependency visualization
-    logger.info(`\n🌐 Dependency Graph:`);
-    const processedModules = new Set<string>();
-    
-    // Find and process root modules (those with no dependencies)
-    const rootModules = status.modules.filter(m => m.dependencies.length === 0);
-    
-    if (rootModules.length > 0) {
-      for (const rootModule of rootModules) {
-        if (processedModules.has(rootModule.moduleId)) continue;
-        logger.info(`   ${rootModule.moduleId} (root)`);
-        showDependents(rootModule.moduleId, status.modules, 1, processedModules);
-      }
-    }
-
-    // Show any remaining modules in dependency chains or circular dependencies
-    for (const module of status.modules) {
-      if (!processedModules.has(module.moduleId)) {
-        if (module.dependencies.length > 0) {
-          // This module has dependencies but wasn't reached from a root
-          // Could be part of a circular dependency or missing dependency
-          logger.info(`   ${module.moduleId} → depends on: ${module.dependencies.join(', ')}`);
-        } else {
-          // This shouldn't happen as root modules are processed above
-          logger.info(`   ${module.moduleId} (isolated)`);
-        }
-        processedModules.add(module.moduleId);
-      }
-    }
+    showDependencyGraph(status.modules);
 
     return { success: true };
 
@@ -264,6 +246,40 @@ export default async function runExecutor(
     return { success: false };
   } finally {
     await engine.close();
+  }
+}
+
+function showDependencyGraph(
+  modules: Array<{ moduleId: string; dependencies: string[]; dependents: string[] }>, 
+  title: string = '🌐 Dependency Graph:'
+): void {
+  logger.info(`\n${title}`);
+  const processedModules = new Set<string>();
+  
+  // Find and process root modules (those with no dependencies)
+  const rootModules = modules.filter(m => m.dependencies.length === 0);
+  
+  if (rootModules.length > 0) {
+    for (const rootModule of rootModules) {
+      if (processedModules.has(rootModule.moduleId)) continue;
+      logger.info(`   ${rootModule.moduleId} (root)`);
+      showDependents(rootModule.moduleId, modules, 1, processedModules);
+    }
+  }
+
+  // Show any remaining modules in dependency chains or circular dependencies
+  for (const module of modules) {
+    if (!processedModules.has(module.moduleId)) {
+      if (module.dependencies.length > 0) {
+        // This module has dependencies but wasn't reached from a root
+        // Could be part of a circular dependency or missing dependency
+        logger.info(`   ${module.moduleId} → depends on: ${module.dependencies.join(', ')}`);
+      } else {
+        // This shouldn't happen as root modules are processed above
+        logger.info(`   ${module.moduleId} (isolated)`);
+      }
+      processedModules.add(module.moduleId);
+    }
   }
 }
 

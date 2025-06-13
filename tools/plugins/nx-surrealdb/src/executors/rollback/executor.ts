@@ -18,6 +18,7 @@ export interface RollbackExecutorSchema {
   configPath?: string;
   dryRun?: boolean;
   steps?: number;
+  detailed?: boolean;
   debug?: boolean;
 }
 
@@ -123,7 +124,10 @@ export default async function runExecutor(
     if (options.dryRun) {
       logger.info('🔍 Dry run mode - showing rollback migrations without executing them');
     }
-    logger.info('🔄 Starting rollback execution...');
+    
+    if (options.detailed || options.debug) {
+      logger.info('🔄 Starting rollback execution...');
+    }
     
     const result = await service.executeMigrations(resolvedTargetModules, 'rollback', targetFilenames);
     
@@ -140,6 +144,15 @@ export default async function runExecutor(
           const reason = fileResult.skipped ? ` (${fileResult.skipReason})` : 
                         fileResult.error ? ` (${fileResult.error})` : '';
           logger.info(`   ${status} ${fileResult.file.moduleId}/${fileResult.file.filename}${reason}`);
+          
+          // Show detailed information when detailed flag is used
+          if (options.detailed && (fileResult.success || fileResult.skipped)) {
+            logger.info(`      File: ${fileResult.file.number}_${fileResult.file.name}_${fileResult.file.direction}.surql`);
+            logger.info(`      Execution time: ${fileResult.executionTimeMs}ms`);
+            if (fileResult.file.checksum) {
+              logger.info(`      Checksum: ${fileResult.file.checksum.substring(0, 12)}...`);
+            }
+          }
         }
       }
     } else {
@@ -148,6 +161,12 @@ export default async function runExecutor(
       for (const fileResult of result.results) {
         if (!fileResult.success && !fileResult.skipped) {
           logger.error(`   ❌ ${fileResult.file.moduleId}/${fileResult.file.filename}: ${fileResult.error}`);
+          
+          // Show detailed error information when detailed flag is used
+          if (options.detailed) {
+            logger.error(`      File: ${fileResult.file.number}_${fileResult.file.name}_${fileResult.file.direction}.surql`);
+            logger.error(`      Execution time: ${fileResult.executionTimeMs}ms`);
+          }
         }
       }
       
