@@ -407,10 +407,10 @@ export class MigrationService {
     }
 
     const { resolver, repository } = this.context;
-    const modulesToCheck = targetModules || resolver.getAllModules();
+    const modulesToCheck = targetModules ? this.resolveTargetModules(targetModules) : resolver.getAllModules();
     
     // Get all status counts in one query
-    const dbStatusMap = await repository.getAllModuleStatusCounts(targetModules);
+    const dbStatusMap = await repository.getAllModuleStatusCounts(modulesToCheck);
     
     const modules = [];
     let totalApplied = 0;

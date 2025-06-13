@@ -31,7 +31,7 @@
       "default": ""
     },
     "module": {
-      "type": "string",
+      "type": ["string", "number"],
       "description": "Target specific module by name (e.g., 'auth'), number (e.g., 10), or full directory name (e.g., '010_auth')",
       "default": ""
     },

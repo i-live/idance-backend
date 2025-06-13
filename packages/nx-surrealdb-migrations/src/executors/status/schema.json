@@ -31,14 +31,7 @@
       "default": ""
     },
     "module": {
-      "oneOf": [
-        {
-          "type": "string"
-        },
-        {
-          "type": "number"
-        }
-      ],
+      "type": ["string", "number"],
       "description": "Show status for specific module by name (e.g., 'auth'), number (e.g., 10), or full directory name (e.g., '010_auth')",
       "default": ""
     },
