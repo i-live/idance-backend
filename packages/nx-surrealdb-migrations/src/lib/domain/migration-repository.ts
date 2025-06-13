@@ -9,13 +9,20 @@ export class MigrationRepository {
 
   constructor(
     private client: SurrealDBClient,
-    private schemaPath?: string
+    private schemaPath?: string,
+    private dryRun: boolean = false
   ) {}
 
   async initialize(): Promise<void> {
     // Default schema path relative to the plugin
     const defaultSchemaPath = path.join(__dirname, '../../schema/system_migrations.surql');
     const schemaFile = this.schemaPath || defaultSchemaPath;
+
+    if (this.dryRun) {
+      this.debug.log('🔍 [DRY-RUN] Would initialize system_migrations table');
+      this.debug.log(`   Schema file: ${schemaFile}`);
+      return;
+    }
 
     try {
       // Read the schema file
@@ -145,7 +152,7 @@ export class MigrationRepository {
       throw new Error('Invalid path format');
     }
 
-    await this.client.create("system_migrations", {
+    const migrationData = {
       number: migration.number,
       name: migration.name,
       direction: migration.direction ?? 'up',
@@ -157,7 +164,18 @@ export class MigrationRepository {
       status: migration.status ?? 'success',
       applied_by: this.client.username,
       execution_time_ms: migration.execution_time_ms
-    });
+    };
+
+    if (this.dryRun) {
+      this.debug.log('🔍 [DRY-RUN] Would record migration execution:');
+      this.debug.log(`   Migration: ${migration.number}_${migration.name}_${migration.direction}.surql`);
+      this.debug.log(`   Module: ${migration.module}`);
+      this.debug.log(`   Status: ${migration.status}`);
+      this.debug.log(`   Direction: ${migration.direction}`);
+      return;
+    }
+
+    await this.client.create("system_migrations", migrationData);
   }
 
   async getMigrationStatus(direction: string, number: string, name: string, filename?: string):
@@ -285,33 +303,27 @@ export class MigrationRepository {
     try {
       this.debug.log(`Finding last migrations for modules: [${moduleIds.join(', ')}]`);
       
-      // Single batched query for all modules to get latest applied migrations
+      // Use SurrealDB's GROUP BY to get the latest record per migration file automatically
       const result = await this.client.query(`
-        SELECT number, name, applied_at, module, direction, status 
+        SELECT id, module, name, number, direction, status, applied_at, filename, path, content, checksum, namespace, database, applied_by, execution_time_ms
         FROM system_migrations 
-        WHERE module IN $modules 
-        AND status = 'success' 
-        AND direction = 'up'
-        ORDER BY module ASC, applied_at DESC
-      `, { modules: moduleIds });
+        WHERE module IN [${moduleIds.map(m => `'${m}'`).join(', ')}]
+        GROUP BY module, name, number 
+        ORDER BY applied_at DESC
+      `);
 
       const migrations = result[0] || [];
-      this.debug.log(`Found ${migrations.length} total applied migrations across modules`);
+      this.debug.log(`Found ${migrations.length} latest migration records across modules`);
       
-      // Group by module and take the latest migration per module
-      const latestByModule = new Map<string, any>();
+      // Filter to only include migrations where the latest record is UP + SUCCESS (case insensitive)
+      const eligibleMigrations = migrations.filter(migration => 
+        migration.direction?.toLowerCase() === 'up' && migration.status?.toLowerCase() === 'success'
+      );
       
-      for (const migration of Array.isArray(migrations) ? migrations : []) {
-        const moduleId = migration.module;
-        if (!latestByModule.has(moduleId)) {
-          latestByModule.set(moduleId, migration);
-          this.debug.log(`Latest migration for ${moduleId}: ${migration.number}_${migration.name}`);
-        }
-        // Since we're ordered by applied_at DESC, first occurrence is the latest
-      }
+      this.debug.log(`Found ${eligibleMigrations.length} migrations eligible for rollback (latest record is UP+SUCCESS)`);
 
       // Convert to Migration interface format
-      const result_migrations = Array.from(latestByModule.values()).map(m => ({
+      const result_migrations = eligibleMigrations.map(m => ({
         id: m.id,
         number: m.number,
         name: m.name,
@@ -329,7 +341,7 @@ export class MigrationRepository {
         execution_time_ms: m.execution_time_ms
       }));
 
-      this.debug.log(`Returning ${result_migrations.length} latest migrations`);
+      this.debug.log(`Returning ${result_migrations.length} eligible migrations for rollback`);
       return result_migrations;
 
     } catch (error) {
@@ -362,6 +374,84 @@ export class MigrationRepository {
       }
     } catch (error) {
       throw new Error(`Failed to update migration status: ${error.message}`);
+    }
+  }
+
+  async getAllModuleStatusCounts(moduleIds?: string[]): Promise<Map<string, {
+    appliedCount: number;
+    totalCount: number;
+    lastApplied?: Date;
+  }>> {
+    try {
+      const targetDescription = moduleIds && moduleIds.length > 0 
+        ? `specific modules: [${moduleIds.join(', ')}]`
+        : 'all modules';
+      this.debug.log(`Getting status counts for ${targetDescription}`);
+      
+      // Get latest status per migration file using GROUP BY - filter by modules if specified
+      const whereClause = moduleIds && moduleIds.length > 0 
+        ? `WHERE module IN [${moduleIds.map(m => `'${m}'`).join(', ')}]`
+        : '';
+        
+      const result = await this.client.query(`
+        SELECT module, name, number, direction, status, applied_at
+        FROM system_migrations 
+        ${whereClause}
+        GROUP BY module, name, number 
+        ORDER BY applied_at DESC
+      `);
+
+      const migrations = result[0] || [];
+      this.debug.log(`Found ${migrations.length} migration records for ${targetDescription}`);
+      
+      // Group by module and calculate counts
+      const moduleStats = new Map<string, {
+        appliedCount: number;
+        totalCount: number;
+        lastApplied?: Date;
+      }>();
+      
+      // Group migrations by module
+      const migrationsByModule = new Map<string, any[]>();
+      const migrationsArray = Array.isArray(migrations) ? migrations : [];
+      for (const migration of migrationsArray) {
+        const moduleId = migration.module;
+        if (!migrationsByModule.has(moduleId)) {
+          migrationsByModule.set(moduleId, []);
+        }
+        migrationsByModule.get(moduleId)!.push(migration);
+      }
+      
+      // Calculate stats for each module
+      for (const [moduleId, moduleMigrations] of migrationsByModule.entries()) {
+        // Count applied migrations (latest status is UP + SUCCESS, case insensitive)
+        const appliedMigrations = moduleMigrations.filter(migration => 
+          migration.direction?.toLowerCase() === 'up' && migration.status?.toLowerCase() === 'success'
+        );
+        
+        // Find the most recent applied migration date
+        let lastApplied: Date | undefined;
+        if (appliedMigrations.length > 0) {
+          const sortedByDate = appliedMigrations.sort((a, b) => 
+            new Date(b.applied_at).getTime() - new Date(a.applied_at).getTime()
+          );
+          lastApplied = new Date(sortedByDate[0].applied_at);
+        }
+
+        moduleStats.set(moduleId, {
+          appliedCount: appliedMigrations.length,
+          totalCount: moduleMigrations.length,
+          lastApplied
+        });
+        
+        this.debug.log(`Module ${moduleId}: ${appliedMigrations.length}/${moduleMigrations.length} applied`);
+      }
+      
+      return moduleStats;
+
+    } catch (error) {
+      this.debug.error(`Failed to get status counts:`, error);
+      throw new Error(`Failed to get module status counts: ${error.message}`);
     }
   }
 }

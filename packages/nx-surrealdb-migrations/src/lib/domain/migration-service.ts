@@ -25,6 +25,7 @@ export interface MigrationServiceOptions {
   force?: boolean;
   configPath?: string;
   debug?: boolean;
+  dryRun?: boolean;
 }
 
 export interface MigrationExecutionContext {
@@ -46,6 +47,7 @@ export interface ResolvedMigrationOptions {
   force: boolean;
   configPath?: string;
   debug?: boolean;
+  dryRun: boolean;
 }
 
 
@@ -102,7 +104,8 @@ export class MigrationService {
       schemaPath: options.schemaPath ? replaceEnvVars(options.schemaPath) : undefined,
       force: options.force || false,
       configPath: options.configPath,
-      debug: options.debug || false
+      debug: options.debug || false,
+      dryRun: options.dryRun || false
     };
 
     if (!resolvedOptions.url || !resolvedOptions.user || !resolvedOptions.pass) {
@@ -114,8 +117,8 @@ export class MigrationService {
       ? resolveProjectPath(this.projectContext, resolvedOptions.initPath)
       : resolvedOptions.initPath;
 
-    // Initialize database client
-    const client = new SurrealDBClient();
+    // Initialize database client with dry-run flag
+    const client = new SurrealDBClient(resolvedOptions.dryRun);
     await client.connect({
       url: resolvedOptions.url,
       username: resolvedOptions.user,
@@ -124,8 +127,8 @@ export class MigrationService {
       database: resolvedOptions.database
     });
 
-    // Initialize migration repository
-    const repository = new MigrationRepository(client, resolvedOptions.schemaPath);
+    // Initialize migration repository with dry-run flag
+    const repository = new MigrationRepository(client, resolvedOptions.schemaPath, resolvedOptions.dryRun);
     await repository.initialize();
 
     // Initialize dependency resolver
@@ -188,16 +191,59 @@ export class MigrationService {
 
   async executeMigrations(
     targetModules?: string[],
-    direction: 'up' | 'down' = 'up'
+    operation: 'migrate' | 'rollback' = 'migrate'
   ): Promise<MigrationResult> {
     if (!this.context) {
       throw new Error('Migration engine not initialized. Call initialize() first.');
     }
 
     const startTime = performance.now();
-    const pendingMigrations = await this.findPendingMigrations(targetModules, direction);
     
-    if (pendingMigrations.length === 0) {
+    // For rollback, find last applied migrations instead of pending migrations
+    let migrationsToProcess: MigrationFile[];
+    if (operation === 'rollback') {
+      const appliedMigrations = await this.findLastMigrations(targetModules || []);
+      
+      // Find corresponding down files for each applied migration
+      const { options } = this.context;
+      const basePath = this.projectContext 
+        ? resolveProjectPath(this.projectContext, options.initPath)
+        : options.initPath;
+
+      migrationsToProcess = [];
+      this.debug.log(`Processing ${appliedMigrations.length} applied migrations for rollback`);
+      for (const migration of appliedMigrations) {
+        const downFilename = `${migration.number}_${migration.name}_down.surql`;
+        const downFilePath = path.join(basePath, migration.module, downFilename);
+        this.debug.log(`Looking for down file: ${downFilePath}`);
+        
+        try {
+          const content = await fs.readFile(downFilePath, 'utf-8');
+          const checksum = crypto.createHash('sha256').update(content).digest('hex');
+          this.debug.log(`Successfully loaded down file: ${downFilename}`);
+          
+          migrationsToProcess.push({
+            number: migration.number,
+            name: migration.name,
+            direction: 'down',
+            filename: downFilename,
+            filePath: downFilePath,
+            moduleId: migration.module,
+            content,
+            checksum
+          });
+        } catch (error) {
+          this.debug.log(`Warning: Down file not found for ${migration.number}_${migration.name} in ${migration.module}: ${downFilePath}`);
+          this.debug.log(`Error details: ${error.message}`);
+        }
+      }
+      this.debug.log(`Total migrations to process: ${migrationsToProcess.length}`);
+    } else {
+      migrationsToProcess = await this.findPendingMigrations(targetModules, 'up');
+    }
+    
+    if (migrationsToProcess.length === 0) {
+      this.debug.log(`No migrations to process - returning early`);
       return {
         success: true,
         filesProcessed: 0,
@@ -207,30 +253,42 @@ export class MigrationService {
       };
     }
 
+    this.debug.log(`Starting execution of ${migrationsToProcess.length} migrations`);
+
     const results: MigrationFileResult[] = [];
     let filesProcessed = 0;
     let filesSkipped = 0;
 
-    for (const migrationFile of pendingMigrations) {
+    this.debug.log(`Processing ${migrationsToProcess.length} migration files`);
+    for (const migrationFile of migrationsToProcess) {
+      this.debug.log(`Executing migration: ${migrationFile.filename}`);
       const result = await this.executeSingleMigration(migrationFile);
       results.push(result);
+      this.debug.log(`Migration ${migrationFile.filename} result: success=${result.success}, skipped=${result.skipped}`);
 
       if (result.skipped) {
         filesSkipped++;
+        this.debug.log(`Incremented skipped count to: ${filesSkipped}`);
       } else if (result.success) {
         filesProcessed++;
+        this.debug.log(`Incremented processed count to: ${filesProcessed}`);
       } else {
+        this.debug.log(`Migration failed: ${result.error}`);
         // If a migration fails and we're not forcing, stop execution
         if (!this.context.options.force) {
+          this.debug.log(`Stopping execution due to failure (force=${this.context.options.force})`);
           break;
         }
       }
     }
 
     const executionTimeMs = Math.round(performance.now() - startTime);
+    const finalSuccess = results.every(r => r.success || r.skipped);
+    
+    this.debug.log(`Final result: success=${finalSuccess}, filesProcessed=${filesProcessed}, filesSkipped=${filesSkipped}, results.length=${results.length}`);
 
     return {
-      success: results.every(r => r.success || r.skipped),
+      success: finalSuccess,
       filesProcessed,
       filesSkipped,
       executionTimeMs,
@@ -351,6 +409,9 @@ export class MigrationService {
     const { resolver, repository } = this.context;
     const modulesToCheck = targetModules || resolver.getAllModules();
     
+    // Get all status counts in one query
+    const dbStatusMap = await repository.getAllModuleStatusCounts(targetModules);
+    
     const modules = [];
     let totalApplied = 0;
     let totalPending = 0;
@@ -359,9 +420,13 @@ export class MigrationService {
       const dependencies = resolver.getModuleDependencies(moduleId);
       const dependents = resolver.getModuleDependents(moduleId);
       
-      const appliedMigrations = await this.countAppliedMigrations(moduleId);
-      const pendingMigrations = await this.countPendingMigrations(moduleId);
-      const lastApplied = await this.getLastAppliedMigration(moduleId);
+      // Get filesystem count and database counts
+      const statusCounts = await this.getModuleStatusCounts(moduleId);
+      const dbStatus = dbStatusMap.get(moduleId);
+      
+      const appliedMigrations = dbStatus?.appliedCount || 0;
+      const pendingMigrations = statusCounts.totalFileCount - appliedMigrations;
+      const lastApplied = dbStatus?.lastApplied;
 
       modules.push({
         moduleId,
@@ -421,7 +486,7 @@ export class MigrationService {
     }
   }
 
-  private resolveTargetModules(targetModules: string[]): string[] {
+  public resolveTargetModules(targetModules: string[]): string[] {
     if (!this.context) {
       throw new Error('Migration engine not initialized.');
     }
@@ -542,6 +607,13 @@ export class MigrationService {
         useTransactions: options.useTransactions
       });
 
+      if (options.dryRun) {
+        this.debug.log('🔍 [DRY-RUN] Would execute migration:');
+        this.debug.log(`   File: ${migrationFile.moduleId}/${migrationFile.filename}`);
+        this.debug.log(`   Direction: ${migrationFile.direction}`);
+        this.debug.log(`   Content preview: ${processedContent.substring(0, 200)}${processedContent.length > 200 ? '...' : ''}`);
+      }
+
       // Execute migration
       await client.query(processedContent);
       const executionTimeMs = Math.round(performance.now() - startTime);
@@ -570,47 +642,25 @@ export class MigrationService {
     }
   }
 
-  private async countAppliedMigrations(moduleId: string): Promise<number> {
-    if (!this.context) return 0;
+  private async getModuleStatusCounts(moduleId: string): Promise<{
+    appliedCount: number;
+    totalFileCount: number;
+    lastApplied?: Date;
+  }> {
+    if (!this.context) return { appliedCount: 0, totalFileCount: 0 };
     
-    const appliedMigrations = await this.getAppliedMigrations(moduleId);
-    return appliedMigrations.length;
-  }
-
-  private async countPendingMigrations(moduleId: string): Promise<number> {
-    if (!this.context) return 0;
-    
+    // Get total migration files from filesystem
     const basePath = this.projectContext 
       ? resolveProjectPath(this.projectContext, this.context.options.initPath)
       : this.context.options.initPath;
     
-    const allMigrations = await this.findModuleMigrations(moduleId, 'up', basePath);
-    let currentlyAppliedCount = 0;
+    const allMigrationFiles = await this.findModuleMigrations(moduleId, 'up', basePath);
     
-    for (const migration of allMigrations) {
-      const latestStatus = await this.context.repository.getLatestMigrationStatus(
-        migration.number, 
-        migration.name
-      );
-      
-      // Count as applied if latest status is 'up' and 'success'
-      if (latestStatus && latestStatus.direction === 'up' && latestStatus.status === 'success') {
-        currentlyAppliedCount++;
-      }
-    }
-    
-    return allMigrations.length - currentlyAppliedCount;
-  }
-
-  private async getLastAppliedMigration(moduleId: string): Promise<Date | undefined> {
-    if (!this.context) return undefined;
-    
-    const appliedMigrations = await this.getAppliedMigrations(moduleId);
-    if (appliedMigrations.length === 0) return undefined;
-    
-    // Sort by applied date and get the most recent
-    const sorted = appliedMigrations.sort((a, b) => b.appliedAt.getTime() - a.appliedAt.getTime());
-    return sorted[0].appliedAt;
+    return {
+      appliedCount: 0, // This will be filled by caller from batch query
+      totalFileCount: allMigrationFiles.length,
+      lastApplied: undefined // This will be filled by caller from batch query
+    };
   }
 
   private async getAppliedMigrations(moduleId: string): Promise<Array<{

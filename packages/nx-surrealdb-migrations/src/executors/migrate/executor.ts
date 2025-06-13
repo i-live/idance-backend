@@ -43,7 +43,8 @@ export default async function runExecutor(
       schemaPath: options.schemaPath,
       force: options.force || false,
       configPath: options.configPath,
-      debug: options.debug
+      debug: options.debug,
+      dryRun: options.dryRun || false
     });
 
     // Determine target modules
@@ -51,26 +52,10 @@ export default async function runExecutor(
     debug.log(`options `,options);
     debug.log(`Target modules: ${targetModules ? targetModules.join(', ') : 'all'}`);
 
-    if (options.dryRun) {
-      // Dry run: show what would be applied
-      logger.info('🔍 Dry run mode - showing pending migrations without applying them');
-      
-      const pendingMigrations = await engine.findPendingMigrations(targetModules);
-
-      if (pendingMigrations.length === 0) {
-        logger.info('✅ No pending migrations found');
-        return { success: true };
-      }
-
-      logger.info(`📋 Found ${pendingMigrations.length} pending migration(s):`);
-      for (const migration of pendingMigrations) {
-        logger.info(`  • ${migration.moduleId}/${migration.filename}`);
-      }
-
-      return { success: true };
-    }
-
     // Execute migrations
+    if (options.dryRun) {
+      logger.info('🔍 Dry run mode - showing pending migrations without applying them');
+    }
     logger.info('🚀 Starting migration execution...');
     
     const result = await engine.executeMigrations(targetModules);
