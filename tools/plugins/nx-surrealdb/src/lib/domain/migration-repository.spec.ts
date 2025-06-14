@@ -17,10 +17,26 @@ describe('MigrationRepository', () => {
     jest.clearAllMocks();
     
     mockClient = {
-      query: jest.fn().mockResolvedValue([]),
+      query: jest.fn().mockResolvedValue([[]]), // Default to empty array result
       create: jest.fn().mockResolvedValue(undefined),
       username: 'testuser'
     } as any;
+    
+    // Set up default filesystem mock to prevent schema file reading issues
+    const defaultSchemaContent = `
+      DEFINE TABLE IF NOT EXISTS system_migrations;
+      DEFINE FIELD IF NOT EXISTS number ON system_migrations TYPE string;
+      DEFINE FIELD IF NOT EXISTS name ON system_migrations TYPE string;
+      DEFINE FIELD IF NOT EXISTS direction ON system_migrations TYPE string;
+      DEFINE FIELD IF NOT EXISTS filename ON system_migrations TYPE string;
+      DEFINE FIELD IF NOT EXISTS path ON system_migrations TYPE string;
+      DEFINE FIELD IF NOT EXISTS content ON system_migrations TYPE string;
+      DEFINE FIELD IF NOT EXISTS module ON system_migrations TYPE string;
+      DEFINE FIELD IF NOT EXISTS status ON system_migrations TYPE string;
+      DEFINE FIELD IF NOT EXISTS applied_at ON system_migrations TYPE datetime;
+    `;
+    
+    mockFs.readFile.mockResolvedValue(defaultSchemaContent);
     
     MockSurrealDBClient.mockImplementation(() => mockClient);
     repository = new MigrationRepository(mockClient);
@@ -35,6 +51,7 @@ describe('MigrationRepository', () => {
       DEFINE FIELD IF NOT EXISTS filename ON system_migrations TYPE string;
       DEFINE FIELD IF NOT EXISTS path ON system_migrations TYPE string;
       DEFINE FIELD IF NOT EXISTS content ON system_migrations TYPE string;
+      DEFINE FIELD IF NOT EXISTS module ON system_migrations TYPE string;
       DEFINE FIELD IF NOT EXISTS status ON system_migrations TYPE string;
       DEFINE FIELD IF NOT EXISTS applied_at ON system_migrations TYPE datetime;
     `;
@@ -53,7 +70,7 @@ describe('MigrationRepository', () => {
 
     it('should use custom schema path when provided', async () => {
       const customPath = '/custom/schema.surql';
-      repository = new MigrationTracker(mockClient, customPath);
+      repository = new MigrationRepository(mockClient, customPath);
       mockFs.readFile.mockResolvedValue(mockSchemaContent);
       
       await repository.initialize();
@@ -175,6 +192,7 @@ describe('MigrationRepository', () => {
         DEFINE FIELD IF NOT EXISTS filename ON system_migrations TYPE string;
         DEFINE FIELD IF NOT EXISTS path ON system_migrations TYPE string;
         DEFINE FIELD IF NOT EXISTS content ON system_migrations TYPE string;
+        DEFINE FIELD IF NOT EXISTS module ON system_migrations TYPE string;
         DEFINE FIELD IF NOT EXISTS status ON system_migrations TYPE string;
         DEFINE FIELD IF NOT EXISTS applied_at ON system_migrations TYPE datetime;
       `;
@@ -262,7 +280,7 @@ describe('MigrationRepository', () => {
         }
       ];
       
-      mockClient.query.mockResolvedValue([{ result: mockMigrations }]);
+      mockClient.query.mockResolvedValue([mockMigrations]);
       
       const result = await repository.getMigrationsByDirectionAndPath('up', 'database/010_auth');
       
@@ -275,7 +293,7 @@ describe('MigrationRepository', () => {
     });
 
     it('should handle empty results', async () => {
-      mockClient.query.mockResolvedValue([{ result: [] }]);
+      mockClient.query.mockResolvedValue([[]]);
       
       const result = await repository.getMigrationsByDirectionAndPath('up', 'database/010_auth');
       
