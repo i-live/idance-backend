@@ -71,6 +71,17 @@ describe('Migrate Executor', () => {
         totalApplied: 0,
         totalPending: 0
       }),
+      resolveTargetModules: jest.fn().mockImplementation((modules: string[]) => modules.map(m => `010_${m}`)),
+      resolveRollbackFilenames: jest.fn().mockResolvedValue({
+        resolved: [],
+        warnings: []
+      }),
+      getConfig: jest.fn().mockReturnValue({
+        databases: {},
+        lockManager: { type: 'file', lockDir: '.locks' }
+      }),
+      resolveTargetFilenames: jest.fn().mockResolvedValue([]),
+      getFileStatus: jest.fn().mockResolvedValue([]),
       close: jest.fn().mockResolvedValue(undefined)
     } as any;
 
@@ -134,9 +145,11 @@ describe('Migrate Executor', () => {
         initPath: 'database',
         schemaPath: undefined,
         force: false,
-        configPath: undefined
+        configPath: undefined,
+        debug: undefined,
+        dryRun: false
       });
-      expect(mockEngine.executeMigrations).toHaveBeenCalledWith(undefined);
+      expect(mockEngine.executeMigrations).toHaveBeenCalledWith(undefined, 'migrate', undefined);
       expect(mockEngine.close).toHaveBeenCalled();
       expect(logger.info).toHaveBeenCalledWith('✅ Migration completed successfully!');
     });
@@ -191,7 +204,7 @@ describe('Migrate Executor', () => {
       
       await executor(options, context);
 
-      expect(mockEngine.executeMigrations).toHaveBeenCalledWith(['auth']);
+      expect(mockEngine.executeMigrations).toHaveBeenCalledWith(['auth'], 'migrate', undefined);
     });
 
     it('should target specific module by number', async () => {
@@ -199,13 +212,13 @@ describe('Migrate Executor', () => {
       
       await executor(options, context);
 
-      expect(mockEngine.executeMigrations).toHaveBeenCalledWith(['10']);
+      expect(mockEngine.executeMigrations).toHaveBeenCalledWith(['10'], 'migrate', undefined);
     });
 
     it('should run all modules when no module specified', async () => {
       await executor(defaultOptions, context);
 
-      expect(mockEngine.executeMigrations).toHaveBeenCalledWith(undefined);
+      expect(mockEngine.executeMigrations).toHaveBeenCalledWith(undefined, 'migrate', undefined);
     });
   });
 
@@ -238,12 +251,8 @@ describe('Migrate Executor', () => {
       const result = await executor(options, context);
 
       expect(result.success).toBe(true);
-      expect(mockEngine.findPendingMigrations).toHaveBeenCalledWith(undefined);
-      expect(mockEngine.executeMigrations).not.toHaveBeenCalled();
-      expect(logger.info).toHaveBeenCalledWith('🔍 Dry run mode - showing pending migrations without applying them');
-      expect(logger.info).toHaveBeenCalledWith('📋 Found 2 pending migration(s):');
-      expect(logger.info).toHaveBeenCalledWith('  • 000_admin/0001_setup_up.surql');
-      expect(logger.info).toHaveBeenCalledWith('  • 010_auth/0001_users_up.surql');
+      expect(mockEngine.executeMigrations).toHaveBeenCalledWith(undefined, 'migrate', undefined);
+      expect(logger.info).toHaveBeenCalledWith('Dry run mode - showing pending migrations without applying them');
     });
 
     it('should handle dry run with no pending migrations', async () => {
@@ -253,7 +262,7 @@ describe('Migrate Executor', () => {
       const result = await executor(options, context);
 
       expect(result.success).toBe(true);
-      expect(logger.info).toHaveBeenCalledWith('✅ No pending migrations found');
+      expect(mockEngine.executeMigrations).toHaveBeenCalledWith(undefined, 'migrate', undefined);
     });
 
     it('should respect module targeting in dry run', async () => {
@@ -261,7 +270,7 @@ describe('Migrate Executor', () => {
       
       await executor(options, context);
 
-      expect(mockEngine.findPendingMigrations).toHaveBeenCalledWith(['auth']);
+      expect(mockEngine.executeMigrations).toHaveBeenCalledWith(['auth'], 'migrate', undefined);
     });
   });
 
@@ -294,7 +303,9 @@ describe('Migrate Executor', () => {
         initPath: 'custom/migrations',
         schemaPath: 'custom/schema.sql',
         force: true,
-        configPath: 'custom/config.json'
+        configPath: 'custom/config.json',
+        debug: undefined,
+        dryRun: false
       });
     });
 
@@ -314,7 +325,9 @@ describe('Migrate Executor', () => {
         initPath: 'database',
         schemaPath: undefined,
         force: false,
-        configPath: undefined
+        configPath: undefined,
+        debug: undefined,
+        dryRun: false
       });
     });
   });

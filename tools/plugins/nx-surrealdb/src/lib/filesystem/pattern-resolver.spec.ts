@@ -1,13 +1,23 @@
 import { PatternResolver } from './pattern-resolver';
 import { DependencyResolver } from '../domain/dependency-resolver';
+import { MigrationFileProcessor } from './migration-file-processor';
 import * as fs from 'fs/promises';
+import * as path from 'path';
 
-// Mock fs/promises
+// Mock fs/promises and path modules
 jest.mock('fs/promises');
+jest.mock('path');
+
 const mockFs = fs as jest.Mocked<typeof fs>;
+const mockPath = path as jest.Mocked<typeof path>;
 
 // Mock DependencyResolver
 jest.mock('../domain/dependency-resolver');
+
+// Mock MigrationFileProcessor
+jest.mock('./migration-file-processor');
+const MockMigrationFileProcessor = MigrationFileProcessor as jest.MockedClass<typeof MigrationFileProcessor>;
+
 const mockDependencyResolver = {
   getAllModules: jest.fn(),
   validateRollback: jest.fn()
@@ -19,6 +29,31 @@ describe('PatternResolver', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    
+    // Setup path.join mock
+    mockPath.join.mockImplementation((...args: string[]) => args.join('/'));
+    
+    // Setup MigrationFileProcessor mocks
+    MockMigrationFileProcessor.parseMigrationFile = jest.fn().mockImplementation((filename: string) => {
+      const match = filename.match(/^(\d{4})_(.+?)_(up|down)\.surql$/);
+      if (!match) return null;
+      const [, number, name, direction] = match;
+      return {
+        number,
+        name,
+        direction: direction as 'up' | 'down',
+        filename,
+        filePath: filename,
+        moduleId: '',
+        content: '',
+        checksum: ''
+      };
+    });
+    
+    MockMigrationFileProcessor.filterMigrationFiles = jest.fn().mockImplementation((files: string[], _pattern?: string, direction: 'up' | 'down' = 'up') => {
+      return files.filter(f => f.endsWith(`_${direction}.surql`));
+    });
+    
     resolver = new PatternResolver(mockDependencyResolver, basePath);
   });
 

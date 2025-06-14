@@ -1,4 +1,4 @@
-# @idance/nx-surrealdb
+# nx-surrealdb
 
 A comprehensive SurrealDB toolkit for [Nx](https://nx.dev/) monorepos featuring migration management, dependency resolution, and extensible tooling architecture.
 
@@ -35,7 +35,8 @@ A comprehensive SurrealDB toolkit for [Nx](https://nx.dev/) monorepos featuring 
 
 ### 🎯 **Developer Experience**
 - **Smart Module Targeting**: Reference modules by index (`1`), name (`auth`), number (`10`), or full path (`010_auth`)
-- **Multiple Reference Patterns**: Mix and match module patterns in a single command (`--module 0,auth,20`)
+- **Granular File Targeting**: Reference specific migration files by index (`1`), name (`auth`), or full filename
+- **Multiple Reference Patterns**: Mix and match module and filename patterns in a single command (`--module 0,auth,20 --filename 1,2`)
 - **Environment Variables**: Full `.env` support with variable interpolation
 - **Rich Logging**: Emoji-enhanced console output with detailed execution statistics
 - **Error Handling**: Comprehensive error messages with actionable guidance
@@ -79,7 +80,7 @@ Update your `database/project.json`:
   "name": "database",
   "targets": {
     "migrate": {
-      "executor": "@idance/nx-surrealdb-migrations:migrate",
+      "executor": "@idance/nx-surrealdb:migrate",
       "options": {
         "url": "${SURREALDB_URL}",
         "user": "${SURREALDB_ROOT_USER}",
@@ -90,7 +91,7 @@ Update your `database/project.json`:
       }
     },
     "rollback": {
-      "executor": "@idance/nx-surrealdb-migrations:rollback",
+      "executor": "@idance/nx-surrealdb:rollback",
       "options": {
         "url": "${SURREALDB_URL}",
         "user": "${SURREALDB_ROOT_USER}",
@@ -101,7 +102,7 @@ Update your `database/project.json`:
       }
     },
     "status": {
-      "executor": "@idance/nx-surrealdb-migrations:status",
+      "executor": "@idance/nx-surrealdb:status",
       "options": {
         "url": "${SURREALDB_URL}",
         "user": "${SURREALDB_ROOT_USER}",
@@ -183,10 +184,10 @@ database/
 
 ```bash
 # Generate migration in existing module
-nx g @idance/nx-surrealdb-migrations:migration create-users --project database --module auth
+nx g @idance/nx-surrealdb:migration create-users --project database --module auth
 
 # Generate migration with new module creation  
-nx g @idance/nx-surrealdb-migrations:migration setup-notifications --project database --module notifications --createModule
+nx g @idance/nx-surrealdb:migration setup-notifications --project database --module notifications --createModule
 ```
 
 ### Apply Migrations
@@ -212,6 +213,18 @@ nx run database:migrate --module auth --dryRun
 
 # Force apply even if already applied
 nx run database:migrate --force
+
+# Target specific migration files
+nx run database:migrate --filename 1          # First migration file
+nx run database:migrate --filename auth       # Migration file with 'auth' in name
+nx run database:migrate --filename 0001_setup_up.surql  # Exact filename
+
+# Combine module and filename targeting
+nx run database:migrate --module auth --filename 1      # First migration in auth module
+nx run database:migrate --module 0,1 --filename 2       # Second migration in first two modules
+
+# Target multiple specific files
+nx run database:migrate --filename 1,2,auth    # Multiple files using mixed patterns
 ```
 
 ### Check Status
@@ -237,6 +250,14 @@ nx run database:status --module auth --detailed
 # Output as JSON for automation
 nx run database:status --json
 nx run database:status --module auth --json
+
+# Check status of specific migration files
+nx run database:status --filename 1           # Status of first migration file
+nx run database:status --filename auth        # Status of auth migration file
+nx run database:status --filename 1,2,auth --detailed  # Multiple files with details
+
+# Combine module and filename for precise status
+nx run database:status --module auth --filename 1 --json
 ```
 
 ### Rollback Migrations
@@ -265,6 +286,18 @@ nx run database:rollback --module auth --force
 
 # Rollback specific number of steps
 nx run database:rollback --module auth --steps 2
+
+# Rollback specific migration files (automatically finds _down.surql files)
+nx run database:rollback --filename 1           # Rollback first migration file
+nx run database:rollback --filename auth        # Rollback auth migration file
+nx run database:rollback --filename 0001_setup_up.surql  # Rollback specific file
+
+# Combine module and filename for precise rollback
+nx run database:rollback --module auth --filename 1     # Rollback first migration in auth module
+nx run database:rollback --module 0,1 --filename 2      # Rollback second migration in first two modules
+
+# Rollback multiple specific files
+nx run database:rollback --filename 1,2,auth    # Multiple files using mixed patterns
 ```
 
 ## Common Workflows
@@ -426,6 +459,7 @@ Protect critical modules from accidental rollbacks by adding lock configuration:
 - `namespace`: SurrealDB namespace
 - `database`: SurrealDB database
 - `module`: Target specific module (string or number)
+- `filename`: Target specific migration file (string or number)
 - `envFile`: Path to environment file
 - `initPath`: Path to migrations directory (default: "database")
 - `configPath`: Path to config file (default: auto-detected)
@@ -510,6 +544,36 @@ Combine any reference patterns with comma separation:
 - `--module 0,auth,20` → `000_admin,010_auth,020_schema`
 
 **💡 Pro Tip**: Index-based referencing (`--module 1`) is often the quickest for interactive use, while name-based (`--module auth`) is most readable for scripts and documentation.
+
+### Filename Reference Patterns
+
+The plugin also supports granular filename targeting within modules, allowing you to run specific migration files instead of entire modules:
+
+#### **Numeric Patterns**
+Reference migration files by their numeric sequence:
+- `--filename 1` → `0001_setup_up.surql` (first migration file)
+- `--filename 2` → `0002_users_up.surql` (second migration file)
+
+#### **Name Patterns**
+Reference migration files by their descriptive name:
+- `--filename auth` → `0001_authentication_up.surql`
+- `--filename users` → `0002_users_up.surql`
+
+#### **Full Filename**
+Reference migration files by their complete name:
+- `--filename 0001_authentication_up.surql` → exact match
+
+#### **Combined Module + Filename Targeting**
+For precise control, combine module and filename patterns:
+- `--module auth --filename 1` → First migration in auth module only
+- `--module 0,1 --filename 2` → Second migration in first two modules
+
+#### **Multiple Filenames**
+Target multiple files with comma separation:
+- `--filename 1,2,auth` → Multiple files using mixed patterns
+- `--filename 0001,0002` → Multiple files by number
+
+**💡 Pro Tip**: Filename patterns work with all executors (migrate, rollback, status) and automatically handle `_up.surql` vs `_down.surql` file resolution.
 
 ## Console Output Examples
 
@@ -771,7 +835,7 @@ MigrationService (Business Logic)
 1. Fork the repository
 2. Create a feature branch
 3. Make your changes with tests
-4. Ensure all tests pass: `nx test nx-surrealdb-migrations`
+4. Ensure all tests pass: `nx test nx-surrealdb`
 5. Submit a pull request
 
 ## License
@@ -780,6 +844,6 @@ MIT License - see LICENSE file for details.
 
 ## Support
 
-- [GitHub Issues](https://github.com/your-org/nx-surrealdb-migrations/issues)
-- [Documentation](https://docs.your-domain.com/nx-surrealdb-migrations)
+- [GitHub Issues](https://github.com/idancelive/idance/issues)
+- [Documentation](https://github.com/idancelive/idance/tree/main/tools/plugins/nx-surrealdb)
 - [SurrealDB Community](https://surrealdb.com/community)

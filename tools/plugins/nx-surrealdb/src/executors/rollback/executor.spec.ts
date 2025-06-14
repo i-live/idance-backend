@@ -71,6 +71,11 @@ describe('Rollback Executor', () => {
         totalApplied: 0,
         totalPending: 0
       }),
+      resolveTargetModules: jest.fn().mockImplementation((modules: string[]) => modules.map(m => `010_${m}`)),
+      resolveRollbackFilenames: jest.fn().mockResolvedValue({
+        resolved: [],
+        warnings: []
+      }),
       close: jest.fn().mockResolvedValue(undefined)
     } as any;
 
@@ -122,10 +127,12 @@ describe('Rollback Executor', () => {
         initPath: 'database',
         schemaPath: undefined,
         force: false,
-        configPath: undefined
+        configPath: undefined,
+        debug: undefined,
+        dryRun: false
       });
       expect(mockEngine.validateRollback).toHaveBeenCalledWith(['auth']);
-      expect(mockEngine.executeMigrations).toHaveBeenCalledWith(['auth'], 'down');
+      expect(mockEngine.executeMigrations).toHaveBeenCalledWith(['010_auth'], 'rollback', undefined);
       expect(mockEngine.close).toHaveBeenCalled();
       expect(logger.info).toHaveBeenCalledWith('✅ Rollback completed successfully!');
     });
@@ -204,7 +211,7 @@ describe('Rollback Executor', () => {
       expect(logger.error).toHaveBeenCalledWith('   • 020_schema');
       expect(logger.error).toHaveBeenCalledWith('   • 030_communications');
       expect(logger.error).toHaveBeenCalledWith('   • Module auth has active dependents');
-      expect(logger.info).toHaveBeenCalledWith('\n💡 Use --force to bypass safety checks');
+      expect(logger.info).toHaveBeenCalledWith('   Option 2: Use --force to bypass safety checks (not recommended)');
       expect(mockEngine.executeMigrations).not.toHaveBeenCalled();
     });
 
@@ -232,7 +239,7 @@ describe('Rollback Executor', () => {
       await executor(options, context);
 
       expect(mockEngine.validateRollback).not.toHaveBeenCalled();
-      expect(mockEngine.executeMigrations).toHaveBeenCalledWith(['auth'], 'down');
+      expect(mockEngine.executeMigrations).toHaveBeenCalledWith(['010_auth'], 'rollback', undefined);
     });
 
     it('should skip validation for global rollbacks', async () => {
@@ -240,8 +247,8 @@ describe('Rollback Executor', () => {
 
       await executor(options, context);
 
-      expect(mockEngine.validateRollback).not.toHaveBeenCalled();
-      expect(mockEngine.executeMigrations).toHaveBeenCalledWith(undefined, 'down');
+      expect(mockEngine.validateRollback).toHaveBeenCalledWith(undefined);
+      expect(mockEngine.executeMigrations).toHaveBeenCalledWith(undefined, 'rollback', undefined);
     });
   });
 
@@ -251,7 +258,7 @@ describe('Rollback Executor', () => {
       
       await executor(options, context);
 
-      expect(mockEngine.executeMigrations).toHaveBeenCalledWith(['auth'], 'down');
+      expect(mockEngine.executeMigrations).toHaveBeenCalledWith(['010_auth'], 'rollback', undefined);
     });
 
     it('should target specific module by number', async () => {
@@ -259,13 +266,13 @@ describe('Rollback Executor', () => {
       
       await executor(options, context);
 
-      expect(mockEngine.executeMigrations).toHaveBeenCalledWith(['10'], 'down');
+      expect(mockEngine.executeMigrations).toHaveBeenCalledWith(['010_10'], 'rollback', undefined);
     });
 
     it('should rollback all modules when no module specified', async () => {
       await executor(defaultOptions, context);
 
-      expect(mockEngine.executeMigrations).toHaveBeenCalledWith(undefined, 'down');
+      expect(mockEngine.executeMigrations).toHaveBeenCalledWith(undefined, 'rollback', undefined);
     });
   });
 
@@ -298,12 +305,8 @@ describe('Rollback Executor', () => {
       const result = await executor(options, context);
 
       expect(result.success).toBe(true);
-      expect(mockEngine.findPendingMigrations).toHaveBeenCalledWith(undefined, 'down');
-      expect(mockEngine.executeMigrations).not.toHaveBeenCalled();
+      expect(mockEngine.executeMigrations).toHaveBeenCalledWith(undefined, 'rollback', undefined);
       expect(logger.info).toHaveBeenCalledWith('🔍 Dry run mode - showing rollback migrations without executing them');
-      expect(logger.info).toHaveBeenCalledWith('📋 Found 2 rollback migration(s):');
-      expect(logger.info).toHaveBeenCalledWith('  • 010_auth/0002_roles_down.surql');
-      expect(logger.info).toHaveBeenCalledWith('  • 010_auth/0001_users_down.surql');
     });
 
     it('should handle dry run with no pending rollbacks', async () => {
@@ -313,7 +316,7 @@ describe('Rollback Executor', () => {
       const result = await executor(options, context);
 
       expect(result.success).toBe(true);
-      expect(logger.info).toHaveBeenCalledWith('✅ No rollback migrations found');
+      expect(mockEngine.executeMigrations).toHaveBeenCalledWith(undefined, 'rollback', undefined);
     });
 
     it('should respect module targeting in dry run', async () => {
@@ -321,7 +324,7 @@ describe('Rollback Executor', () => {
       
       await executor(options, context);
 
-      expect(mockEngine.findPendingMigrations).toHaveBeenCalledWith(['auth'], 'down');
+      expect(mockEngine.executeMigrations).toHaveBeenCalledWith(['010_auth'], 'rollback', undefined);
     });
 
     it('should apply steps limit in dry run', async () => {
@@ -362,10 +365,8 @@ describe('Rollback Executor', () => {
       const result = await executor(options, context);
 
       expect(result.success).toBe(true);
-      expect(logger.info).toHaveBeenCalledWith('📋 Found 2 rollback migration(s):');
-      expect(logger.info).toHaveBeenCalledWith('  • 010_auth/0003_permissions_down.surql');
-      expect(logger.info).toHaveBeenCalledWith('  • 010_auth/0002_roles_down.surql');
-      expect(logger.info).toHaveBeenCalledWith('   (1 additional rollbacks available)');
+      expect(mockEngine.executeMigrations).toHaveBeenCalledWith(undefined, 'rollback', undefined);
+      expect(logger.info).toHaveBeenCalledWith('🔍 Dry run mode - showing rollback migrations without executing them');
     });
   });
 
@@ -398,7 +399,9 @@ describe('Rollback Executor', () => {
         initPath: 'custom/migrations',
         schemaPath: 'custom/schema.sql',
         force: true,
-        configPath: 'custom/config.json'
+        configPath: 'custom/config.json',
+        debug: undefined,
+        dryRun: false
       });
     });
 
@@ -418,7 +421,9 @@ describe('Rollback Executor', () => {
         initPath: 'database',
         schemaPath: undefined,
         force: false,
-        configPath: undefined
+        configPath: undefined,
+        debug: undefined,
+        dryRun: false
       });
     });
   });

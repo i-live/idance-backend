@@ -1,6 +1,8 @@
 import { MigrationFileProcessor } from './migration-file-processor';
 import { DependencyResolver } from '../domain/dependency-resolver';
 import { Debug } from '../infrastructure/debug';
+import * as fs from 'fs/promises';
+import * as path from 'path';
 
 export interface PatternResolutionResult<T> {
   resolved: T[];
@@ -192,25 +194,30 @@ export class PatternResolver {
     const migration = MigrationFileProcessor.parseMigrationFile(filename);
     if (!migration) return false;
 
-    // Remove leading zeros for comparison
-    const normalizedPattern = pattern.replace(/^0+/, '');
+    const lowerPattern = pattern.toLowerCase();
+    const lowerFilename = filename.toLowerCase();
+    
+    // For exact filename matches, don't remove leading zeros
+    if (lowerFilename === lowerPattern || lowerFilename === `${lowerPattern}.surql`) {
+      return true;
+    }
+    
+    // For numeric and name patterns, apply normalization
+    const normalizedPattern = pattern.replace(/^0+/, '').toLowerCase();
     const normalizedNumber = parseInt(migration.number, 10).toString();
+    const normalizedMigrationName = migration.name.toLowerCase();
 
     return (
-      filename.toLowerCase() === pattern.toLowerCase() ||
-      filename.toLowerCase() === `${pattern.toLowerCase()}.surql` ||
       normalizedPattern === normalizedNumber ||
-      normalizedPattern === migration.name.toLowerCase() ||
-      normalizedPattern === `${normalizedNumber}_${migration.name.toLowerCase()}` ||
-      normalizedPattern === `${migration.number}_${migration.name.toLowerCase()}`
+      normalizedPattern === normalizedMigrationName ||
+      normalizedMigrationName.includes(normalizedPattern) || // Substring matching
+      normalizedPattern === `${normalizedNumber}_${normalizedMigrationName}` ||
+      normalizedPattern === `${migration.number}_${normalizedMigrationName}`
     );
   }
 
   private async getModuleFiles(moduleId: string, direction: 'up' | 'down'): Promise<string[]> {
     try {
-      const fs = await import('fs/promises');
-      const path = await import('path');
-      
       const modulePath = path.join(this.basePath, moduleId);
       const files = await fs.readdir(modulePath);
       

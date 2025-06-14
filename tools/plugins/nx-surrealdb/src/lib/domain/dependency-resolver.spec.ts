@@ -182,7 +182,7 @@ describe('DependencyResolver', () => {
     it('should allow rollback when dependents are in target list', () => {
       const validation = resolver.validateRollback('000_admin', ['000_admin', '010_auth', '020_schema']);
       
-      expect(validation.canRollback).toBe(false); // Still blocked because 010_auth depends on it
+      expect(validation.canRollback).toBe(true); // Allowed because all dependents are also being rolled back
     });
 
     it('should handle non-existent module', () => {
