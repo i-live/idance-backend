@@ -9,9 +9,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Lint all code: `nx run-many --target=lint --all` or `pnpm lint`
 - Type check: `nx run-many --target=type-check --all` or `pnpm type-check`
 - Run all tests: `nx run-many --target=test --all` or `pnpm test`
-- Run specific app tests: `nx run backoffice:test`
-- Run package tests: `nx run nx-surrealdb-migrations:test`
-- Run single test file: `nx run nx-surrealdb-migrations:test --testFile=src/lib/client.spec.ts`
+- Run package tests: `nx run nx-surrealdb:test`
+- Run single test file: `nx run nx-surrealdb:test --testFile=src/lib/client.spec.ts`
 - Run database migrations: `pnpm db:migrate`
 
 ## Code Style Guidelines
@@ -140,10 +139,10 @@ Always include usage updates in responses showing:
 4. Follow the exact commands and patterns documented here
 
 ## Package Development
-**IMPORTANT:** When making changes to NX packages (e.g., nx-surrealdb-migrations):
+**IMPORTANT:** When making changes to NX packages (e.g., nx-surrealdb):
 1. Always build the package after making changes: `nx run <package-name>:build`
 2. Changes won't take effect until the package is built
-3. Example: `nx run nx-surrealdb-migrations:build`
+3. Example: `nx run nx-surrealdb:build`
 4. This applies to all code changes in packages/ directory
 
 **CRITICAL - NEVER EDIT COMPILED FILES:**
