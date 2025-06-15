@@ -3,6 +3,7 @@
 .env.local filter=git-crypt diff=git-crypt
 .env.production filter=git-crypt diff=git-crypt
 .env.staging filter=git-crypt diff=git-crypt
+.env.mcp filter=git-crypt diff=git-crypt
 # Note: .env.example files are NOT encrypted (they're templates)
 
 # Text files
