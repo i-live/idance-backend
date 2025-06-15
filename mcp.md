@@ -14,8 +14,8 @@ claude mcp add context7 "npx -y @upstash/context7-mcp" --scope user
 
 ### Firecrawl Web Tools
 ```bash
-# Web scraping and crawling (requires FIRECRAWL_API_KEY)
-claude mcp add firecrawl "npx -y firecrawl-mcp" --scope user --env FIRECRAWL_API_KEY=your_api_key_here
+# Web scraping and crawling (requires FIRECRAWL_API_KEY from .env.mcp)
+claude mcp add firecrawl "npx -y firecrawl-mcp" --scope user --env FIRECRAWL_API_KEY=<from_.env.mcp>
 ```
 
 ### Gmail Integration
@@ -34,6 +34,12 @@ claude mcp add nx-mcp "http://localhost:9730/mcp" --scope user --transport http
 ```bash
 # Web scraping with Bright Data (requires multiple env vars - see .env.mcp)
 claude mcp add brightdata "npx -y @brightdata/mcp" --scope user --env API_TOKEN=<from_.env.mcp> --env WEB_UNLOCKER_ZONE=<from_.env.mcp> --env BROWSER_AUTH=<from_.env.mcp>
+```
+
+### Brave Search
+```bash
+# Brave search engine (requires BRAVE_API_KEY from .env.mcp)
+claude mcp add brave-search "npx -y brave-search-mcp" --scope user --env BRAVE_API_KEY=<from_.env.mcp>
 ```
 
 ## Available MCP Functions by Category
@@ -94,6 +100,8 @@ echo ".env.mcp filter=git-crypt diff=git-crypt" >> .gitattributes
 # API_TOKEN=<bright_data_api_token>
 # WEB_UNLOCKER_ZONE=<zone_name>
 # BROWSER_AUTH=<browser_websocket_url>
+# FIRECRAWL_API_KEY=<firecrawl_api_key>
+# BRAVE_API_KEY=<brave_search_api_key>
 ```
 
 ## Example Usage
@@ -101,10 +109,11 @@ echo ".env.mcp filter=git-crypt diff=git-crypt" >> .gitattributes
 To add all servers to your project:
 ```bash
 claude mcp add context7 "npx -y @upstash/context7-mcp" --scope project
-claude mcp add firecrawl "npx -y firecrawl-mcp" --scope project --env FIRECRAWL_API_KEY=your_api_key_here
+claude mcp add firecrawl "npx -y firecrawl-mcp" --scope project --env FIRECRAWL_API_KEY=<from_.env.mcp>
 claude mcp add gmail "npx -y @gongrzhe/server-gmail-autoauth-mcp" --scope project
 claude mcp add nx-mcp "http://localhost:9730/mcp" --scope project --transport http
 claude mcp add brightdata "npx -y @brightdata/mcp" --scope project --env API_TOKEN=<from_.env.mcp> --env WEB_UNLOCKER_ZONE=<from_.env.mcp> --env BROWSER_AUTH=<from_.env.mcp>
+claude mcp add brave-search "npx -y brave-search-mcp" --scope project --env BRAVE_API_KEY=<from_.env.mcp>
 ```
 
 This would create/update a `.mcp.json` file in your project root with these MCP server configurations.
